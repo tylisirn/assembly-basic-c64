@@ -1,0 +1,824 @@
+Assembly BASIC for the Commodore 64
+Implementation design for an integer and string BASIC ROM cartridge
+Implementation status: working development cartridge; the full version-one release is not complete. See Appendix B for measured implementation facts, explicit differences and pending acceptance work.
+Design specification  |  Version 0.4  |  9 October 2026
+Implement Assembly BASIC as a normal 16 KB autostart cartridge containing the editor, tokenizer, compiler and an execution runtime image. Copy the execution helpers to upper RAM and run compiled programs with cartridge and KERNAL ROM banked out. Numbered lines retain compact binary source tokens beside native 6510 code. Every native body ends with JMP to the next line’s stable executable entry; its operand also serves as the linked-list next pointer. LIST expands the tokens into canonical PETSCII source.
+Use a seven-byte stable anchor per line and a single allocation containing its tokens and native body. Bind full identifiers to an interned name dictionary. Keywords, operators and the first 128 name references each occupy one byte; valid integer immediates are binary values. Runtime calls use fixed addresses in the copied RAM image. A small gateway in permanently visible RAM handles ROM access, KERNAL calls and interrupt transitions.
+Version 0.3 replaces the earlier ROM-resident execution model, 32-byte nodes and stock BASIC token storage. It adds RAM beneath both cartridge ROM and KERNAL to the allocation map, removes persistent statement and relocation tables, and adopts the custom source format specified in Appendix A. Source and file tokens have no binary compatibility requirement with stock BASIC. Familiar BASIC syntax, integer/string behavior and device interaction remain the compatibility goals.
+Full identifiers, $-prefixed hexadecimal constants and modulo-65536 arithmetic remain part of the language. Decimal 53248 and hexadecimal $D000 both store the word $D000, displayed as -12288. V=53248:POKE V+33,1 and V=$D000:POKE V+33,1 both write 1 to I/O address $D021 under the execution map. The fixed runtime and cartridge size budgets are engineering targets that require implementation measurements.
+1 Requirements and architectural decisions
+Requirement
+Implementation decision
+Tokenize on entry
+Use custom one-byte token codes, interned name references and binary integer immediates; Appendix A is normative.
+Generate runnable assembly
+Emit documented NMOS 6502 machine code immediately after tokenization; share semantic operations through copied RAM helpers.
+Expand program RAM
+Bank ROM out for execution with port bits 2..0 equal to 101; keep I/O visible and reserve an execution image at the top of RAM.
+Link lines in numeric order
+Use the final JMP operand as both the execution successor and the sorted linked-list next pointer.
+Compact line metadata
+Seven-byte stable entry plus one token-length byte and a two-byte shared allocation header; derive body length and trailer location.
+Integer and string variables
+16-bit words with signed interpretation and wrapping arithmetic, and strings up to 255 bytes; every identifier character is significant.
+LIST canonical source
+Expand custom codes and dictionary names, format binary values, and preserve raw string/comment bytes.
+Replace stock BASIC
+Standard 16 KB cartridge with /GAME and /EXROM low; no cartridge RAM or bank-control hardware is required.
+
+The cartridge stores both the command firmware and the load image of the RAM runtime. Compilation, listing, editing, execution and file conversion occur on the C64. No external compiler is needed. The CPU banking port can hide a normal cartridge without changing its /GAME or /EXROM wiring. RAM at $D000-$DFFF is deliberately excluded from user allocation because the execution map keeps hardware I/O visible. [8]
+Native code does not call the stock BASIC evaluator. Assembly BASIC supplies its own integer math, strings, arrays, control flow, numeric conversion and BASIC-level I/O adapters. KERNAL remains available through a common-RAM bank gateway, with ROM mapped only for the duration of each service or command operation. Ordinary arithmetic, branches and line chaining stay in RAM.
+2 Compatibility contract
+Source syntax and identifiers
+Accept decimal line numbers 0 through 63999, colon-separated statements, optional LET, PRINT abbreviated as ?, standalone BASIC V2 keyword abbreviations, quoted PETSCII strings, REM, DATA, decimal and $-prefixed hexadecimal immediates, and the usual statement and expression punctuation. Line numbers remain unsigned decimal compiler metadata, not wrapped integer expressions; hexadecimal line labels and hexadecimal GOTO targets are not added.
+Identifiers consist of a letter followed by letters or digits and an optional final % or $ suffix. Every character is significant. Canonicalize letters to uppercase for comparison, so Score and SCORE are the same variable while SCORE and SCORETOTAL are distinct. The name dictionary stores a one-byte length and up to 255 name bytes, including the suffix; there is no two-character aliasing or shorter name limit. Interactive entry remains bounded by the screen editor’s 80-character line limit. Imported compact source can refer to a longer dictionary name without repeating its spelling in each line. Numeric names without a suffix and names ending in % remain distinct namespaces, both holding 16-bit words. Names ending in $ are strings; scalars and arrays are distinct entries. Unassigned values are zero or an empty string. This intentionally replaces stock BASIC V2’s two-character identity rule. [4]
+The lexer consumes a complete identifier before testing the reserved-word table. Only an exact reserved name becomes a keyword token; embedded keywords are ordinary name characters, allowing TOTAL, COSMIC and SCORE. Exact keywords and special variables such as PRINT, LEFT$, TI and TI$ remain reserved. Keyword abbreviations are accepted only as standalone keyword lexemes. Require a separator between a keyword and an identifier or decimal target: PRINT A and GOTO 30 are valid, whereas PRINTA and GOTO30 denote identifiers. Likewise use DEF FN DOUBLED(X)=X*2 and FN DOUBLED(3) for a full function name. PRINT#, INPUT#, GET#, TAB( and SPC( retain their punctuation forms.
+Area
+Version 1 contract
+Preserved
+Numbered editing, familiar BASIC source syntax, strings, arrays, line control flow, PETSCII screen interaction and KERNAL device I/O.
+Changed
+Full-length name identity and keyword boundaries; decimal/hex word literals; unsuffixed numeric variables, division, wrapping arithmetic and signed formatting.
+Unsupported numeric features
+Fractional constants, E-format constants, π, RND, SIN, COS, TAN, ATN, EXP, LOG and SQR have no floating-point fallback.
+Internal binary compatibility
+Stock tokens, variable tables, program-memory addresses, BASIC ROM entry points and extensions are incompatible; Appendix A defines the replacement format.
+External source files
+Versioned Assembly BASIC source container with a name dictionary and binary token records; canonical text is the exchange representation.
+Machine-code interaction
+SYS/USR enter the RAM map; KERNAL services require the documented bank gateway. Stock BASIC internals and unguarded ROM calls are outside the contract.
+
+Word literals and integer semantics
+Each numeric value is a 16-bit word. Its signed interpretation is u when u is below 32768 and u-65536 otherwise, where u is the unsigned bit pattern. Decimal immediates accept magnitudes 0 through 65535 in every numeric expression, assignment and array element, without a special address-only syntax. Thus 32768 stores -32768, 53248 stores -12288, and 65535 stores -1. A leading sign is the ordinary unary operator: -32768 is valid and -65535 evaluates to 1. Reject a literal magnitude above 65535 with ?ILLEGAL QUANTITY rather than silently reducing an oversized source constant.
+Hexadecimal immediates use $ followed by one through four hexadecimal digits, accepting A-F in either case. $D000, $d000 and decimal 53248 produce the identical word. Hex constants are allowed wherever a numeric expression is allowed, including POKE values, subscripts, DATA numeric fields and function arguments. A bare $ or an attached nonhex character raises ?SYNTAX ERROR; more than four digits raises ?ILLEGAL QUANTITY. Require a delimiter after the digits. A trailing $ on an identifier still marks a string variable, so VALUE$=$D000 is a type mismatch rather than a different numeric declaration.
+Addition, subtraction, multiplication, unary negation and nonnegative-integer exponentiation return the low 16 bits of the mathematical result. This modulo-65536 rule is uniform for variables and constants: 32767+1 becomes -32768, 65535+1 becomes 0, and $FFFF*2 becomes -2. Arithmetic wrap is normal behavior and does not raise ?OVERFLOW. Constant folding uses the same reductions at each operation. The low word of a signed and an unsigned product is identical, so multiplication does not require a separate unsigned variable type.
+Division interprets both operand words as signed integers and truncates toward zero: 5/2 is 2, -5/2 is -2, and 65535/2 is 0 because 65535 is -1 as an operand. Division by zero raises ?DIVISION BY ZERO. Reduce the quotient to 16 bits, including -32768/-1 becoming -32768. ABS also uses wrapped negation, so ABS(-32768) is -32768; document this boundary case explicitly. INT is the identity, SGN uses signed interpretation, and ^ requires a nonnegative signed exponent. Define x^0 as 1, including 0^0. Negative exponents remain unsupported.
+PRINT and STR$ display signed decimal values, preserving Commodore’s leading positive space and PRINT separator behavior; PRINT $D000 displays -12288. Numeric INPUT and VAL use a shared decoder accepting an optional sign and a decimal magnitude up to 65535 or a $ hex literal. Apply the sign modulo 65536 and select the radix before checking decimal exponent syntax; E in $1E2 is a valid hex digit. READ consumes binary DATA values directly, using that decoder only for preserved text fields where conversion is required. VAL retains longest-integer-prefix behavior for ordinary trailing text but rejects malformed hex, oversized magnitudes, fractional continuations and exponent continuations. Fractional and scientific forms remain listable but trap when evaluated.
+Preserve BASIC V2 precedence and evaluation order, including exponentiation versus unary minus, NOT after comparisons, and eager AND and OR. Derive associativity and chained-comparison handling from the stock parser and freeze them in differential tests. Relational results are -1 or 0; IF treats any nonzero integer as true. AND, OR and NOT operate on all 16 bits without arithmetic overflow. Numeric and string operands cannot be mixed except through explicit conversion. String comparisons use unsigned PETSCII byte order and then length. [5]
+Unsigned addresses and special values
+PEEK, POKE, WAIT and SYS evaluate their address expression with the ordinary word rules and reinterpret its final 16 bits as an unsigned address from $0000 through $FFFF. They must not reject a negative signed representation or sign-extend it into a larger address. No address-only literal exception is needed. The same rule works for direct constants, variables, array elements and computed expressions, including POKE 53248+33,1 and POKE $D000+$21,$01.
+Expression or statement
+Required result
+V=53248 or V=$D000
+V stores bytes $00,$D0; signed value -12288.
+V+33
+Word $D021; signed value -12255; address 53281.
+V=53248:POKE V+33,1
+Write byte $01 to CPU address $D021.
+V=$D000:POKE V+$21,$01
+Same address and byte as the decimal form.
+V=$7FFF:V=V+1
+V becomes $8000, displayed as -32768; valid as address $8000.
+V=$FFFF:V=V+1
+V becomes $0000; addition wraps at the word boundary.
+
+Signed interpretation still governs comparisons, division, loop limits and ordinary quantity checks; V=$D000 therefore makes V<0 true. POKE values, WAIT masks and CHR$ arguments must evaluate to a signed value in 0 through 255 before conversion to a byte; reject $FFFF instead of silently storing $FF. Array subscripts, DIM sizes and allocation counts likewise undergo semantic bounds checks and wider checked size calculations. Wrapping arithmetic does not authorize pointer, allocator or block-size overflow. USR takes a word value and uses a separately configured call vector, not an address argument.
+Keep ST as the KERNAL status byte and TI$ as the full six-digit time string backed by the KERNAL clock. Numeric TI returns the low 16 bits of the jiffy clock interpreted as signed; it is explicitly not stock TI’s full-range value. Only TI$ is assignable for setting the clock. FRE(0) returns the total free user-arena bytes after collection as a 16-bit word. Counts above 32767 display as negative under signed PRINT; the READY banner uses a separate unsigned formatter. The count excludes workspace, runtime, anchors already allocated and reserved graphics or machine-code regions. POS, TAB and SPC keep their screen-related roles with integer arguments.
+3 Cartridge hardware and system entry
+Normal cartridge and CPU maps
+Use a standard 16 KB cartridge decoding ROML at $8000-$9FFF and ROMH at $A000-$BFFF, with /GAME and /EXROM tied low. The normal command configuration has LORAM, HIRAM and CHAREN set. It exposes the cartridge, I/O and KERNAL, hiding stock BASIC. Preserve cassette-related upper port bits and make bits 0..2 of the direction register outputs. This is normal cartridge mode. [1, 8]
+Mode
+Port bits 2..0
+CPU mapping
+Command and KERNAL service
+111, typically $37
+Cartridge at $8000-$BFFF; I/O at $D000-$DFFF; KERNAL at $E000-$FFFF.
+Native execution
+101, typically $35
+RAM at $8000-$BFFF and $E000-$FFFF; I/O stays visible at $D000-$DFFF.
+All RAM for diagnostics
+100, typically $34
+RAM also replaces I/O; this is not the supported language execution map.
+
+With a normal 16 KB cartridge, $35 banks out both cartridge windows and KERNAL while retaining I/O; $34 hides I/O as well. Use the exact 16 KB cartridge map rather than assuming that all ROM-off configurations preserve device access. Writes through ROM windows reach underlying RAM in the command map. Graphics visibility is governed separately by the VIC-II map. [8]
+; Cartridge image begins at $8000
+.word cold_start
+.word cartridge_nmi_warm
+.byte $C3,$C2,$CD,$38,$30   ; CBM80 signature
+
+The KERNAL recognizes this signature before its ordinary initialization and transfers through $8000. Initialize the machine explicitly. Keep defensive cold/warm vector words at $A000 and $A002 for the verified KERNAL recovery paths, but expose no stock BASIC ROM ABI. [2, 6]
+Cold start and copying the execution image
+Disable IRQs, clear decimal mode and establish a bounded hardware stack. Set the port direction and command map, preserving cassette control bits. Perform the audited IOINIT, RAMTAS, RESTOR and CINT startup sequence. Allocate language state and install hooks only after RAMTAS has cleared its work areas. Use explicit language memory boundaries rather than accepting the cartridge-aware RAM test as the allocator limit. [3, 6]
+Link the execution image for fixed run addresses $E400-$FFF9 (runtime ABI 2). Store a deterministic LZSS-compressed load image in the standard cartridge and decompress it through common-RAM read gates at cold start, RUN and CONT. The linker emits the RAM runtime as a separate fixed-address binary before compression; all internal calls already name its RAM run addresses. Copy the complete dependency closure, including helper code, tables, constants and diagnostics. No arbitrary relocation of ROM instructions is assumed.
+Copy the common-RAM gateway image into its reserved workspace, and write the six RAM hardware-vector bytes at $FFFA-$FFFF underneath KERNAL. The vector targets are common-RAM interrupt entries. Finish all copies and validate their build stamp/checksum before enabling IRQs. The top RAM reservation is permanent, including while the ROM is visible; allocation must never use it as temporary editing space.
+Before RUN, verify the runtime image and refresh it from ROM when required. CONT uses the same fixed helper addresses and may refresh identical bytes, but an ABI/build change or structural program change invalidates continuation. A helper copy does not recompile already valid user bodies. Hardware RESET performs cold initialization and does not promise retention.
+Common RAM gateways
+Every map-changing instruction sequence executes from $0800-$13FF, which is RAM in both maps. A ROM caller enters a low-RAM gateway before ROM is hidden; a RAM caller enters it before upper runtime RAM is covered by KERNAL. The gateway switches the map, calls the selected service, returns to low RAM, restores the caller’s map and then returns. Never bank out the instructions following STA $01 or return into a hidden runtime routine while ROM remains mapped.
+Save the caller’s low three mapping bits and interrupt state. Mask IRQs during the short map transition, preserve required register arguments/results and service carry status, and restore the requested interrupt state for long device calls. Preserve the current upper port bits on each write; a tape service can legitimately change motor control, so restoring an old full port byte would undo that change. Keep decimal mode clear on language return.
+A pointer passed to ROM must identify memory visible to ROM. Stage filenames, input buffers and file-transfer chunks in common RAM. CHROUT/CHRIN and register-only clock/status calls do not need high-memory payload pointers. The ROM compiler copies each token stream into low scratch before parsing; common-RAM read/copy gates provide access to hidden names, allocation headers and code. It may emit bytes into RAM under ROM using verified write-through behavior. [8]
+Interrupts and asynchronous breaks
+Keep IRQs active during native execution. RAM hardware IRQ/BRK and NMI vectors point to distinct common-RAM entries. The native IRQ entry saves A/X/Y and map state, enters the KERNAL map, invokes the stock IRQ path with a synthesized interrupt frame that returns to a low-RAM completion entry, restores the execution map and registers, and RTIs through the original hardware frame. The synthetic status has BRK clear and IRQ masking set. Audit stack depth and stock handler behavior on each supported KERNAL. [6]
+Leave the ordinary KERNAL IRQ RAM vector directed at the audited stock IRQ service, so an IRQ occurring during a mapped KERNAL call takes its normal ROM path. Do not redirect that vector back into the raw RAM wrapper and create recursive dispatch. Separate BRK handling from the IRQ service and transfer to a deferred error at a safe language boundary.
+NMI cannot be masked by SEI. Both the raw RAM-vector entry and the KERNAL $0318 entry preserve their documented entry frames, acknowledge the relevant CIA2 source, set a pending-abort flag and RTI. They do not allocate, edit pointers or return to READY inside a bank transition. Source polls service the request only after the mapping and allocator state are coherent. Version 1 excludes KERNAL RS-232 device 2 and arbitrary external NMI hooks until an explicit dispatcher is implemented.
+A fatal runtime error, normal termination or nonresumable abort passes through a common-RAM ENTER_READY entry. It restores the command map before jumping to the ROM prompt/error handler and resets temporary stacks and channels. STOP uses the separate continuation path. Warm recovery validates the program and reinstalls hooks. Verify the cartridge $8002 and $A002 fallback entry stack shapes against the supported KERNALs; their contracts differ from a raw RAM hardware interrupt. [6]
+4 Memory layout and allocation
+CPU address range
+Size
+Ownership and use
+$0000-$0001
+2 bytes
+6510 direction and banking port.
+$0002-$00FF
+254 bytes
+Audited split between language scratch and KERNAL/editor/device state.
+$0100-$01FF
+256 bytes
+Hardware stack for bounded helper calls and both real and synthetic interrupt frames.
+$0200-$03FF
+512 bytes
+KERNAL state, RAM vectors, input and tape buffers; preserve ownership.
+$0400-$07FF
+1 KB
+Screen RAM and sprite pointers.
+$0800-$13FF
+3 KB
+Common language workspace, bank/interrupt gateways and I/O staging buffers.
+$1400-$7FFF
+27 KB
+User arena visible in both maps; allocate stable anchors and binding records here first.
+$8000-$BFFF
+16 KB RAM
+User tokens, native bodies, names, arrays and strings beneath cartridge ROM.
+$C000-$CFFF
+4 KB
+User arena; explicitly reserve portions for machine code or graphics when needed.
+$D000-$DFFF
+4 KB window
+Hardware I/O remains mapped; underlying RAM is excluded from allocation.
+$E000-$E3FF
+1 KB RAM
+User objects beneath the lower part of KERNAL.
+$E400-$FFF9
+7162 bytes
+Copied execution helpers, tables and constants; permanently reserved.
+$FFFA-$FFFF
+6 bytes
+RAM hardware vectors beneath KERNAL.
+
+The implemented allocator has two spans: [$1400,$D000) and [$E000,$E400). Their raw total is 48 KiB (49152 bytes), before anchors, names, source, generated code, arrays, strings and free-block overhead. The $E000-$E3FF shadow span supplies 1 KiB; $E400-$FFFF is permanently reserved for the runtime and six vector bytes. This is the lower-runtime-base adjustment permitted by the original design.
+These are ABI 2 build limits. Runtime helpers have 7162 bytes at $E400-$FFF9; the measured image occupies 6549 bytes. Any future runtime-base change requires a new ABI/build identifier and recompilation. ROM-off execution remains required. No allocation may cross the I/O hole, overlap the runtime or assume visibility during a ROM gateway.
+Fixed workspace within $0800-$13FF
+Bytes
+Language state, arena heads and saved context
+256
+Input and binary-token scratch
+512
+Parser and sizing workspace
+384
+Expression values and temporary string roots
+192
+Tagged software control stack
+512
+Integer math, I/O scratch and transaction journal
+448
+Common bank/interrupt gateways and bridge buffers
+768
+Total
+3072
+
+Set initial limits of 32 expression nesting levels, 255 token bytes per stored line and eight array dimensions. GOSUB frames use three bytes and FOR frames nine bytes, so the 512-byte mixed stack has theoretical maxima of 170 GOSUB or 56 FOR frames before function activations and other overhead. There is no persistent statement-entry table or separate 63-statement limit; the token limit and bounded parser counters constrain statement count. All counters and allocations are checked before writes.
+Audit zero-page ownership for every supported KERNAL operation. Save overlapping language temporaries or avoid the locations. Place indirect-JMP pointers away from a low byte of $FF to avoid the NMOS page-boundary bug. Reserve graphics and machine-code regions through an explicit allocator reservation mechanism before allocating programs; $C000 is no longer an implicit free scratch area.
+Allocator and compact objects
+Use a coalescing, address-ordered free list per span. An allocated block has a two-byte little-endian physical byte size, including the header. There is no per-object type, owner pointer or allocated-list link. The owning anchor, symbol or descriptor supplies the type and address. A freed span stores size and next-free pointer in four bytes; ensure all allocations occupy at least four physical bytes. Strings of length one therefore consume four bytes, not three.
+Line payloads are exact-sized and unaligned: allocation header, token-length byte, tokens and code, with no padding after the final JMP. This makes the allocator’s end address the native-body end. Two-byte addresses and sizes remain necessary because the arena crosses 256-byte pages and can exceed 32767 bytes. Check physical-size addition with wider arithmetic; language word wrapping never applies to allocator sizes.
+Allocate stable line anchors in packed slabs in the common span. A slab has a shared two-byte allocation header, a two-byte next-slab pointer, a one-byte used count and 35 seven-byte slots: 250 bytes when full. Search populated slots for line numbers instead of maintaining a second per-line index. Stable binding records also remain in common RAM; their names and other movable data can use shadow RAM.
+Collection and stopped rebuilding
+The implemented runtime collector is nonmoving mark-and-sweep with free-list coalescing. It never moves string payloads, line code or native return addresses. It enumerates physical allocation boundaries and retains objects reachable from source, slabs, names/bindings, arrays/functions, descriptors, expression temporaries and live helper roots. It runs wholly within copied RAM helpers. Fragmentation can prevent allocation despite sufficient total free bytes. Stopped code compaction/rebuild remains planned and is not implemented.
+For stopped payload compaction, invalidate CONT and active function definitions, and clear values under the documented rebuild operation. Copy the at-most-255-byte source stream to scratch, reserve a nonoverlapping destination, then regenerate that line’s code there using the same stable names, anchors and RAM-helper ABI. Commit its new payload/body fields only after validation and release the old allocation afterward. Preserve its successor trailer and validate its predecessor link. Internal absolute labels, literal pointers and function entries are emitted afresh. No relocation records are retained.
+The sizing pass computes the exact destination size while the old payload remains valid. Version 1 does not destructively overlap a live source/code block to obtain compaction space. If staging or regeneration fails, retain the old line; earlier individually committed moves still form a valid program. This conservative policy can fail to compact an arena with no sufficiently large free span. NEW releases all slabs, name bindings and payloads. Total free bytes do not guarantee a successful allocation.
+5 Line representation and executable linkage
+Seven byte stable anchor
+Every entered or forward-referenced line has a stable seven-byte anchor. All words are little-endian. The executable entry is the anchor address itself. The sorted live list is represented by the native trailer operands, so the anchor stores neither a next pointer nor a previous pointer. A global head word starts traversal; RUN_END is the end sentinel.
+Offset
+Bytes
+Field
+$00
+1
+$4C, the absolute JMP opcode
+$01
+2
+Native body address for a live line; RAM UNDEFINED_LINE for a missing target
+$03
+2
+Unsigned line number, 0..63999
+$05
+2
+Payload pointer; zero means unresolved or deleted
+
+A nonzero payload is sufficient to mark a live line. Unresolved and deleted anchors have identical runtime behavior, so they need no separate state bits. Compiler diagnostics reside in generated error calls, not a node field. Use one global program-generation word for CONT invalidation; there is no per-line generation, incoming-reference count or reserved field.
+Single source and code allocation
+Location
+Bytes
+Meaning
+payload - 2
+2
+Physical allocation size, including these two header bytes
+payload
+1
+T, token-stream byte count, 1..255
+payload + 1
+T
+Authoritative custom token stream
+payload + 1 + T
+C
+Native body; C includes its final three-byte JMP
+block end - 3
+3
+$4C followed by the next live anchor or RAM RUN_END
+
+T and C in this table are byte counts, not stored fields named T and C. The body starts at payload+1+T, equal to the anchor’s JMP operand. The allocation end is payload-2+physical_size. Derive C by subtracting the body address from that end, and derive the trailer address as end-3. The fixed per-line bookkeeping is seven anchor bytes plus three payload bytes, with about 0.14 shared slab bytes per occupied slot when slabs are full. Source bytes and native code are additional.
+Reading the trailer’s operand yields the linked-list next entry. LIST and editing use a bounded common-RAM accessor when the payload is under ROM. Verify $4C before following the operand, accept only a live anchor or RUN_END, and use cycle/range checks while validating program integrity. The compiler and LIST must not use an untrusted arbitrary jump operand as a pointer without validation.
+Sequential execution takes JMP next_anchor followed by the anchor’s JMP body. This costs one additional three-cycle JMP per line boundary compared with direct body-to-body linkage, while preserving all branch targets when a line’s variable-size payload is replaced. Every physical numbered body ends with the trailer even if END, GOTO, RETURN or STOP makes it unreachable.
+Insertion replacement and deletion
+For lines 10, 30 and 50, traverse head10 through the trailer links. Inserting 20 sets line20’s trailer to anchor30 and changes line10’s trailer operand to anchor20. Replacing 30 keeps anchor30, gives its new body the saved old successor anchor50, and changes only anchor30’s body/payload fields. No independent logical next pointer can disagree with the executable successor.
+Locate predecessors by traversal rather than paying two bytes per line for a reverse link. Deleting a live line patches its predecessor trailer to its successor, or changes the head if it was first. Set the removed anchor’s payload to zero and its entry to RAM UNDEFINED_LINE, then release its source/code allocation. The runtime reports a missing target in the originating line; an unexecuted missing branch is legal.
+Keep unresolved and deleted anchor slots until NEW or an explicit complete rebuild. This removes reference counts, incoming-reference lists and reclamation work from normal edits. It can retain memory for many historical line numbers; report that slab occupancy separately. An optional stopped sweep may scan branch tokens and release unused slots, but it is not required for version 1 and must never reuse a still-referenced anchor.
+Eliminating persistent auxiliary tables
+GOSUB, FOR and STOP continuations hold native PCs. A running or suspended program’s code never moves; edits, LOAD, NEW and stopped rebuilding invalidate all saved continuations before structural changes. Continuation entries emit their own source-context setup. This removes statement ordinal/offset tables from every line and shortens software frames.
+DATA cursors scan typed source tokens using an anchor and one-byte token offset; no per-line DATA index is stored. Line anchors and stable cells keep inter-line and variable targets fixed. Rebuilding code from retained tokens resolves internal labels, literals and function entries, so persistent relocation records are also unnecessary. The price is compile work during stopped compaction and linear searches during editing and DATA traversal.
+6 Tokenization and canonical listing
+Compact binary source
+Appendix A defines custom format version 1. Punctuation and keyword codes occupy one byte. A reference to interned name IDs 0..127 also occupies one byte; larger name IDs use a three-byte extended reference. Most small programs therefore use one byte for every nonliteral token. An unbounded full-name namespace cannot be represented by a single global byte, so the explicit extended form avoids a 128-name language limit.
+Tokenize valid decimal and hexadecimal numbers into binary words during entry. Decimal 0..15 has a one-byte compact code; 16..255 uses a code plus one value byte; 256..65535 uses a code plus two little-endian bytes. A hexadecimal immediate uses a distinct code plus two bytes, preserving its radix for LIST. No ordinary valid numeric occurrence retains decimal digit text. Leading signs remain operator tokens.
+Intern each full uppercase name once and store its ID in the token stream. The name dictionary retains its full spelling, suffix and length. Array/scalar usage is determined by syntax and binding kind, so the same name ID can refer to distinct scalar and array records. Strings, comments, nonnumeric DATA fields and malformed/unsupported numeric spellings use bounded length-prefixed payload tokens. Their payload bytes can have any value without being mistaken for token codes.
+Interactive entry accepts at most 80 PETSCII characters per logical screen-editor line. Stored token streams have a byte length from 1 through 255, independent of expanded character length. Import can therefore contain a long dictionary name that occupies one token byte. Runtime strings may reach 255 bytes, but a single source-literal payload must still fit inside its line’s 255-byte token budget. Reject input or token expansion beyond the applicable limit explicitly.
+Tokenization removes outside-literal whitespace and abbreviations. It validates full identifier boundaries and numeric magnitudes before choosing the smallest encoding. Keep a bounded temporary parser representation or parse twice for sizing and emission; no full AST persists. Dictionary allocation is part of the edit transaction, and malformed input is stored only through defined raw/recovery forms, never as arbitrary bytes mixed into the instruction vocabulary.
+DATA representation
+Within DATA, numeric fields use the same binary immediate codes and optional unary sign. Quoted strings use string tokens; nonnumeric unquoted fields use DATA_TEXT. Commas and the unquoted colon are ordinary delimiter tokens. READ consumes typed fields directly for numeric destinations, avoiding repeated numeric parsing of canonical integer DATA.
+A numeric DATA field may also be read into a string. Preserve its original trimmed field spelling only when it differs from the canonical expansion, using the optional DATA_SPELLING payload after the binary value. For example DATA 001 stores binary 1 plus the spelling 001, so READ A$ still obtains 001. Canonical DATA 53248 needs no spelling payload: its binary value is signed -12288 for READ A, while unsigned source expansion 53248 supplies READ A$. This exception stores formatting evidence, not a second numeric representation to evaluate.
+Test trimming, quoted/unquoted fields, signs and empty fields against the chosen BASIC compatibility subset. A DATA_SPELLING record must preserve the binary field’s unsigned magnitude, radix and optional sign; compare the complete field, not its immediate before unary negation. Reject mismatches on file import. Unsupported floating numeric DATA is listable as NUMTEXT and traps when consumed as a number; reading its preserved text into a string remains possible.
+Canonical LIST rules
+LIST traverses the live trailer chain, prints decimal line numbers, and expands codes and dictionary names. Use uppercase keywords/full identifiers, safe spaces around operators and after commas, and a single separator space around colons. Keep an explicit LET if entered. Expand ? and standalone keyword abbreviations. Decimal binary immediates print their unsigned source magnitude with no leading zeros; hex immediates print $ followed by four uppercase digits. PRINT and STR$ continue to use signed runtime formatting.
+Thus an entered 0001 becomes 1 in ordinary source, $d becomes $000D, and decimal 53248 never becomes -12288 merely because its runtime word is negative. Preserve exact string/comment and DATA_TEXT bytes. In DATA, keep a unary sign adjacent to its number; when DATA_SPELLING exists, print it as the whole field instead of the default sign/value expansion. This preserves READ into strings without duplicating the displayed number. Invalid or unsupported spellings remain visible through their recovery tokens. No original whitespace or spelling copy is stored for normal tokens.
+Entered:  10 ?scoretotal%+0001:goto 30
+LIST:     10 PRINT SCORETOTAL% + 1 : GOTO 30
+
+Entered:  20 a$="PRINT : DATA":rem keep  these bytes
+LIST:     20 A$ = "PRINT : DATA" : REM keep  these bytes
+
+Entered:  30 video=$d000:poke video+33,1
+LIST:     30 VIDEO = $D000 : POKE VIDEO + 33, 1
+
+Tokenizing a canonical listing with the same name dictionary must reproduce identical canonical tokens for valid source. With a rebuilt dictionary, compare token meaning and full names after ID remapping. Keep recovery forms distinguishable; they need not promise byte-identical spelling repair beyond their preserved raw spans. LIST works even when the corresponding native body contains a syntax or unsupported-feature stub.
+7 Compile on entry and transactional editing
+Treat a numbered edit as a transaction. Traverse to locate the stable anchor, predecessor and current successor; tokenize into scratch; intern names; reserve forward-target anchors; parse, bind and size; allocate an exact source/code payload; then emit the native body. A counting pass and emitting pass use the same parser and helper ABI. Verify the generated body starts immediately after tokens and ends with the successor JMP.
+Parsing discovers static types and native templates without a whole-program pass. DIM and DEF FN bind stable records but allocate array payloads or activate definitions at runtime. Forward GOTO/GOSUB targets reserve empty anchor slots. Dynamic array and control-stack validity is checked while executing.
+Retain malformed and unsupported source in defined tokens so it can be LISTed and repaired. Generate an error call at the first reached invalid statement or expression, preserving valid earlier work and an enclosing false IF path. If a safe statement boundary cannot be recovered, emit a whole-line syntax stub. Resource failure rolls back the edit and preserves the previous source/code payload; it does not discard the old line to obtain space.
+Edit
+Commit changes
+Insert
+Publish payload and anchor entry; patch predecessor trailer or head. New trailer already points to successor.
+Replace
+Publish existing anchor’s new payload/body fields. The new trailer retains the old successor.
+Delete
+Patch predecessor trailer or head, clear payload pointer, set entry undefined, release old payload.
+Append
+Patch former tail to new anchor. New trailer points to RAM RUN_END.
+
+Commit only while execution is stopped. Set EDIT_BUSY, mask IRQs briefly, publish the pointer/operand changes from common RAM, restore IRQ state and clear EDIT_BUSY. NMI only records a pending request. Free superseded payloads after publication. Long compilation, hidden-RAM copies, I/O and collection occur outside the short critical interval. Staged name/binding allocations must roll back safely; unused reserved anchor slots may be retained as harmless tombstones.
+Successful numbered edits clear values, array payloads, active function definitions and software execution stacks, invalidate CONT, and increment the global generation word. Stable binding cells remain because other code embeds their addresses. CLR clears values without destroying bindings or bodies; NEW destroys the whole program. Generation wrap is safe because edits explicitly discard saved continuations.
+8 Native code generation and calling convention
+Compiler structure
+Use a hand-written, bounded precedence parser and statement parser in ROM. Maintain a compact intermediate operation sequence for one statement at a time, or generate twice from tokens. Emit direct loads, stores, arithmetic, tests and branches for common scalar operations. Call the fixed RAM helpers for multiplication, division, strings, formatting, devices, arrays and control-stack manipulation. Device helpers enter KERNAL through common RAM. Those calls implement semantic operations; they do not redispatch statement tokens.
+Fold constants with exactly the runtime modulo-65536 arithmetic and signed interpretation rules. Consume the tokenizer’s validated binary decimal/hex values directly; file validation enforces the same magnitude and canonical-encoding rules. Arithmetic wrap generates an ordinary constant; division by zero, invalid literal ranges and illegal quantities generate a runtime trap at their evaluation point. Cache a loaded scalar within a side-effect-free expression, but not across KERNAL calls, SYS, USR, input or allocation. Do not remove PEEK, WAIT or function calls when that could change hardware reads or side effects.
+Emit only documented NMOS 6502 instructions supported by the 6510. Keep decimal mode clear at every language boundary. For a conditional branch whose final destination cannot fit in -128 through +127 bytes, emit the inverse short branch over JMP absolute. A deterministic sizing pass can use long forms consistently, then optionally shorten local branches after offsets stabilize. Never truncate a displacement.
+Runtime ABI
+Interface
+Convention
+Integer value
+A is low byte; X is high byte. Y is scratch unless a specific helper documents preservation.
+Binary helper
+Right operand in A/X; left operand in named two-byte zero-page scratch. Result in A/X.
+String value
+Pointer to a registered four-byte descriptor in a named zero-page pair; no unregistered payload pointer across allocation.
+Clobbers
+A, X, Y and arithmetic flags are caller-clobbered. Each helper declares zero-page scratch and maximum hardware-stack use.
+Source context
+CURRENT_LINE anchor and a one-byte token offset are set before a trapping or blocking statement and at resumable native entries.
+Errors
+RAM ERROR transfers through common RAM to the ROM reporter; restore prompt stack baseline/channels and report the source line.
+Boundary invariant
+Expression stack empty, D clear, port bits 101 for native code, registered string roots only; KERNAL calls use a gateway.
+
+Generated bodies have a line-entry context prologue. Every native continuation entry sets source context and checks a pending break; ordinary internal paths can share the context already established. Emit a periodic poll on every potentially unbounded backedge and within long helpers, as well as at line entry. This prevents a one-line loop, WAIT or long string operation from ignoring STOP.
+Example native body
+; Source: 10 A% = A% + 1
+; A_CELL is a stable two-byte symbol cell.
+; Context setup and break polling precede this snippet.
+        CLC
+        LDA A_CELL
+        ADC #$01
+        STA A_CELL
+        LDA A_CELL+1
+        ADC #$00
+        STA A_CELL+1
+line10_trailer:
+        JMP line20_entry    ; always final three body bytes
+
+line20_entry:              ; first byte of the seven-byte anchor
+        JMP line20_body
+
+The increment above deliberately discards the final carry and ignores the signed overflow flag. It implements the same operation for a signed integer or an address word, including $7FFF->$8000 and $FFFF->$0000. Excluding context setup and the trailer, it occupies 17 bytes and takes 22 CPU cycles. The boundary trailer and entry add six cycles in two JMPs. These are instruction-level costs, not a measured overall speedup; screen output, device latency, IRQs and VIC bus stealing can dominate elapsed time.
+9 Statements and control flow
+Fall through and conditional branches
+Every native body ends physically with its patchable successor JMP, including bodies whose last source statement is END, GOTO, RETURN or STOP. Such statements transfer elsewhere before reaching the trailer, so the trailer may be unreachable. A false IF skips the rest of its physical BASIC line and reaches the trailer; it does not merely skip one colon-delimited statement. THEN followed by a line number and IF ... GOTO use a stable target anchor. Version 1 adds no ELSE token.
+Literal GOTO targets compile to JMP anchor_entry. ON expression GOTO/GOSUB selects from a table of target anchors; selectors 0 through 255 are accepted, zero or above the target count falls through, and negative values or values above 255 raise ?ILLEGAL QUANTITY. Preserve source-order evaluation under the integer contract. Target literals are parsed as unsigned line numbers even above 32767. Dynamic GOTO expressions are not introduced as an extension.
+GOSUB and RETURN
+Do not implement BASIC GOSUB as a simple CPU JSR into a line body. Line tails JMP onward and RETURN must return to the statement following the call, including one on the same line. Before jumping to the callee, push a three-byte software frame: one tag byte and the two-byte native continuation PC. RETURN searches the tagged stack according to BASIC nesting rules, discards appropriate transient FOR frames, pops the frame and jumps to that PC. Its continuation prologue resets caller source context. RETURN without a frame reports the familiar error.
+The hardware stack contains only bounded native helper calls and interrupt frames. The shared software control stack is separate, with explicit tagged frame sizes and overflow checks. Tags imply frame size, avoiding a separate size byte. Raw PCs are safe because RUN and suspended CONT never move code. Every edit or structural rebuild invalidates CONT and its PCs before changing a payload.
+FOR and NEXT
+A nine-byte FOR frame stores a one-byte tag, numeric scalar cell address, signed limit, signed step and the native continuation PC immediately after FOR, each remaining field two bytes. Both unsuffixed and % scalar loop variables are accepted; string and subscripted loop variables are rejected. Evaluate initialization, limit and step once, in source order. NEXT adds the step modulo 65536, stores the wrapped word, and uses signed comparisons for continuation. Step zero can produce a nonterminating loop until interrupted. A loop crossing the signed boundary can also continue unexpectedly: after 32767+1, the value is -32768. Do not promise termination for boundary-crossing loops or add a hidden overflow exception; polling must remain active.
+Use dynamic frames rather than requiring lexical FOR/NEXT matching at compile time. Preserve NEXT without a variable, NEXT with a variable, comma-separated NEXT variables, nested reuse of loop variables, and the stack-search/discard behavior of stock BASIC. Do not add a pretest that skips the first loop-body execution when the initial value is beyond the limit. Differential tests on integer-range examples define the precise stack behavior.
+DATA and functions
+DATA produces no executable work beyond normal line linkage. At READ, use a cursor containing an anchor and one-byte token offset. Scan typed fields and delimiters, read binary integers directly, and obtain text or spelling payloads for string destinations. Follow the shared trailer links to locate the next DATA statement. RESTORE resets the cursor to the first live line and scans forward. No DATA index or numeric text parse is required for a canonical integer field.
+Support DEF FN with one numeric parameter and a numeric body. The definition statement activates a stable function record at runtime; a call before execution of its definition raises ?UNDEF’D FUNCTION. Generate the native function body inside its owning line allocation, with RTS as the expression-helper return. Insert a local jump around that function code on the numbered line’s ordinary fall-through path, and emit its entry address into the stable function record at definition execution. Preserve the parameter’s former value through a bounded software activation record. The containing numbered line still ends with its required JMP trailer. Clear active definitions on RUN/CLR while retaining compiled bindings.
+10 Variables arrays and strings
+Stable bindings and arrays
+Intern each complete normalized spelling into a dictionary with a one-byte length, full name bytes and a 16-bit ID. The implementation compares complete spellings in a linked dictionary rather than using the proposed hash buckets. This has linear compile-time lookup cost but preserves every character and suffix. Scalar cells and separate array/function bindings remain stable; repeated source references carry IDs rather than repeated spellings. A, A% and A$ and SCORE and SCORETOTAL remain distinct.
+Bind scalar references during compilation so native accesses name stable cells without runtime full-name lookup. Dictionary lookup and storage grow with complete spellings; repeated token references remain compact. Retain interned names and cells until NEW or a future complete stopped rebuild that rebinds all source and code. Deletion cannot free a cell still referenced by native code. RUN clears values while retaining bindings.
+Integer arrays contain two-byte elements; string arrays contain four-byte descriptors. Stable array records hold a movable payload pointer, dimension count, bounds and strides. DIM allocates at execution time, rejects redimensioning, and checks total element count and byte size before allocation. Each dimension’s upper bound is inclusive. Undimensioned arrays use the stock default upper bound of 10 when first accessed. Use a tested stock-compatible subscript order for strides; no code may assume a stock array-memory layout.
+Indices must be nonnegative integers and within bounds. Check dimension products and offsets using wider temporary arithmetic before narrowing to 16-bit addresses. Generate fast constant subscript paths only when the array still undergoes runtime existence and bound checks. Payload movement updates the stable descriptor; generated accesses load the base pointer rather than embedding a potentially stale element address.
+String ownership and collection
+A string descriptor is four bytes: one-byte length, two-byte payload pointer, and ownership/root flags. Zero length uses a shared empty value. Version 1 copies literals and assignment results into heap-owned immutable payloads rather than storing lasting pointers into token source. Aliasing descriptors may share immutable payloads. Concatenation and substrings allocate new values; all assignments publish the new descriptor only after allocation succeeds. A byte length above 255 raises ?STRING TOO LONG.
+Use the implemented nonmoving mark-and-sweep collector with registered descriptor and helper roots. Roots include scalar cells, array elements, expression temporaries and function state. Allocating helpers must publish temporary string pointers before a collection boundary. Pointer rewriting is unnecessary because payloads remain stationary; the tradeoff is fragmentation. Clear temporary roots at statement completion and error exit.
+Implement LEN, LEFT$, RIGHT$, MID$, CHR$, ASC, STR$ and integer VAL. CHR$ accepts 0 through 255; ASC of an empty string is an error. Embedded NUL and other PETSCII bytes are valid runtime string data even though source/file encodings impose their own restrictions. PRINT outputs by descriptor length, not a zero terminator. Do not invent quote escaping for LIST; source literals follow Commodore quoting rules and CHR$(34) constructs a quote byte when needed.
+11 Direct mode program execution and device services
+READY and RUN lifecycle
+READY runs the editor/compiler in the command map. Use the KERNAL screen editor for a logical line. A decimal line number selects transactional editing; a number alone deletes the line. Other input is tokenized and compiled into a transient payload and synthetic anchor. Execute it through the RAM gateway so direct statements share the same word semantics, helpers and address map as stored programs. Its final JMP targets RAM DIRECT_DONE, which enters the ROM command loop through common RAM.
+Pin a direct payload while any GOSUB frame can return to it. Command statements such as LIST, NEW, LOAD, SAVE and VERIFY transfer to the command subsystem through a gateway; any source/code inspection there uses hidden-RAM accessors. Direct code cannot call a ROM handler and continue executing from shadow RAM without a gateway return.
+RUN clears values, continuation and software stacks, resets active function definitions and DATA state, validates anchors/trailers/source bounds and ensures the runtime image is ready. A low-RAM entry selects the execution map and jumps to the head anchor. RUN n requires that exact live line number, still clears values, and reports a missing statement if absent. Valid lines are not recompiled on every RUN. Native execution never dispatches source statement tokens.
+STOP, END and RUN/STOP at safe statement boundaries save a native continuation PC and the global program generation, preserve values and freeze the software control stack below a saved top, then enter READY through common RAM. END omits the BREAK message. CONT after the final line reaches RAM RUN_END again. Direct commands may use frames above the frozen top; RETURN/NEXT cannot consume suspended frames. CONT validates the generation, reenters the execution map and jumps to the saved PC.
+Blocking INPUT/device operations may abort without continuation unless their internal state is explicitly resumable. NMI aborts, direct STOP and runtime errors invalidate CONT in version 1. Defer asynchronous abort requests until the bank gateway and allocator are outside critical updates. This prevents abandoning a ROM service with the execution map or stack half restored.
+Statement coverage
+Group
+Required version 1 coverage
+Execution
+LET/implicit assignment, IF/THEN, GOTO, GOSUB, RETURN, ON, FOR, NEXT, END, STOP, CONT, RUN.
+Data and memory
+DIM, DATA, READ, RESTORE, CLR, PEEK, POKE, WAIT, SYS, USR, DEF FN/FN.
+Interactive and files
+PRINT, PRINT#, INPUT, INPUT#, GET, GET#, OPEN, CLOSE, CMD, LOAD, SAVE, VERIFY, LIST, NEW.
+Integer and string functions
+ABS, SGN, INT, LEN, LEFT$, RIGHT$, MID$, ASC, CHR$, STR$, VAL, POS, TAB, SPC, FRE; ST, TI and TI$.
+Recognized but unsupported
+Floating-point functions, π and numeric forms; retain their custom tokens for listing and trap when reached.
+
+INPUT, INPUT# and GET preserve the documented prompting, empty-field and channel behavior within the integer contract. The RAM decoder applies the same word-literal rules as the entry tokenizer. Numeric GET retains checked single-character conversion behavior. Verify PRINT commas, semicolons, carriage returns, positive padding, TAB, SPC and redirected CMD output against stock behavior.
+KERNAL service boundary
+RAM helpers call SETNAM, SETLFS, OPEN, CLOSE, CHKIN, CHKOUT, CLRCHN, CHRIN, CHROUT, GETIN, READST, RDTIM and SETTIM through common RAM. Restore the caller’s mapping and preserve each documented return condition. Copy any argument that ROM will dereference from shadow RAM to a bridge buffer first. Restore screen channels on normal completion/error without unnecessarily closing unrelated files. Translate device errors to BASIC diagnostics.
+Serial source files are streamed as bounded chunks through common RAM. Do not call an unrestricted KERNAL LOAD into the enlarged arena: it could overwrite compiled code, low gateways or the runtime image. Long IEC/tape operations may delay abort servicing until protocol-safe return, but polling resumes afterward. KERNAL workspace and cassette buffers remain excluded from the arena.
+PEEK POKE SYS and USR
+All direct and stored user expressions execute in the RAM map. PEEK/POKE therefore see RAM at $8000-$BFFF and $E000-$FFFF, and real I/O at $D000-$DFFF. Both required V/POKE idioms reach the VIC background-color register $D021. Reading an old BASIC/KERNAL ROM address now reads RAM; this is an intentional map change. The command firmware may inspect ROM only through an explicit diagnostic access interface.
+SYS uses a common-RAM trampoline and the stock $030C-$030F register convention to enter an unsigned address in the execution map. USR uses the configured vector at $0311-$0312 and the integer A/X ABI. User code beneath cartridge or KERNAL ROM is executable, but code that calls KERNAL at $FFxx must use the published common-RAM bank service rather than an unguarded JSR. Entering $FFD2 in the RAM map does not invoke KERNAL CHROUT.
+Before resuming language execution, the trampoline restores the execution map and clears decimal mode. User code must return with the expected stack shape. POKE can still corrupt gateway bytes, allocation state, runtime helpers, hardware vectors or $0000/$0001; ordinary C64 memory access provides no protection. Supported reservations and the gateway ABI make deliberate machine-code integration possible without allocator collisions.
+12 File formats and program persistence
+Custom authoritative source container
+SAVE writes Assembly BASIC source format version 1, specified in Appendix A. The container has a magic/version header, a full-name dictionary, sorted line-number/token records and a CRC. It contains no pointers, compiled bodies, line anchors or C64 load address. Use a Commodore sequential byte file for normal disk persistence, with a conventional .AB name. LOAD and VERIFY use the same format.
+The native source format uses the compact vocabulary rather than stock BASIC V2 keyword assignments or linked PRG records. Existing stock tokenized PRGs require an external or optional text conversion path; they are not the native loader’s input. Canonical PETSCII text produced by LIST is the exchange representation for other editors and languages.
+SAVE includes only names referenced by live source and assigns dense export IDs in ascending order of their existing IDs. Each export ID is therefore no greater than its original ID: remapping can shorten a reference but never widen it or overflow a valid 255-byte line. Rewrite references during serialization and omit unused tombstones, deleted names and values. LOAD stages a fresh dictionary in file-ID order with new stable bindings; it does not append names to the old program’s ID space. Pointer values never come from the file.
+Validate magic, format version, limits, full name spelling, dictionary uniqueness, token payload lengths, minimal integer encodings, ID bounds, DATA spelling consistency, sorted unique line numbers, end marker and CRC before publication. Reject reserved codes and truncated payloads. A token count is a byte count, not an instruction count. Raw literal bytes can include zero and token-valued bytes, so zero does not terminate a record.
+Transactional LOAD and bounded transport
+Stream disk bytes through a bounded common-RAM buffer into a staged name/source graph, compiling each staged line with the standard sizing/emission path. LOAD replaces the old graph only after the entire container validates. If there is not enough space for both graphs, fail without erasing the old source; the user may explicitly NEW before loading. A valid source graph can contain generated error stubs, but never corrupt record structure or partly published code.
+In-program LOAD leaves native execution through the command gateway and invalidates its control frames and CONT. Automatic chaining is outside version 1. Tape sequential-file support requires separate bounded transport and interrupt tests; unsupported tape forms must fail explicitly. Raw binary/machine-code loading is a separate utility with explicit destinations and reservations, not a disguised language-source LOAD.
+VERIFY text exchange and native caches
+VERIFY compares canonical serialized source, including dictionary remapping and CRC, against the file. It ignores allocator addresses and code layout. Text export expands the same tokens as LIST; a text importer invokes the whole-identifier lexer and immediately produces custom binary tokens. Text export cannot reproduce discarded outside-literal whitespace, decimal leading zeros or hexadecimal digit case.
+Do not save machine code in version 1. A future native cache must include a cartridge/runtime ABI identifier and complete binding validation; discarded relocation tables cannot be assumed to exist. Invalid caches regenerate from retained tokens. The compact source container remains authoritative for LIST, editing and rebuilds.
+13 Capacity performance and ROM budget
+Cartridge contents
+Planning budget
+Load image of RAM execution helpers and data
+6.0 KiB
+Tokenizer, LIST and custom source serialization
+2.0 KiB
+Parser, sizing and native emitter
+4.0 KiB
+Startup and common-RAM gateway load image
+0.75 KiB
+Editor, name interning and command management
+2.0 KiB
+Other tables, diagnostics and spare space
+1.25 KiB
+Hard cartridge limit
+16.0 KiB
+
+The preceding subdivision is the original planning allocation. ABI 2 measured link sizes are recorded in Appendix B and dist/size-report.json. The compressed runtime consumes ROM as well as 6549 bytes in its 7162-byte RAM reservation. Gateway code consumes both low-RAM workspace and cartridge space. The build enforces the 16384-byte cartridge, 768-byte gateway and 7162-byte runtime limits.
+The compact line cost is approximately 10.14 + T + C bytes with full anchor slabs: 7 anchor bytes, 3 source/allocation header bytes, shared slab overhead, token bytes T and code bytes C. No statement table or relocation list is added. If illustrative averages are T=18 and C=80, a line occupies about 108 bytes. Reserving 8 KiB of the 48 KiB raw arena for names, bindings, arrays, strings and edit headroom leaves roughly 379 such lines. This is a scenario calculation, not a promised capacity.
+Compact IDs improve repeated full-name occurrences: a 20-byte name repeated ten times uses ten one-byte references plus one dictionary spelling, rather than 200 repeated characters. The dictionary and stable binding record still have costs. Large ID sets use three-byte references; comments and long strings do not compress. Binary constants can shrink five-digit numbers to three bytes, while decimal 0..15 needs one byte. Frequent historical edits can waste partially occupied anchor slabs and retain tombstones.
+Measure compile latency, token/native bytes, actual metadata per line, fragmentation, hidden-RAM access cost and RUN startup copy cost. Measure runtime speed on integer assignments, branching, arrays, strings and device output with normal IRQ/VIC activity. Arithmetic and line chaining have no per-operation ROM mapping cost. KERNAL-backed I/O and IRQ service pay gateway transitions and interrupt-frame work. Report that cost separately from native execution speed.
+Keep quantity, literal, allocation and bounds checks with the wrapping word arithmetic contract. Later optimizations may shorten local branches, fold constants and specialize array paths. The seven-byte anchor, final JMP/list link, safe context polls and helper ABI remain observable implementation invariants. A lower runtime base can increase helper space at the cost of user RAM; a larger/banked cartridge would change the hardware baseline and requires a separate design decision.
+14 Implementation plan and acceptance tests
+Implementation sequence
+Stage
+Deliverable and exit condition
+1 Cartridge and RAM platform
+16 KB ROM/.CRT; autostart, $37/$35 mapping, copied runtime, low-RAM gateways and RAM vectors validated.
+2 Binary source and LIST
+Appendix A tokenizer/dictionary; seven-byte anchors; trailer-linked insertion/replacement/deletion; canonical round trips.
+3 Integer native core
+Assignments, PRINT, IF/GOTO; execution from cartridge and KERNAL shadow RAM with exact final JMP linkage.
+4 Control and storage
+Raw-PC GOSUB/FOR/STOP/CONT, typed DATA, strings, arrays, functions and RAM-only collection.
+5 Devices and source files
+KERNAL gateways, staged pointer arguments, bounded .AB LOAD/SAVE/VERIFY and canonical text exchange.
+6 Hardening and release
+Failure injection, emulator/hardware corpus, ROM/runtime/workspace size gates, capacity and latency measurements.
+
+Build with a reproducible assembler/linker targeting documented NMOS instructions. Separate ROM command modules, the RAM runtime’s run-address sections, and the common gateway image. Add host-side token decoders, disassembly and structural checks. The runtime dependency checker must reject any ordinary helper call/data reference into hidden ROM, except a declared common-RAM gateway. Produce separate ROM bytes and RAM reservation reports.
+Memory mapping and interrupt tests
+On a cycle-accurate emulator and at least one PAL and one NTSC C64, place executable lines at $8000, $A000, $C000 and $E000. Confirm the $35 map reads and executes the written RAM bytes, while I/O at $D021 remains visible. Write distinct values beneath ROM and inspect both maps. Verify the arena hole, allocation endpoints, top-runtime/vector reservation and every size calculation with canaries.
+Exercise KERNAL services with filenames and strings originally stored under cartridge/KERNAL ROM. Confirm staging prevents ROM from reading the overlaid bytes and that gateways preserve A/X/Y, carry, mapping and cassette controls according to each service ABI. Test a service that blocks with IRQs enabled, and STOP/RESTORE requests arriving inside that service.
+Inject IRQ/NMI before and after every mapping write, gateway return and edit-commit store. Check genuine versus synthesized interrupt frames, IRQ masks, BRK dispatch, source context and maximum hardware-stack depth. Validate raw RAM-vector entry separately from the KERNAL $0318 and cartridge warm-vector contracts. No handler may return into ROM-hidden or RAM-hidden code with the wrong map.
+Compact records and token tests
+Use randomized insert/replace/delete sequences, forward targets, tombstones and rebuilds. Assert the seven-byte anchor layout, exact source/code adjacency, allocator-end trailer location, sorted acyclic trailer chain, valid head/sentinel, and correct $4C opcodes. Replacing an anchor must preserve every existing GOTO/GOSUB target. Test scans across a payload beneath each ROM window.
+Exhaustively encode/decode every word in decimal and hex forms. Check one-byte decimal 0..15, byte values 16..255, word values 256..65535, radix-preserving LIST, unary signs and nonminimal encodings. Test name IDs 0, 127, 128 and the highest valid imported ID; verify full names, suffixes, keyword-containing names, case equality and hash collisions. Compare canonical streams after dictionary ID remapping.
+Test payload bytes containing $00, $4C, $80 and $FF in strings, comments and DATA text. Exercise empty/malformed DATA fields, numeric DATA read as strings, exceptional DATA_SPELLING and unsupported floating text. Fuzz every token code, length prefix, ID, line byte count and file header/CRC boundary. Reject malformed containers before any live graph changes.
+Runtime semantics and failure tests
+Compare word arithmetic with a wider reference reduced modulo 65536, covering $7FFF+1, $FFFF+1, multiplication wrap, -32768/-1, ABS(-32768), signed comparisons/division and ^. Test both V=53248:POKE V+33,1 and V=$D000:POKE V+33,1 under the RAM map and observe a write to $D021. Invalid byte quantities, negative subscripts and oversized allocation products must still fail.
+Test same-line GOSUB returns, FOR continuations, STOP/CONT after gateways, frozen stack boundaries, END at the last line and function code embedded in a payload. Code must remain stationary throughout RUN and suspended CONT. Every structural edit/rebuild must invalidate saved PCs before moving source/code. Stress string collection with all descriptor roots and ensure it never moves line payloads.
+Force failure at every staged edit, interning, DIM, string and LOAD allocation. Verify the old source remains available, old live code remains safe after failed edits, and no partial graph is published. Exercise rebuild source preservation when memory is nearly exhausted. Restrict stock differential tests to the declared common source/semantic subset; custom tokens, expanded memory and word arithmetic have their own expected results.
+Release criteria
+Release only when the standard cartridge boots into Assembly BASIC, the promised source subset passes its tests, and RUN executes native RAM code with cartridge and KERNAL ROM normally off. Every numbered body must end with the validated successor JMP. LIST/source SAVE must round-trip the custom format, all gateways and IRQ/NMI paths must preserve maps and frames, and the linked ROM, copied runtime and workspace must fit their stated budgets. Publish measured memory capacity, startup latency and representative speedups.
+15 Design risks and remaining validation
+Risk
+Resolution or required evidence
+Runtime or cartridge does not fit
+Measure both ROM load bytes and RAM run bytes; fix the runtime base per ABI/build and reduce the arena if needed.
+Gateway hides the current PC or arguments
+Keep transition code/returns in common RAM and stage all pointers dereferenced by ROM.
+IRQ/NMI corrupts map or stack
+Distinct raw/vectored entries, verified synthetic frames, short transitions and deferred aborts.
+Compact list link is corrupted
+Validate trailer opcode, target range, live status, ordering and cycle freedom before RUN/traversal.
+Metadata removal breaks continuation
+Never move code during RUN/CONT; invalidate native PCs before editing or stopped rebuilding.
+Retained anchors consume RAM
+Expose slab/tombstone counts; free them at NEW or a verified complete sweep/rebuild.
+Token compaction changes DATA strings
+Optional original spelling only for exceptional numeric DATA; validate word/radix equality and READ behavior.
+File or allocator overrun
+Bounded streaming, transactional publication, wider size calculations and the I/O/runtime exclusions.
+
+The seven-byte anchor and binary vocabulary are defined designs, not measured firmware. Important implementation evidence includes the helper dependency closure fitting in 7162 bytes, the common gateway/bridge budget fitting in 768 bytes, correct tape and interrupt interactions, and source-preserving rebuilds without persistent relocations. Resolve any failure by changing explicit budgets or the declared feature set; do not silently reintroduce ROM-resident execution or stock token storage.
+16 Technical references
+Hardware and stock behavior references establish the platform facts. Data structures, allocation strategies, integer semantics, ABI and budgets in this document are proposed design decisions rather than statements from those sources.
+[1] Commodore 64 Programmer’s Reference Guide, page 266, cartridge memory maps.
+https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_5/page_266.html
+[2] Commodore 64 Programmer’s Reference Guide, page 263, expansion cartridge autostart.
+https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_5/page_263.html
+[3] Commodore KERNAL API documentation, reproduced in Ultimate Commodore 64 Reference.
+https://www.pagetable.com/c64ref/kernal/
+[4] Commodore 64 Programmer’s Reference Guide, page 7, variables and strings.
+https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_1/page_007.html
+[5] Commodore 64 Programmer’s Reference Guide, pages 12 to 14, operations and logical values.
+https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_1/page_013.html
+[6] Original Commodore KERNAL source and ROM bytes, displayed with source commentary; reset $FCE2, NMI $FE43 and warm transfers.
+https://www.pagetable.com/c64ref/c64disasm/
+[7] Original BASIC parser and control-flow routines, displayed in the ROM reference; use only as a source-behavior test oracle.
+https://www.pagetable.com/c64ref/c64disasm/
+[8] Thomas Giesel, The C64 PLA Dissected, revision 1.1, Appendix A, tables A.3, A.5 and A.6; exact cartridge/RAM/I/O maps and write-through behavior.
+https://skoe.de/docs/c64-dissected/pla/c64_pla_dissected_a4ss.pdf
+Appendix A Compact source token format
+This appendix specifies Assembly BASIC source format version 1. Token values are unrelated to BASIC V2 ROM assignments. Hexadecimal byte values below use a $ prefix. All two-byte words are little-endian. A stored line is a byte-counted token stream, not a zero-terminated string. Its line number and name dictionary live outside that stream.
+A1 Code space and decoding
+Code range
+Meaning
+Encoded size
+$00-$0F
+Punctuation and arithmetic/relational operators
+1 byte
+$10-$19
+Literal, raw-payload and extended-name forms
+Code plus the payload defined below
+$1A-$1F
+Reserved; reject in format version 1
+No valid encoding
+$20-$67
+Statement, connective, function and special-variable codes
+1 byte
+$68-$6F
+Reserved; reject in format version 1
+No valid encoding
+$70-$7F
+Decimal immediate magnitude 0..15; value = code - $70
+1 byte
+$80-$FF
+Name ID 0..127; ID = code - $80
+1 byte
+
+Decode one code byte, then consume precisely its declared payload before interpreting another code. Payload bytes are never recursively tokenized. A length prefix is an unsigned byte; integers and name IDs in payloads are unsigned words. The line byte budget includes every prefix and payload byte. There is no EOL token, padding token or implicit zero terminator.
+Code
+Punctuation or operator
+Code
+Punctuation or operator
+$00
+:
+$08
+/
+$01
+,
+$09
+^
+$02
+;
+$0A
+=
+$03
+(
+$0B
+<
+$04
+)
+$0C
+>
+$05
++
+$0D
+<=
+$06
+-
+$0E
+>=
+$07
+*
+$0F
+<>
+
+The parser assigns unary/binary meaning to + and - by context. Compound comparisons have single canonical codes; accepted alternate source orderings normalize to these spellings. TAB( and SPC( below include their opening parenthesis, saving a byte; their closing parenthesis remains $04. Other function names use a separate $03 opening parenthesis.
+A2 Payload forms
+Code and name
+Following payload
+Rules
+$10 DEC8
+One unsigned value byte
+Canonical only for values 16..255.
+$11 DEC16
+Low byte, high byte
+Canonical only for values 256..65535.
+$12 HEX16
+Low byte, high byte
+All words 0..65535; LIST emits exactly four hex digits.
+$13 STRING
+Length byte, then that many PETSCII bytes
+Quoted source literal; quotes are not stored. Empty length is valid.
+$14 REMTEXT
+Length byte, then raw remainder bytes
+Must immediately follow REM and consume the rest of the token stream.
+$15 DATA_TEXT
+Length byte, then unquoted field bytes
+Only inside DATA; no quotes, commas, colons or line endings. Zero length is an empty field.
+$16 DATA_SPELLING
+Length byte, then original trimmed numeric-field bytes
+Only after a numeric DATA field; nonzero length and matching magnitude/radix/sign.
+$17 NUMTEXT
+Length byte, then unsupported numeric spelling
+Fractions, scientific notation or oversized numeric source retained for listing and a reached trap.
+$18 BADTEXT
+Length byte, then malformed source span
+Nonzero length; a reached lexical/syntax error, never executable text.
+$19 NAME16
+Low byte, high byte of name ID
+Canonical for IDs 128..65534. $FFFF is invalid.
+
+Ordinary integers require no textual spelling payload. Decimal leading zeros disappear when tokenized. Hex digit case and width are discarded while radix is retained. Invalid numeric values do not wrap at entry: oversized decimal/hex forms use NUMTEXT or BADTEXT with the appropriate generated error. String payloads cannot contain a literal quote because source has no quote-escape syntax; construct a runtime quote with CHR$(34). NUL and token-valued bytes are permitted in the binary payload when the input route can supply them.
+An end-of-line unterminated string accepted by the legacy-compatible lexer stores STRING and LIST supplies its closing quote. In DATA, STRING represents a quoted field and DATA_TEXT an unquoted one, preserving that distinction. Numeric field grammar is an optional $05/$06 sign followed by a compact decimal or HEX16 immediate, optionally followed by one DATA_SPELLING record. NUMTEXT may serve as a text-preserving unsupported numeric field. DATA_SPELLING is never used outside DATA.
+REMTEXT may contain commas, colons, quotes, zero bytes and values matching instructions. STRING may contain commas and colons. The decoder treats every payload byte as data, but valid unquoted DATA_TEXT must exclude source delimiters so LIST can reproduce the field without changing its meaning. A colon outside a payload ends DATA. Raw forms remain subject to line and string-length limits.
+A3 Keyword assignments
+These assignments are exhaustive for version 1. Recognized floating-point function codes and π remain listable but produce an unsupported-feature error when evaluated. Exact keyword spellings, including suffixes and # forms, are reserved in the whole-identifier lexer.
+Code
+Keyword
+Code
+Keyword
+$20
+END
+$44
+TAB(
+$21
+FOR
+$45
+TO
+$22
+NEXT
+$46
+FN
+$23
+DATA
+$47
+SPC(
+$24
+INPUT#
+$48
+THEN
+$25
+INPUT
+$49
+NOT
+$26
+DIM
+$4A
+STEP
+$27
+READ
+$4B
+AND
+$28
+LET
+$4C
+OR
+$29
+GOTO
+$4D
+SGN
+$2A
+RUN
+$4E
+INT
+$2B
+IF
+$4F
+ABS
+$2C
+RESTORE
+$50
+USR
+$2D
+GOSUB
+$51
+FRE
+$2E
+RETURN
+$52
+POS
+$2F
+REM
+$53
+SQR
+$30
+STOP
+$54
+RND
+$31
+ON
+$55
+LOG
+$32
+WAIT
+$56
+EXP
+$33
+LOAD
+$57
+COS
+$34
+SAVE
+$58
+SIN
+$35
+VERIFY
+$59
+TAN
+$36
+DEF
+$5A
+ATN
+$37
+POKE
+$5B
+PEEK
+$38
+PRINT#
+$5C
+LEN
+$39
+PRINT
+$5D
+STR$
+$3A
+CONT
+$5E
+VAL
+$3B
+LIST
+$5F
+ASC
+$3C
+CLR
+$60
+CHR$
+$3D
+CMD
+$61
+LEFT$
+$3E
+SYS
+$62
+RIGHT$
+$3F
+OPEN
+$63
+MID$
+$40
+CLOSE
+$64
+ST
+$41
+GET
+$65
+TI
+$42
+GET#
+$66
+TI$
+$43
+NEW
+$67
+π
+
+A4 Name dictionary and bindings
+A dictionary entry’s identity is its complete uppercase PETSCII spelling, including any final % or $. IDs are unsigned 0..65534; no ID $FFFF is assigned. Length is 1..255 bytes. A spelling begins with a letter and continues with letters/digits followed by at most one final type suffix. Reject duplicate normalized names and exact reserved keywords/special variables. ID allocation is stable until NEW or complete source rebinding.
+IDs 0..127 have direct one-byte codes $80..$FF. All later names use $19 followed by a two-byte ID, avoiding an artificial limit on full identifiers. Retaining a global dictionary minimizes repeated-name storage without paying a separate local name list for every line. The lexer and LIST consult the dictionary; native scalar operations use already bound RAM addresses and perform no ID lookup.
+A and A() share a spelling ID but bind distinct scalar/array storage. A, A% and A$ have distinct IDs. Function and parameter uses resolve to their appropriate records. SAVE densely remaps referenced names in ascending original-ID order, which cannot widen a token. LOAD creates a fresh dictionary in file-ID order before compilation. Reserved tokens and runtime addresses never serve as dictionary IDs.
+A5 Worked token encodings
+Dictionary ID 0: V
+Source: V=$D000:POKE V+33,1
+Bytes:  80 0A 12 00 D0 00 37 80 05 10 21 01 71
+Count:  13 bytes, excluding line number and shared dictionary
+
+Source: V=53248:POKE V+33,1
+Bytes:  80 0A 11 00 D0 00 37 80 05 10 21 01 71
+Count:  13 bytes; DEC16 replaces HEX16
+
+Dictionary ID 128: SCORETOTAL%
+Source: SCORETOTAL%=65535
+Bytes:  19 80 00 0A 11 FF FF
+Count:  7 bytes
+
+Source: DATA 001,53248,$D000,"A:B"
+Bytes:  23 71 16 03 30 30 31 01 11 00 D0 01
+        12 00 D0 01 13 03 41 3A 42
+Count:  21 bytes; 001 is binary 1 plus exceptional spelling
+
+In the first example, $80 is name ID 0, $0A is =, $12,$00,$D0 is hexadecimal $D000, $00 is colon, $37 is POKE, and $10,$21 is decimal 33. The final $71 is decimal 1. The line header supplies the byte count, so the zero bytes inside the constant and colon cannot terminate it. The DATA example’s colon byte $3A is inside a three-byte string payload and does not end DATA.
+A6 Source file container
+Field in file order
+Encoding
+Constraint
+Magic
+8 bytes: 41 42 36 34 53 52 43 00
+ASCII AB64SRC followed by zero.
+Format version
+One byte: $01
+Reject unknown versions.
+Flags
+One byte: $00
+All bits reserved in version 1.
+Name count N
+Unsigned word
+0..65535 entries, assigning IDs 0..N-1; last possible ID is 65534.
+Dictionary
+N repetitions: length byte then uppercase name bytes
+Length 1..255; unique valid names; no address or value payload.
+Live line records
+Line-number word, token-length byte, exactly T token bytes
+Strictly increasing numbers 0..63999; T=1..255.
+End marker
+Line-number word $FFFF
+No length byte or tokens follow this marker.
+CRC
+Two bytes, low byte first
+CRC-16/CCITT-FALSE over all prior bytes, including the end marker.
+
+CRC parameters are polynomial $1021, initial value $FFFF, no input/output reflection and final XOR $0000. There is no C64 PRG load-address prefix and no serialized next-line pointer. EOF must follow the CRC. An empty program has N=0, no line records, the $FFFF end marker and its CRC. A sequential file’s bytes are decoded by Assembly BASIC rather than loaded verbatim into the CPU arena.
+The container deliberately separates name spelling from occurrences and excludes native code. Import validates the complete container before replacing the live graph. Export dictionary compaction may change token ID bytes without changing source meaning. A native-byte dump or stock BASIC PRG is not this format, even if a filename has a .AB extension.
+A7 Canonical validation and invariants
+Valid binary streams use the smallest decimal encoding, direct name codes for IDs below 128, and nonzero payload lengths for BADTEXT, NUMTEXT and DATA_SPELLING. Require REM followed by exactly one REMTEXT token. Check DATA-only forms in context, reject delimiter bytes in DATA_TEXT and require numeric fields to use binary values rather than hiding them in DATA_TEXT. Validate syntax separately from lexical structure: safe tokens may still compile to a reached BASIC syntax error. Reserved codes, out-of-range IDs or payload overruns cannot enter the live graph.
+Keep source tokens authoritative. Constant folding modifies native code only. Canonical LIST and the text importer must preserve numeric magnitude/radix, full names, signs, literal bytes and DATA spelling semantics. A format version change is required before reassigning any code or altering its payload interpretation.
+Appendix B — implementation status, revision 0.4
+This appendix records the development implementation on 9 October 2026. The full version-one contract is not yet complete. Original release requirements above remain the target unless an architectural choice is explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.
+Measured linked build: {"arena_raw_bytes": 49152, "arena_spans": [[5120, 53248], [57344, 58368]], "gateway_budget_bytes": 768, "gateway_used_bytes": 392, "rom_bytes": 16384, "rom_sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe", "rom_spare_bytes": 145, "rom_used_bytes": 16239, "runtime_abi": 2, "runtime_budget_bytes": 7162, "runtime_packed_bytes": 4871, "runtime_run_address": 58368, "runtime_used_bytes": 6549, "segments": {"COMMAND": 7746, "COMPILER": 3217, "GATEWAY": 392, "HEADER": 9, "PACKED": 4871, "RECOVERY": 4, "RUNTIME": 6549}, "workspace_bytes": 3072}
+Automated validation: 44 tests passed, 3205 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
+Source/container version 1 and runtime ABI 2 are distinct. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, without the proposed inline scalar optimizations.
+Instruction-level measurements and capacity scenario: {"capacity_scenario": {"accepted_lines": 788, "failure": "?OUT OF MEMORY\r\rREADY.\r", "first_rejected_line": 789, "note": "Cold NEW, one scalar; common-span anchor exhaustion and fragmentation can limit capacity before all raw bytes are used.", "remaining_free_physical_bytes": 50, "source_template": "<number> A=A+1"}, "cold_start_instructions": 238787, "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing", "rom_sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe", "workloads": {"integer_loop": {"entry_instructions": 22552, "lines": [{"line": 10, "native_bytes": 203, "payload_physical_bytes": 229, "token_bytes": 23}], "output": " 5050 \r\rREADY.\r", "run_instructions": 279767}, "shadow_address": {"entry_instructions": 17423, "lines": [{"line": 10, "native_bytes": 140, "payload_physical_bytes": 168, "token_bytes": 25}], "output": "-12288  1 \r\rREADY.\r", "run_instructions": 234549}, "strings_arrays": {"entry_instructions": 40812, "lines": [{"line": 10, "native_bytes": 169, "payload_physical_bytes": 206, "token_bytes": 34}, {"line": 20, "native_bytes": 141, "payload_physical_bytes": 171, "token_bytes": 27}], "output": " 246 ROOT\r\rREADY.\r", "run_instructions": 238339}}}
+Implementation status — design revision 0.4
+The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
+Area — Implemented behavior — Remaining work
+Platform — Standard 16 KiB ROM/CRT, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame — Cycle-accurate VICE, stock ROM integration, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts
+Editing and storage — Seven-byte stable anchors in 250-byte slabs, exact adjacent tokens/native bodies, final successor JMP, sorted insertion/replacement/deletion, tombstones, coalescing allocator with payloads allocated from the high end, staged failed edits — Stopped payload compaction/rebuild, explicit graphics/machine-code reservations, full graph-integrity preflight before every traversal, complete name-allocation rollback on failed edits
+Source — Custom Appendix A vocabulary, binary words and hexadecimal radix, whole/full identifiers up to 255 imported bytes, shifted-letter abbreviations, raw comments/strings/DATA, dense export dictionary — Exact firmware LIST whitespace normalization and every malformed text-recovery case; host period abbreviations are an extra host convenience
+Compilation — Bounded two-pass Pratt parser, real 6502 machine code, stable scalar cells, native branch/line linkage, false IF skips physical line, context and deferred error stubs — Helper-heavy expression code lacks the proposed inline scalar arithmetic optimizations; no stock-ROM differential corpus yet
+Integer operations — Wrapped 16-bit arithmetic, signed division/comparison/formatting, eager logical operators, precedence, checked byte/address and allocation quantities, integer VAL — Full INPUT conversion/retry compatibility and unsupported numeric diagnostic corpus
+Control — GOTO, ON GOTO/GOSUB, GOSUB/RETURN, dynamic FOR/NEXT including variable reuse, STOP/END/CONT, frozen stack boundary and edit invalidation — Stock-ROM differential tests for unusual mixed control-stack cases
+Strings and arrays — Immutable heap strings, concatenation/slicing/conversion, numeric/string arrays, checked bounds/products, eight dimensions, READ array targets, registered-root collection — Broader failure injection and automatic collection/fragmentation stress under IRQ/VIC activity
+Functions — Full-name DEF FN, compiled expression bodies, stable parameter cells restored after calls, guarded recursion — Activations use a bounded hardware stack with depth limit eight; move them to the designed tagged software activation stack and audit interrupt headroom
+Devices and clocks — PRINT#/INPUT#/GET#/OPEN/CLOSE/CMD, staged filenames, SYS/USR map recovery, ST, low-word TI, six-digit TI$ read/set — INPUT and GET accept scalar targets only; custom INPUT prompts, line retry, missing/extra-field handling, real serial/device-status tests
+Persistence — Source-only SAVE, CRC, dense referenced-name IDs, bounded sequential LOAD with second-graph publication and failure rollback, target VERIFY — Target VERIFY compares canonical output bytes rather than canonicalizing arbitrary valid file dictionaries; target loader lacks every DATA_SPELLING equality/context check in Appendix A; host validator is stricter
+Release evidence — Automated instruction-level regression suite, all 65,536 word round trips in both radices, malformed-container fuzzing, runtime dependency/opcode and size gates — Capacity/fragmentation workload corpus, cycle-accurate latency and speedup comparison, PAL/NTSC and real-device release checklist
+Recorded architectural decisions
+Stable anchors/bindings allocate from the low end of free spans; payloads and runtime heap objects allocate from the high end, preserving common RAM for future anchor slabs. Common allocations are checked against the `$8000` boundary even for whole free blocks.
+Runtime ABI **2** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$1400,$D000)` and `[$E000,$E400)`, totaling 49,152 raw bytes. This uses the design's permitted lower-base adjustment.
+The fixed-address runtime is linked separately and stored as a deterministic LZSS load image in the cartridge. Cold start, RUN and CONT decompress the same image without moving user code. The link output proves its RAM addresses; no runtime relocation is assumed.
+String collection is **nonmoving mark-and-sweep**, followed by free-list coalescing, rather than the proposed compacting collector. Roots include line/slab/name/binding objects, arrays, functions, direct code, descriptors, expression temporaries and live helper string pointers. It avoids descriptor pointer rewriting but can leave fragmented free space.
+Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
+Language zero page is `$02–$78`; KERNAL service state uses `$90–$FF`. Common workspace is `$0800–$13FF`. A supported stock KERNAL audit remains a release requirement.
+Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+Releasing version one
+Resolve the remaining behavior above, then execute the original section 14 acceptance corpus with genuine KERNAL ROMs, a cycle-accurate emulator, and PAL/NTSC machines. Include every bank-transition interrupt boundary, hardware stack maximum, allocation-failure site and source corruption boundary. Publish measured capacity, startup/copy latency and representative native speedups with normal VIC/IRQ activity. The current harness results cannot substitute for that evidence.

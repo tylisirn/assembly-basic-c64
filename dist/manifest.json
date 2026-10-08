@@ -1,0 +1,41 @@
+{
+  "status": "development; version-one release acceptance incomplete",
+  "design_revision": "0.4",
+  "runtime_abi": 2,
+  "source_version": 1,
+  "validated_tests": 44,
+  "artifacts": {
+    "abi.json": {
+      "bytes": 4045,
+      "sha256": "71272e5ccda6343937e07898ea72fc919b526c2cfac5c1e0b605c1436bdbd11b"
+    },
+    "assembly-basic.bin": {
+      "bytes": 16384,
+      "sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe"
+    },
+    "assembly-basic.crt": {
+      "bytes": 16480,
+      "sha256": "cd2f44da51d59bef786357226f2c912b5ac4b3a8f91129bcbf2a84c396e0336f"
+    },
+    "examples/hello.ab": {
+      "bytes": 62,
+      "sha256": "f846e3cf938d7ff57912658cf838afacd9695dc1521b332640606bc80b07309a"
+    },
+    "examples/strings_arrays.ab": {
+      "bytes": 175,
+      "sha256": "7e911508a918dd4b95220abec8aea6d8a9a1eeaaad00efdb5f850e084b94b081"
+    },
+    "examples/video.ab": {
+      "bytes": 58,
+      "sha256": "017dab3c7d0cc8d033de0c5328574257d487769e95e8fa535b8d8992830a5246"
+    },
+    "size-report.json": {
+      "bytes": 681,
+      "sha256": "b2d9427f7775fcfbda3e8bcbd97c90a3f1ff3b68d5faf43e65c2d39d591dce10"
+    },
+    "test-report.json": {
+      "bytes": 265,
+      "sha256": "8c778ba0a1a68d5126d1ff3346a01bc438b2ce3619808094b9764e48fdb58bc5"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "assembly-basic-c64"
+version = "0.4.0"
+description = "Assembly BASIC C64 cartridge and source exchange utilities"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+emulator = ["py65==1.2.0"]
+
+[project.scripts]
+ab64 = "ab64.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["host"]

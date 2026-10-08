@@ -1,0 +1,60 @@
+{
+  "rom_sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe",
+  "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing",
+  "cold_start_instructions": 238787,
+  "workloads": {
+    "integer_loop": {
+      "entry_instructions": 22552,
+      "run_instructions": 279767,
+      "output": " 5050 \r\rREADY.\r",
+      "lines": [
+        {
+          "line": 10,
+          "token_bytes": 23,
+          "native_bytes": 203,
+          "payload_physical_bytes": 229
+        }
+      ]
+    },
+    "strings_arrays": {
+      "entry_instructions": 40812,
+      "run_instructions": 238339,
+      "output": " 246 ROOT\r\rREADY.\r",
+      "lines": [
+        {
+          "line": 10,
+          "token_bytes": 34,
+          "native_bytes": 169,
+          "payload_physical_bytes": 206
+        },
+        {
+          "line": 20,
+          "token_bytes": 27,
+          "native_bytes": 141,
+          "payload_physical_bytes": 171
+        }
+      ]
+    },
+    "shadow_address": {
+      "entry_instructions": 17423,
+      "run_instructions": 234549,
+      "output": "-12288  1 \r\rREADY.\r",
+      "lines": [
+        {
+          "line": 10,
+          "token_bytes": 25,
+          "native_bytes": 140,
+          "payload_physical_bytes": 168
+        }
+      ]
+    }
+  },
+  "capacity_scenario": {
+    "source_template": "<number> A=A+1",
+    "accepted_lines": 788,
+    "first_rejected_line": 789,
+    "remaining_free_physical_bytes": 50,
+    "failure": "?OUT OF MEMORY\r\rREADY.\r",
+    "note": "Cold NEW, one scalar; common-span anchor exhaustion and fragmentation can limit capacity before all raw bytes are used."
+  }
+}

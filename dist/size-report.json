@@ -1,0 +1,34 @@
+{
+  "rom_bytes": 16384,
+  "rom_sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe",
+  "runtime_run_address": 58368,
+  "runtime_used_bytes": 6549,
+  "runtime_packed_bytes": 4871,
+  "runtime_budget_bytes": 7162,
+  "gateway_used_bytes": 392,
+  "gateway_budget_bytes": 768,
+  "workspace_bytes": 3072,
+  "arena_spans": [
+    [
+      5120,
+      53248
+    ],
+    [
+      57344,
+      58368
+    ]
+  ],
+  "arena_raw_bytes": 49152,
+  "segments": {
+    "HEADER": 9,
+    "RECOVERY": 4,
+    "COMMAND": 7746,
+    "GATEWAY": 392,
+    "COMPILER": 3217,
+    "RUNTIME": 6549,
+    "PACKED": 4871
+  },
+  "rom_used_bytes": 16239,
+  "rom_spare_bytes": 145,
+  "runtime_abi": 2
+}
