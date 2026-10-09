@@ -28,7 +28,7 @@ The implemented cartridge is a development build. The revision 0.3 version-one c
 
 ## Revision 0.5 semantics
 
-- Successful numbered edits/deletions produce no READY prompt. Recoverable lexical/assembly failures report an error and retain their tokens and deferred runtime trap. Resource exhaustion retains the previous line.
+- Enter explicitly outputs the screen-editor carriage return before parsing/output, including blank lines. Successful numbered edits/deletions produce no READY prompt. Recoverable lexical/assembly failures report an error and retain their tokens and deferred runtime trap. Resource exhaustion retains the previous line.
 - LIST accepts exact numbers and inclusive/open ranges in 0–63999; a reversed range produces an empty listing. It emits a newline before the first listed line.
 - ELSE binds to the nearest unmatched IF on its physical line; colon-separated arms and literal line targets are supported. An unchosen arm does not execute. The compiler bounds pending IF depth to 32 and patch count to 64.
 - RND uses a full-period word LCG, `state = (25173*state + 13849) mod 65536`. First positive use seeds from the low word of RDTIM, zero repeats, and a negative argument supplies its complete two's-complement seed before advancing. It returns every word bit; normal display is signed.

@@ -97,6 +97,7 @@ class Machine:
                 self.output.append(c.a)
                 if c.a == 13:
                     m[0xd3] = 0
+                    m[0xd6] = min(m[0xd6]+1,24)
                 elif c.a >= 32:
                     m[0xd3] = (m[0xd3]+1)%40
             elif c.pc == 0xffe4:
@@ -140,11 +141,16 @@ class Machine:
     def boot(self):
         self.pump()
         return self
-    def command(self,s):
+    def command(self,s,include_input_newline=False):
         self.input.extend(s.encode('latin-1')+b'\r')
         start = len(self.output)
         self.pump()
-        return bytes(self.output[start:]).decode('latin-1')
+        result=bytes(self.output[start:]).decode('latin-1')
+        # A console caller already echoes Enter. Keep its CR in output history,
+        # but return only command output unless the screen trace is requested.
+        if not include_input_newline and result.startswith('\r'):
+            result=result[1:]
+        return result
     def word(self,p):
         return self.memory.ram[p] | self.memory.ram[p+1]<<8
     def state(self,n):

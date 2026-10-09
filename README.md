@@ -26,7 +26,7 @@ VICE and physical PAL/NTSC machine validation remain pending; see the status doc
 
 ## Use
 
-At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Numbered entry and deletion return silently to input. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits and display signed decimal. Hexadecimal constants preserve their radix in LIST.
+At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Enter advances the screen cursor before processing each command or numbered line. Numbered entry and deletion resume input without another READY prompt. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits and display signed decimal. Hexadecimal constants preserve their radix in LIST.
 
 ```basic
 10 VIDEO=$D000

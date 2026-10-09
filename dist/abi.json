@@ -1,6 +1,6 @@
 {
   "runtime_abi": 3,
-  "rom_sha256": "56e546ce0b5da160b75542170639513b49c29b1c5bb7ffed63b66cf7045d3fb0",
+  "rom_sha256": "6b15a50716ff5cdd19fad74bc8e7fb473d8db21dac948e469c056fd725a23322",
   "command_port_bits": 7,
   "execution_port_bits": 5,
   "runtime_base": 58368,

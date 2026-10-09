@@ -3,19 +3,19 @@
   "design_revision": "0.5",
   "runtime_abi": 3,
   "source_version": 1,
-  "validated_tests": 58,
+  "validated_tests": 61,
   "artifacts": {
     "abi.json": {
       "bytes": 4329,
-      "sha256": "6a7ff061b1e049874207fc7c27a0f773f653e5ccfd1c0945d4d4925f59ab3e00"
+      "sha256": "6d88db17cb1fd99f4f2f74e291a6d5481e8688c774b61e3a103af42d92adca74"
     },
     "assembly-basic.bin": {
       "bytes": 16384,
-      "sha256": "56e546ce0b5da160b75542170639513b49c29b1c5bb7ffed63b66cf7045d3fb0"
+      "sha256": "6b15a50716ff5cdd19fad74bc8e7fb473d8db21dac948e469c056fd725a23322"
     },
     "assembly-basic.crt": {
       "bytes": 16464,
-      "sha256": "f6d5403db8b0ac28430476d0dc8521919707fa3f372e5ad3a2a9e43e594252a2"
+      "sha256": "1eeb2cef68ac4ef3149500719bc4f4aebc8778ae0ca1efd414f135b6842402d3"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -35,11 +35,11 @@
     },
     "size-report.json": {
       "bytes": 869,
-      "sha256": "8d33bc96ad652fc16b9d41eceaaa94ecc82a176dead1e4867343b54d4bb5162d"
+      "sha256": "1ab6b5a4caa63f9f3ec6bfd21f26f7f1d6a04e3f223c5c996f15798655f67995"
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "7c26f01a3b0b5909274df263ce71a00344041292a6b7d4acd1c3de2ccf5d6eca"
+      "sha256": "73f9cf1511f3cc263d3d644cdfa5080280e270ce117019aa2be459cbf56439db"
     }
   }
 }

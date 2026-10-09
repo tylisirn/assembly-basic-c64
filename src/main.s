@@ -154,6 +154,8 @@ input_loop:
  inc INPUT_LEN
  jmp @read
 @line:
+ ; CHRIN returns the editor CR; send it to CHROUT before parsing/output.
+ jsr $ffd2
  ldx INPUT_LEN
  lda #0
  sta INPUT_BUFFER,x
