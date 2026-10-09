@@ -7,6 +7,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 for p in ('host','.tools/py65'):sys.path.insert(0,str(ROOT/p))
 from ab64.emulator import Machine
+from measure_collection import measure_collection
 
 def measure():
     m=Machine().boot()
@@ -51,5 +52,6 @@ def measure():
     destination=ROOT/'docs/measurements.json'
     destination.write_text(json.dumps(report,indent=2)+'\n')
     print(destination)
+    measure_collection()
 
 if __name__=='__main__':measure()

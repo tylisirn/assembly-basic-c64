@@ -298,22 +298,6 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-report_error:
- pha
- lda #'?'
- jsr $ffd2
- pla
- asl
- tax
- lda error_table,x
- sta SCRATCH
- lda error_table+1,x
- tax
- lda SCRATCH
- jsr rom_puts
- lda #13
- jsr $ffd2
- rts
 banner: .byte 147,"ASSEMBLY BASIC 0.5",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
@@ -390,6 +374,56 @@ clear_values:
  lda #<clear_runtime
  sta gateway_call+1
  lda #>clear_runtime
+ sta gateway_call+2
+ jmp call_ram
+
+; Stopped command helpers share the compressed resident image to fit ROM.
+.segment "COMPILER"
+report_error:
+ pha
+ lda #'?'
+ jsr $ffd2
+ pla
+ asl
+ tax
+ lda error_table,x
+ sta SCRATCH
+ lda error_table+1,x
+ tax
+ lda SCRATCH
+ jsr rom_puts
+ lda #13
+ jsr $ffd2
+ rts
+command_alloc_common:
+ sta IO_A
+ stx IO_X
+ lda #<alloc_common
+ sta gateway_call+1
+ lda #>alloc_common
+ sta gateway_call+2
+ jsr call_ram
+ jmp check_alloc
+command_alloc:
+ sta IO_A
+ stx IO_X
+ lda #<alloc
+ sta gateway_call+1
+ lda #>alloc
+ sta gateway_call+2
+ jsr call_ram
+check_alloc:
+ lda ALLOC_RESULT
+ ora ALLOC_RESULT+1
+ bne :+
+ lda #ERR_MEMORY
+ jmp command_error
+:
+ rts
+command_free:
+ lda #<free_block
+ sta gateway_call+1
+ lda #>free_block
  sta gateway_call+2
  jmp call_ram
 

@@ -72,6 +72,13 @@ from compilation, heap allocation and collection. `$C000` is otherwise user-aren
 RAM, not implicit scratch space. Stock BASIC's `POKE 55/56` memory-top convention
 does not apply because this language owns its own zero-page state.
 
+The later gameplay freeze was traced to a long garbage-collection pause. The updated
+collector uses windowed bitmap marking and an ordered free-list sweep; captured-heap
+replay uses approximately 109 times fewer CPU cycles. See the
+[investigation and retest instructions](docs/VOIDRUNNER_FREEZE.md). Reset with the
+new cartridge and reload/reenter source; restoring an old snapshot restores its
+old runtime too.
+
 ## Host source tools
 
 The standard-library encoder/decoder exchanges numbered Latin-1/PETSCII source with version-one `.AB` files. Compilation still occurs in the cartridge. Set `PYTHONPATH=host` on Linux/macOS, or install the package with `python -m pip install -e .`.

@@ -196,3 +196,10 @@ RESERVE_START = STATE+243
 RESERVE_END = STATE+245
 RESERVE_BLOCK_END = STATE+247
 RESERVE_NEXT = STATE+249
+
+; Runtime collection borrows lexer scratch; no lexer is active at GC boundaries.
+GC_MARKS = LEX_BUFFER ; 2048 possible payload starts, one bit each
+GC_PAGE = SIZE ; Cached high byte rounded down to a 2-KiB window.
+; Allocating string helpers recompute SIZE after collection.
+GC_FREE_PREV = PREV
+GC_FREE_NEXT = WALK

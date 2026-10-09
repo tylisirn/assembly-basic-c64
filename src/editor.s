@@ -200,37 +200,6 @@ find_anchor:
  iny
  sta (PTR),y
  rts
-command_alloc_common:
- sta IO_A
- stx IO_X
- lda #<alloc_common
- sta gateway_call+1
- lda #>alloc_common
- sta gateway_call+2
- jsr call_ram
- jmp check_alloc
-command_alloc:
- sta IO_A
- stx IO_X
- lda #<alloc
- sta gateway_call+1
- lda #>alloc
- sta gateway_call+2
- jsr call_ram
-check_alloc:
- lda ALLOC_RESULT
- ora ALLOC_RESULT+1
- bne :+
- lda #ERR_MEMORY
- jmp command_error
-:
- rts
-command_free:
- lda #<free_block
- sta gateway_call+1
- lda #>free_block
- sta gateway_call+2
- jmp call_ram
 find_position:
  lda #0
  sta PREDECESSOR

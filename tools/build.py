@@ -44,8 +44,16 @@ def build(toolchain=None):
     raw_compiler=(build/'assembly-basic.bin.compiler').read_bytes()
     packed_compiler=compress(raw_compiler)
     assert decompress(packed_compiler,len(raw_compiler))==raw_compiler
-    (build/'compiler0.lz').write_bytes(packed_compiler[:1104])
-    (build/'compiler.lz').write_bytes(packed_compiler[1104:])
+    # Fill the first bank after command/gateway code; put the remainder in bank 1.
+    # These load addresses are identical in the empty and final packed links.
+    first_labels = (build/'assembly-basic.lbl').read_text()
+    def first_label(name):
+        match = re.search(r'al ([0-9A-Fa-f]+) \.' + name + r'$', first_labels, re.M)
+        return int(match[1], 16)
+    first_capacity = 0xa000 - first_label('__GATEWAY_LOAD__') - first_label('__GATEWAY_SIZE__')
+    first_size = min(first_capacity, len(packed_compiler))
+    (build/'compiler0.lz').write_bytes(packed_compiler[:first_size])
+    (build/'compiler.lz').write_bytes(packed_compiler[first_size:])
     subprocess.run([tool('ca65'),'-I',str(root/'src'),'--bin-include-dir',str(build),'-g','-l',str(build/'assembly-basic.lst'),'-o',str(build/'assembly-basic.o'),str(root/'src/main.s')],check=True)
     subprocess.run([tool('ld65'),'-C',str(root/'src/cart.cfg'),'-m',str(build/'assembly-basic.map'),'-Ln',str(build/'assembly-basic.lbl'),'-o',str(build/'assembly-basic.bin'),str(build/'assembly-basic.o')],check=True)
     assert (build/'assembly-basic.bin.runtime').read_bytes()==raw_runtime

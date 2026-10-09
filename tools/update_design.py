@@ -78,7 +78,7 @@ def synchronize():
         'These sizes are proposed budgets.':
         'These are ABI 3 build limits. Runtime helpers have 7162 bytes at $E400-$FFF9; the measured image occupies 6386 bytes. Any future runtime-base change requires a new ABI/build identifier and recompilation. ROM-off execution remains required. No allocation may cross the I/O hole, overlap the runtime or assume visibility during a ROM gateway.',
         'Runtime string collection may move string payloads':
-        'The implemented runtime collector is nonmoving mark-and-sweep with free-list coalescing. It never moves string payloads, line code or native return addresses. It enumerates physical allocation boundaries and retains objects reachable from source, slabs, names/bindings, arrays/functions, descriptors, expression temporaries and live helper roots. It runs wholly within copied RAM helpers. Fragmentation can prevent allocation despite sufficient total free bytes. Direct CLEAN now rebuilds source, anchors and bindings into a second graph, densely remaps names, clears values/continuations and collects the released graph. It requires temporary headroom; general sliding arena compaction remains pending.',
+        'The implemented runtime collector is nonmoving mark-and-sweep with free-list coalescing. It never moves string payloads, line code or native return addresses. It enumerates physical allocation boundaries and retains objects reachable from source, slabs, names/bindings, arrays/functions, descriptors, expression temporaries and live helper roots. It marks roots once per 2 KiB address window in a 256-byte bitmap over inactive lexer/compiler scratch at $0E00-$0EFF. A monotonic sorted-free-list cursor avoids repeated searches while inserting reclaimed blocks; coalescing follows the sweep. Headers retain full 16-bit allocation sizes. All collection boundaries occur outside active lexing/compilation, and no additional user-arena allocation is needed. It runs wholly within copied RAM helpers. Fragmentation can prevent allocation despite sufficient total free bytes. Direct CLEAN now rebuilds source, anchors and bindings into a second graph, densely remaps names, clears values/continuations and collects the released graph. It requires temporary headroom; general sliding arena compaction remains pending.',
         'Use compacting mark-and-copy or sliding collection':
         'Use the implemented nonmoving mark-and-sweep collector with registered descriptor and helper roots. Roots include scalar cells, array elements, expression temporaries and function state. Allocating helpers must publish temporary string pointers before a collection boundary. Pointer rewriting is unnecessary because payloads remain stationary; the tradeoff is fragmentation. Clear temporary roots at statement completion and error exit.',
         'Intern each full normalized spelling into a name dictionary':
@@ -204,6 +204,9 @@ def synchronize():
     assert measurements['rom_sha256']==report['rom_sha256'], 'Measurements refer to a different cartridge'
     additions.append(paragraph('Instruction-level measurements and capacity scenario: '+
                                json.dumps(measurements,sort_keys=True)))
+    collection=json.loads((ROOT/'docs/voidrunner-collection.json').read_text())
+    assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
+    additions.append(paragraph('Captured Void Runner collection replay: '+json.dumps(collection,sort_keys=True)))
     status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()
     for line in status.splitlines():
         if not line or line.startswith('| ---'):continue

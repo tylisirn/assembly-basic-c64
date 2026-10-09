@@ -18,7 +18,7 @@ def check():
     base=labels['__RUNTIME_RUN__'];end=base+len(raw)
     memory=bytearray(65536);memory[base:end]=raw
     cpu=MPU(memory=memory);dis=Disassembler(cpu)
-    data={labels[k]:n for k,n in [('powers_lo',5),('powers_hi',5),('runtime_stamp',5),('clock_low',3),('clock_mid',3),('clock_high',3)]}
+    data={labels[k]:n for k,n in [('gc_bits',8),('powers_lo',5),('powers_hi',5),('runtime_stamp',5),('clock_low',3),('clock_mid',3),('clock_high',3)]}
     gateways={labels[k] for k in ('kernal_gate','enter_ready','sys_gateway','usr_gateway','file_entry')}
     dynamic={labels['fn_dispatch']}
     p=base;count=0

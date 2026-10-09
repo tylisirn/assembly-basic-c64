@@ -1,0 +1,47 @@
+{
+  "source": "debug/voidrunner-freeze1.vsf, VICE 2.4 C64MEM module",
+  "original_rom_sha256": "27623e821e625748d7955b1d57b1cd46ef644f38fed1faa4dc773cf0acbce0c9",
+  "fixture_ram_sha256": "3a4870211b31baf3a8eef8e9fc94c22fa08f2fad7481ed6992fe086b092dab64",
+  "physical_blocks": 1636,
+  "initial_free_blocks": 253,
+  "baseline_remaining_instructions": 44268554,
+  "baseline_remaining_cpu_cycles": 137980792,
+  "expected_free_blocks": [
+    [
+      12011,
+      7
+    ],
+    [
+      18105,
+      1103
+    ],
+    [
+      19216,
+      204
+    ],
+    [
+      19446,
+      4
+    ],
+    [
+      49920,
+      3328
+    ],
+    [
+      57344,
+      6
+    ],
+    [
+      57360,
+      6
+    ],
+    [
+      57370,
+      197
+    ],
+    [
+      57572,
+      796
+    ]
+  ]
+}
