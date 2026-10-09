@@ -46,6 +46,32 @@ Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THE
 
 `CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The standard 16 KiB cartridge uses runtime ABI 3, reserves 6 KiB at `$1400–$2BFF` for a compiler image decompressed at startup, and has a 42 KiB raw program arena.
 
+`RESERVE address,bytes` declares RAM for graphics or machine code before the
+compiler allocates it. Both arguments must be unsigned numeric literals aligned
+to 256-byte pages; the nonzero range must lie within one user-arena span and be
+entirely free. Up to eight regions are supported. Put declarations on the first
+numbered line before entering/importing the rest of the program, or issue them
+directly before loading it. They take effect during compilation, cannot appear
+inside IF, and do not run again during RUN. Repeating identical bounds is harmless;
+conflicting/live allocations fail without being overwritten. Reservations remain
+through RUN, CLR, edits and CLEAN; NEW releases them. SAVE stores numbered
+declarations, so LOAD reinstates them. Removing a declaration does not release
+its region until NEW. Failed entry/import may retain a successfully declared
+reservation. POKE and SYS still require the caller to respect memory ownership.
+
+[Void Runner](examples/voidrunner.bas) uses this first line:
+
+```basic
+10 RESERVE $3C00,$200:RESERVE $C000,$300:CLR
+```
+
+Start with `NEW`, paste the updated program, and `RUN`, or load
+[dist/examples/voidrunner.ab](dist/examples/voidrunner.ab) from a sequential file.
+The sprite pages `$3C00–$3DFF` and native code/workspace `$C000–$C2FF` are excluded
+from compilation, heap allocation and collection. `$C000` is otherwise user-arena
+RAM, not implicit scratch space. Stock BASIC's `POKE 55/56` memory-top convention
+does not apply because this language owns its own zero-page state.
+
 ## Host source tools
 
 The standard-library encoder/decoder exchanges numbered Latin-1/PETSCII source with version-one `.AB` files. Compilation still occurs in the cartridge. Set `PYTHONPATH=host` on Linux/macOS, or install the package with `python -m pip install -e .`.

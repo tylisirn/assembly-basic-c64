@@ -114,6 +114,18 @@ def synchronize():
         'READY runs the editor/compiler in the command map':
         'READY runs the editor/compiler in the command map. Send the screen-editor carriage return returned by CHRIN to CHROUT before parsing every submitted command, numbered line, deletion or blank line. This advances the cursor before subsequent output or input. Successful numbered entry/deletion resumes input without another READY prompt. Recoverable lexical/assembly failure prints an error but saves the new line. Direct LIST starts on a new line and accepts LIST n, LIST low-high and open endpoints; bounds are inclusive unsigned line numbers 0..63999 and reversed bounds give an empty listing. Direct CLEAN rebuilds dense slabs/symbols, clears variables and invalidates CONT. Other direct statements compile into a transient native payload and synthetic anchor, execute through the RAM gateway and end at DIRECT_DONE.',
     })
+    rewrites['Audit zero-page ownership for every supported KERNAL operation.'] = (
+        'Audit zero-page ownership for every supported KERNAL operation. Save overlapping language '
+        'temporaries or avoid the locations. Place indirect-JMP pointers away from a low byte of $FF '
+        'to avoid the NMOS page-boundary bug. RESERVE address,bytes is an implemented compile-time '
+        'declaration outside IF: both unsigned numeric literals must be multiples of 256, with a '
+        'nonzero range wholly inside a free portion of one user-arena span. Declare up to eight '
+        'regions before allocating the program, normally on its first numbered line. Allocation '
+        'and collection exclude the full region, with bounds stored outside user RAM. RUN, CLR, '
+        'edits and CLEAN preserve reservations; NEW releases them. SAVE/LOAD retain numbered '
+        'declarations. Identical bounds are idempotent; occupied/overlapping bounds fail safely. '
+        'Removing source or a failed import may leave a reservation until NEW. $C000 is not implicit '
+        'scratch RAM, and stock BASIC memory-top POKEs at 55/56 do not configure this allocator.')
     paragraphs=list(body.iter(f'{{{W}}}p'))
     for p in paragraphs:
         nodes=list(p.iter(f'{{{W}}}t'))
@@ -149,8 +161,8 @@ def synchronize():
                 new=copy.deepcopy(row)
                 for c,text in zip(new.findall('w:tc',NS),('$1C-$1F','Reserved; reject in format version 1','No valid encoding')):set_cell(c,text)
                 table.insert(list(table).index(row)+1,new)
-            elif values[0]=='$20-$67':set_cell(cells[0],'$20-$69')
-            elif values[0]=='$68-$6F':set_cell(cells[0],'$6A-$6F')
+            elif values[0] in ('$20-$67', '$20-$69'):set_cell(cells[0],'$20-$6A')
+            elif values[0] in ('$68-$6F', '$6A-$6F'):set_cell(cells[0],'$6B-$6F')
         rows=table.findall('w:tr',NS)
         header=''.join(rows[0].itertext())
         contents=''.join(table.itertext())
@@ -161,6 +173,10 @@ def synchronize():
         if header=='CodeKeywordCodeKeyword' and '$68' not in contents:
             new=copy.deepcopy(rows[-1])
             for c,text in zip(new.findall('w:tc',NS),('$68','ELSE','$69','CLEAN')):set_cell(c,text)
+            table.append(new)
+        if header=='CodeKeywordCodeKeyword' and 'RESERVE' not in contents:
+            new=copy.deepcopy(rows[-1])
+            for c,text in zip(new.findall('w:tc',NS),('$6A','RESERVE','','')):set_cell(c,text)
             table.append(new)
     for row in root.findall('.//w:tr',NS):
         cells=row.findall('w:tc',NS)

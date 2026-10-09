@@ -378,6 +378,8 @@ compile_statement:
  jsr token_take
  cmp #$39
  JEQ compile_print
+ cmp #$6a
+ JEQ compile_reserve
  cmp #$37
  JEQ compile_poke
  cmp #$29

@@ -3137,6 +3137,24 @@ collect:
  cmp #$e4
  bcs @merge
 @visit:
+ ; Reservations contain arbitrary bytes, never allocator headers.
+ ldx #0
+@reserved:
+ cpx RESERVE_COUNT
+ beq @allocation
+ lda GC_SCAN
+ bne @next_reserved
+ lda GC_SCAN+1
+ cmp RESERVATIONS,x
+ bne @next_reserved
+ lda RESERVATIONS+1,x
+ sta GC_SCAN+1
+ jmp @block
+@next_reserved:
+ inx
+ inx
+ bne @reserved
+@allocation:
  lda GC_SCAN
  sta PTR
  clc

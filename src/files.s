@@ -791,7 +791,7 @@ validate_tokens:
  JCS @direct
  cmp #$70
  JCS @small
- cmp #$6a
+ cmp #$6b
  JCS load_fail
  cmp #$20
  bcs @keyword
@@ -830,6 +830,7 @@ validate_tokens:
  lda SCRATCH+42
  cmp #$16
  JCS load_fail
+ lda #0 ; empty STRING/DATA_TEXT: keep the payload length, not its token code
 @raw_length:
  jsr token_need
  clc

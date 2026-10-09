@@ -1,11 +1,11 @@
 {
-  "rom_sha256": "6b15a50716ff5cdd19fad74bc8e7fb473d8db21dac948e469c056fd725a23322",
+  "rom_sha256": "27623e821e625748d7955b1d57b1cd46ef644f38fed1faa4dc773cf0acbce0c9",
   "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing",
-  "cold_start_instructions": 465608,
+  "cold_start_instructions": 490821,
   "workloads": {
     "integer_loop": {
-      "entry_instructions": 24379,
-      "run_instructions": 302846,
+      "entry_instructions": 24507,
+      "run_instructions": 303717,
       "output": " 5050 \r\rREADY.\r",
       "lines": [
         {
@@ -17,8 +17,8 @@
       ]
     },
     "strings_arrays": {
-      "entry_instructions": 45066,
-      "run_instructions": 261310,
+      "entry_instructions": 45246,
+      "run_instructions": 262181,
       "output": " 246 ROOT\r\rREADY.\r",
       "lines": [
         {
@@ -36,8 +36,8 @@
       ]
     },
     "shadow_address": {
-      "entry_instructions": 19413,
-      "run_instructions": 257628,
+      "entry_instructions": 19487,
+      "run_instructions": 258499,
       "output": "-12288  1 \r\rREADY.\r",
       "lines": [
         {

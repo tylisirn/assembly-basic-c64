@@ -88,7 +88,7 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(m.files['COPY'],data)
     def test_bad_binary_source_rollback(self):
         m=self.m;m.command('10 PRINT 7');original=m.command('LIST')
-        for tokens in (b'\x1c',b'\x6a',b'\x10\x01',b'\x13\x02A',b'\x19\0\0',b'\x18\0',b'\x14\0'):
+        for tokens in (b'\x1c',b'\x6b',b'\x10\x01',b'\x13\x02A',b'\x19\0\0',b'\x18\0',b'\x14\0'):
             data=b'AB64SRC\0\1\0\0\0'+word(10)+bytes((len(tokens),))+tokens+b'\xff\xff'
             data+=word(binascii.crc_hqx(data,65535));m.files['BAD']=bytearray(data)
             self.assertIn('?SYNTAX ERROR',m.command('LOAD "BAD"'),tokens.hex())

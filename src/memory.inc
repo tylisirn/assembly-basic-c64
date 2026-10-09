@@ -188,3 +188,11 @@ CLEAN_BUFFER = STATE+203
 CLEAN_PTR = STATE+205
 CLEAN_SIZE = STATE+207
 RANDOM_READY = STATE+209
+
+; Reservation bounds live outside user RAM, so graphics/ML may overwrite all bytes.
+RESERVE_COUNT = STATE+210 ; table byte count, at most eight page ranges
+RESERVATIONS = STATE+211 ; eight [start page,end page) byte pairs
+RESERVE_START = STATE+243
+RESERVE_END = STATE+245
+RESERVE_BLOCK_END = STATE+247
+RESERVE_NEXT = STATE+249

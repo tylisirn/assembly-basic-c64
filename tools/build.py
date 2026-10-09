@@ -44,8 +44,8 @@ def build(toolchain=None):
     raw_compiler=(build/'assembly-basic.bin.compiler').read_bytes()
     packed_compiler=compress(raw_compiler)
     assert decompress(packed_compiler,len(raw_compiler))==raw_compiler
-    (build/'compiler0.lz').write_bytes(packed_compiler[:768])
-    (build/'compiler.lz').write_bytes(packed_compiler[768:])
+    (build/'compiler0.lz').write_bytes(packed_compiler[:1104])
+    (build/'compiler.lz').write_bytes(packed_compiler[1104:])
     subprocess.run([tool('ca65'),'-I',str(root/'src'),'--bin-include-dir',str(build),'-g','-l',str(build/'assembly-basic.lst'),'-o',str(build/'assembly-basic.o'),str(root/'src/main.s')],check=True)
     subprocess.run([tool('ld65'),'-C',str(root/'src/cart.cfg'),'-m',str(build/'assembly-basic.map'),'-Ln',str(build/'assembly-basic.lbl'),'-o',str(build/'assembly-basic.bin'),str(build/'assembly-basic.o')],check=True)
     assert (build/'assembly-basic.bin.runtime').read_bytes()==raw_runtime

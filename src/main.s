@@ -297,8 +297,51 @@ command_error:
  lda MEM_IO
  JNE clean_fail
  jmp ready
+.segment "COMMAND"
+report_error:
+ pha
+ lda #'?'
+ jsr $ffd2
+ pla
+ asl
+ tax
+ lda error_table,x
+ sta SCRATCH
+ lda error_table+1,x
+ tax
+ lda SCRATCH
+ jsr rom_puts
+ lda #13
+ jsr $ffd2
+ rts
+banner: .byte 147,"ASSEMBLY BASIC 0.5",13,0
+ready_text: .byte 13,"READY.",13,0
+error_table:
+.word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
+e_syntax: .byte "SYNTAX ERROR",0
+e_quantity: .byte "ILLEGAL QUANTITY",0
+e_memory: .byte "OUT OF MEMORY",0
+e_divzero: .byte "DIVISION BY ZERO",0
+e_undefined: .byte "UNDEF'D STATEMENT",0
+e_return: .byte "RETURN WITHOUT GOSUB",0
+e_next: .byte "NEXT WITHOUT FOR",0
+e_type: .byte "TYPE MISMATCH",0
+e_cont: .byte "CAN'T CONTINUE",0
+e_unsupported: .byte "UNSUPPORTED FEATURE",0
+e_stack: .byte "FORMULA TOO COMPLEX",0
+e_string: .byte "STRING TOO LONG",0
+e_data: .byte "OUT OF DATA",0
+.include "gateway.s"
+.include "editor.s"
+.include "lexer.s"
+.include "compiler.s"
+.include "list.s"
+.include "files.s"
+.include "clean.s"
+.segment "COMPILER"
 new_program:
  lda #0
+ sta RESERVE_COUNT
  sta NAME_HEAD
  sta NAME_HEAD+1
  sta ARRAY_HEAD
@@ -349,46 +392,8 @@ clear_values:
  lda #>clear_runtime
  sta gateway_call+2
  jmp call_ram
-report_error:
- pha
- lda #'?'
- jsr $ffd2
- pla
- asl
- tax
- lda error_table,x
- sta SCRATCH
- lda error_table+1,x
- tax
- lda SCRATCH
- jsr rom_puts
- lda #13
- jsr $ffd2
- rts
-banner: .byte 147,"ASSEMBLY BASIC 0.5",13,0
-ready_text: .byte 13,"READY.",13,0
-error_table:
-.word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
-e_syntax: .byte "SYNTAX ERROR",0
-e_quantity: .byte "ILLEGAL QUANTITY",0
-e_memory: .byte "OUT OF MEMORY",0
-e_divzero: .byte "DIVISION BY ZERO",0
-e_undefined: .byte "UNDEF'D STATEMENT",0
-e_return: .byte "RETURN WITHOUT GOSUB",0
-e_next: .byte "NEXT WITHOUT FOR",0
-e_type: .byte "TYPE MISMATCH",0
-e_cont: .byte "CAN'T CONTINUE",0
-e_unsupported: .byte "UNSUPPORTED FEATURE",0
-e_stack: .byte "FORMULA TOO COMPLEX",0
-e_string: .byte "STRING TOO LONG",0
-e_data: .byte "OUT OF DATA",0
-.include "gateway.s"
-.include "editor.s"
-.include "lexer.s"
-.include "compiler.s"
-.include "list.s"
-.include "files.s"
-.include "clean.s"
+
+.include "reserve.s"
 .include "runtime.s"
 
 .segment "COMPILER_PACKED0"
