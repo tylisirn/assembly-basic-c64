@@ -2,7 +2,7 @@
 
 A standard 16 KiB autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.4, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.5, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -14,7 +14,7 @@ python3 tools/build.py
 python3 tools/test.py
 ```
 
-With an existing toolchain, use `python3 tools/build.py --toolchain /path/to/cc65/bin` and install `py65==1.2.0` into your Python environment. The build produces `build/assembly-basic.crt`, the raw 16 KiB `build/assembly-basic.bin`, assembler listing, linker map, labels, raw and compressed runtime images, and `build/size-report.json`. Checked-in development cartridge artifacts are in [dist](dist).
+With an existing toolchain, use `python3 tools/build.py --toolchain /path/to/cc65/bin` and install `py65==1.2.0` into your Python environment. The build produces `build/assembly-basic.crt`, the raw 16 KiB `build/assembly-basic.bin`, assembler listing, linker map, labels, raw and compressed runtime/compiler images, and `build/size-report.json`. Checked-in development cartridge artifacts are in [dist](dist).
 
 The CRT is a standard type-zero cartridge with one 16 KiB CHIP packet at `$8000` and both GAME and EXROM low. This packet layout is compatible with VICE's generic cartridge loader; two 8 KiB packets at `$8000` and `$A000` are rejected by VICE 3.7.1's loader. In VICE, use “Attach CRT image” for the `.crt`, or “Attach generic 16KB cartridge” for the raw `.bin`. For example, with VICE installed:
 
@@ -26,7 +26,7 @@ VICE and physical PAL/NTSC machine validation remain pending; see the status doc
 
 ## Use
 
-At `READY.`, enter decimal numbered lines, then use RUN, LIST, NEW and the usual direct commands. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits and display signed decimal. Hexadecimal constants preserve their radix in LIST.
+At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Numbered entry and deletion return silently to input. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits and display signed decimal. Hexadecimal constants preserve their radix in LIST.
 
 ```basic
 10 VIDEO=$D000
@@ -36,7 +36,15 @@ At `READY.`, enter decimal numbered lines, then use RUN, LIST, NEW and the usual
 RUN
 ```
 
-Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/GOTO, DATA/READ/RESTORE and STOP/CONT are implemented. `SAVE "PROGRAM.AB",8`, `LOAD "PROGRAM.AB",8` and `VERIFY "PROGRAM.AB",8` use the custom sequential source container, not stock tokenized PRG files. Tape and RS-232 transports are explicitly unsupported. LOAD stages a second program and preserves the old source on failure; `NEW` can free space before loading a large file.
+Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THEN/ELSE, DATA/READ/RESTORE and STOP/CONT are implemented. `SAVE "PROGRAM.AB",8`, `LOAD "PROGRAM.AB",8` and `VERIFY "PROGRAM.AB",8` use the custom sequential source container, not stock tokenized PRG files. Tape and RS-232 transports are explicitly unsupported. LOAD stages a second program and preserves the old source on failure; `NEW` can free space before loading a large file.
+
+`LIST 10` lists one line; `LIST 10-50` lists an inclusive range. `LIST -50` and `LIST 10-` accept open endpoints. LIST starts on a new screen line.
+
+`IF condition THEN statements ELSE statements` selects one arm for the rest of the physical line. ELSE binds to the nearest unmatched IF; either arm can be a literal line target. `RND(n)` returns a random 16-bit word, displayed as a signed integer: positive arguments advance the generator, zero repeats the last word, and negative arguments reseed it reproducibly. The first positive call seeds from the KERNAL jiffy clock.
+
+`<<` and `>>` are arithmetic shifts. Counts must be 0–255; left shifts wrap, right shifts preserve the sign, and counts of 16 or more yield zero or the right-shift sign fill. Shifts bind below addition and above comparisons. Literal power-of-two multiplication uses a left shift; division uses a biased right shift to retain truncation toward zero (`-5/2` is -2, while `-5>>1` is -3).
+
+`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The standard 16 KiB cartridge uses runtime ABI 3, reserves 6 KiB at `$1400–$2BFF` for a compiler image decompressed at startup, and has a 42 KiB raw program arena.
 
 ## Host source tools
 

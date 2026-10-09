@@ -198,17 +198,27 @@ tokenize_input:
  cmp #'>'
  bne @plain_punct
  lda LEX_CODE
+ cmp #12
+ beq @right_shift
  cmp #11
  bne @plain_punct
  lda #15
  bne @pair
+@right_shift:
+ lda #$1b
+ bne @pair
 @less_pair:
  lda LEX_CODE
+ cmp #11
+ beq @left_shift
  cmp #12
  beq @not_equal
  cmp #10
  bne @plain_punct
  lda #13
+ bne @pair
+@left_shift:
+ lda #$1a
  bne @pair
 @not_equal:
  lda #15

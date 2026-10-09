@@ -1,10 +1,57 @@
 .segment "COMMAND"
 command_list:
+ lda #0
+ sta LIST_MIN
+ sta LIST_MIN+1
+ lda #$ff
+ sta LIST_MAX
+ lda #$f9
+ sta LIST_MAX+1
+ lda #1
+ sta TOKEN_POS
+ cmp TOKEN_LEN
+ beq @start
+ jsr token_peek
+ cmp #6
+ beq @range
+ jsr list_bound
+ lda VALUE
+ sta LIST_MIN
+ sta LIST_MAX
+ lda VALUE+1
+ sta LIST_MIN+1
+ sta LIST_MAX+1
+ lda TOKEN_POS
+ cmp TOKEN_LEN
+ beq @start
+@range:
+ lda #6
+ jsr token_take
+ cmp #6
+ JNE list_syntax
+ lda #$ff
+ sta LIST_MAX
+ lda #$f9
+ sta LIST_MAX+1
+ lda TOKEN_POS
+ cmp TOKEN_LEN
+ beq @start
+ jsr list_bound
+ lda VALUE
+ sta LIST_MAX
+ lda VALUE+1
+ sta LIST_MAX+1
+ lda TOKEN_POS
+ cmp TOKEN_LEN
+ JNE list_syntax
+@start:
+ lda #13
+ jsr $ffd2
  lda PROGRAM_HEAD
  sta LIST_ANCHOR
  lda PROGRAM_HEAD+1
  sta LIST_ANCHOR+1
-@line:
+list_line:
  lda LIST_ANCHOR
  cmp #<run_end
  bne @load
@@ -22,6 +69,25 @@ command_list:
  iny
  lda (WALK),y
  sta IO_X
+ cmp LIST_MIN+1
+ bcc @skip
+ bne @upper
+ lda IO_A
+ cmp LIST_MIN
+ bcc @skip
+@upper:
+ lda IO_X
+ cmp LIST_MAX+1
+ JCC @print
+ JNE ready
+ lda IO_A
+ cmp LIST_MAX
+ JCC @print
+ JEQ @print
+ jmp ready
+@skip:
+ jmp list_advance
+@print:
  jsr print_source_number
  lda #' '
  jsr $ffd2
@@ -64,15 +130,19 @@ command_list:
  cmp #$70
  bcs @small
  cmp #$10
- beq @byte
+ JEQ @byte
  cmp #$11
- beq @word
+ JEQ @word
  cmp #$12
- beq @hex
+ JEQ @hex
  cmp #$13
  JEQ @quoted
  cmp #$13
  bcc @punctuation
+ cmp #$1a
+ JEQ @left_shift
+ cmp #$1b
+ JEQ @right_shift
  cmp #$1a
  JCC @raw
  cmp #$20
@@ -100,6 +170,17 @@ command_list:
  bne :+
  lda #'>'
 :
+ jsr $ffd2
+ jmp @space
+@left_shift:
+ lda #'<'
+ bne @shift
+@right_shift:
+ lda #'>'
+@shift:
+ pha
+ jsr $ffd2
+ pla
  jsr $ffd2
  jmp @space
 @small:
@@ -229,6 +310,7 @@ command_list:
 @next:
  lda #13
  jsr $ffd2
+list_advance:
  lda LIST_ANCHOR
  sta WALK
  lda LIST_ANCHOR+1
@@ -238,7 +320,7 @@ command_list:
  sta LIST_ANCHOR
  lda WALK+1
  sta LIST_ANCHOR+1
- jmp @line
+ jmp list_line
 list_raw:
  jsr token_take
  sta LIST_POS
@@ -332,3 +414,15 @@ list_data_spelling:
 @no:
  clc
  rts
+
+.segment "COMPILER"
+list_bound:
+ jsr parse_immediate
+ bcs list_syntax
+ lda VALUE+1
+ cmp #$fa
+ JCS command_quantity
+ rts
+list_syntax:
+ lda #ERR_SYNTAX
+ jmp command_error

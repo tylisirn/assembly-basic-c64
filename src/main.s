@@ -1,6 +1,7 @@
 .setcpu "6502"
 .include "memory.inc"
 .import __GATEWAY_LOAD__, __GATEWAY_RUN__, __GATEWAY_SIZE__
+.import __COMPILER_RUN__, __COMPILER_SIZE__
 .import __RUNTIME_LOAD__, __RUNTIME_RUN__, __RUNTIME_SIZE__
 .segment "HEADER"
 .word cold_start, cartridge_warm
@@ -38,6 +39,7 @@ cold_start:
  sta COUNT+1
  jsr copy_image
  jsr unpack_runtime
+ jsr unpack_compiler
  lda #<ram_nmi
  sta $fffa
  lda #>ram_nmi
@@ -177,10 +179,14 @@ input_loop:
  beq @delete
  jsr tokenize_input
  jsr edit_line
- jmp ready
+ lda COMPILE_ERROR
+ beq @submitted
+ jsr report_error
+@submitted:
+ jmp input_loop
 @delete:
  jsr delete_line
- jmp ready
+ jmp input_loop
 command_quantity:
  lda #ERR_QUANTITY
  jmp command_error
@@ -198,6 +204,8 @@ direct_command:
  JEQ command_cont
  cmp #$3c
  JEQ command_clear
+ cmp #$69
+ JEQ command_clean
  lda #$ff
  sta LINE_NO
  sta LINE_NO+1
@@ -281,14 +289,11 @@ command_clear:
  jsr clear_values
  jmp ready
 command_error:
- pha
- lda LOADING
- beq :+
- pla
- jmp load_fail
-:
- pla
  sta ERROR_CODE
+ lda LOADING
+ JNE load_fail
+ lda MEM_IO
+ JNE clean_fail
  jmp ready
 new_program:
  lda #0
@@ -312,18 +317,18 @@ new_program:
  sta PROGRAM_HEAD
  lda #>run_end
  sta PROGRAM_HEAD+1
- lda #<$1400
+ lda #<USER_BASE
  sta FREE_HEAD
- lda #>$1400
+ lda #>USER_BASE
  sta FREE_HEAD+1
  lda #$00
- sta $1400
- lda #$bc
- sta $1401
+ sta USER_BASE
+ lda #>($d000-USER_BASE)
+ sta USER_BASE+1
  lda #$00
- sta $1402
+ sta USER_BASE+2
  lda #$e0
- sta $1403
+ sta USER_BASE+3
  lda #$00
  sta $e000
  lda #$04
@@ -358,7 +363,7 @@ report_error:
  lda #13
  jsr $ffd2
  rts
-banner: .byte 147,"ASSEMBLY BASIC 0.4",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.5",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
@@ -381,13 +386,35 @@ e_data: .byte "OUT OF DATA",0
 .include "compiler.s"
 .include "list.s"
 .include "files.s"
+.include "clean.s"
 .include "runtime.s"
 
+.segment "COMPILER_PACKED0"
+compiler_packed:
+.incbin "compiler0.lz"
+compiler_first_end:
+.segment "COMPILER_PACKED"
+compiler_remaining:
+.incbin "compiler.lz"
 .segment "PACKED"
 runtime_packed:
 .incbin "runtime.lz"
 .segment "COMMAND"
 ; Decompress the fixed-address execution image through a common-RAM read gate.
+unpack_compiler:
+ lda #<compiler_packed
+ sta SOURCE
+ lda #>compiler_packed
+ sta SOURCE+1
+ lda #<__COMPILER_RUN__
+ sta DEST
+ lda #>__COMPILER_RUN__
+ sta DEST+1
+ lda #<__COMPILER_SIZE__
+ sta COUNT
+ lda #>__COMPILER_SIZE__
+ sta COUNT+1
+ jmp unpack_image
 unpack_runtime:
  lda #<runtime_packed
  sta SOURCE
@@ -401,6 +428,7 @@ unpack_runtime:
  sta COUNT
  lda #>__RUNTIME_SIZE__
  sta COUNT+1
+unpack_image:
 @group:
  jsr packed_byte
  sta SCRATCH+38
@@ -458,6 +486,17 @@ unpack_runtime:
 @done:
  rts
 packed_byte:
+ lda SOURCE
+ cmp #<compiler_first_end
+ bne @read
+ lda SOURCE+1
+ cmp #>compiler_first_end
+ bne @read
+ lda #<compiler_remaining
+ sta SOURCE
+ lda #>compiler_remaining
+ sta SOURCE+1
+@read:
  ldy #0
  lda (SOURCE),y
  inc SOURCE

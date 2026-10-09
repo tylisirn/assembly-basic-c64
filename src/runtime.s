@@ -451,6 +451,122 @@ or_word:
  lda LEFT
  ora RIGHT
  jmp push_number
+rnd_word:
+ jsr pop_number
+ sta VALUE
+ stx VALUE+1
+ ora VALUE+1
+ beq @last
+ txa
+ bpl @positive
+ sta RANDOM_STATE+1
+ ; Negative arguments reseed with their complete two's-complement word.
+ lda VALUE
+ sta RANDOM_STATE
+ lda #1
+ sta RANDOM_READY
+ bne @advance
+@positive:
+ lda RANDOM_READY
+ bne @advance
+ lda #<$ffde
+ sta service_call+1
+ lda #>$ffde
+ sta service_call+2
+ jsr kernal_gate
+ sta RANDOM_STATE
+ stx RANDOM_STATE+1
+ inc RANDOM_READY
+@advance:
+ lda RANDOM_STATE
+ sta LEFT
+ lda RANDOM_STATE+1
+ sta LEFT+1
+ lda #$55
+ sta RIGHT
+ lda #$62
+ sta RIGHT+1
+ jsr multiply_ax
+ clc
+ adc #$19
+ sta RANDOM_STATE
+ txa
+ adc #$36
+ sta RANDOM_STATE+1
+@last:
+ lda RANDOM_STATE
+ ldx RANDOM_STATE+1
+ jmp push_number
+shift_left_word:
+ jsr binary_operands
+ lda #0
+ beq shift_mode
+shift_right_word:
+ jsr binary_operands
+ lda #1
+shift_mode:
+ sta NUM_SIGN
+ lda RIGHT+1
+ beq :+
+ lda #ERR_QUANTITY
+ jmp runtime_error
+:
+ ldy RIGHT
+ cpy #16
+ bcc shift_loop
+ ldy #16
+shift_loop:
+ cpy #0
+ beq shift_result
+ lda NUM_SIGN
+ bne @right
+ asl LEFT
+ rol LEFT+1
+ jmp @next
+@right:
+ lda LEFT+1
+ cmp #$80
+ ror LEFT+1
+ ror LEFT
+@next:
+ dey
+ bne shift_loop
+shift_result:
+ lda LEFT
+ ldx LEFT+1
+ jmp push_number
+; Constant power-of-two word divisors become biased arithmetic right shifts.
+divide_negative_power_word:
+ jsr divide_power_word
+ jmp negate_word
+divide_power_word:
+ jsr binary_operands
+ lda LEFT+1
+ bpl @shift
+ lda #$ff
+ sta VALUE
+ sta VALUE+1
+ ldy RIGHT
+@mask:
+ cpy #0
+ beq @bias
+ asl VALUE
+ rol VALUE+1
+ dey
+ bne @mask
+@bias:
+ lda VALUE
+ eor #$ff
+ clc
+ adc LEFT
+ sta LEFT
+ lda VALUE+1
+ eor #$ff
+ adc LEFT+1
+ sta LEFT+1
+@shift:
+ lda #1
+ jmp shift_mode
 multiply_word:
  jsr binary_operands
  jsr multiply_ax
@@ -1845,7 +1961,7 @@ clear_next:
  stx WALK
  rts
 runtime_stamp:
-.byte "AB64",2
+.byte "AB64",3
 
 format_source:
  sta LEFT
@@ -3002,9 +3118,9 @@ file_word:
 collect:
  lda #1
  sta GC_BUSY
- lda #<$1400
+ lda #<USER_BASE
  sta GC_SCAN
- lda #>$1400
+ lda #>USER_BASE
  sta GC_SCAN+1
 @block:
  lda GC_SCAN+1

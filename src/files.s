@@ -47,14 +47,14 @@ file_command:
  JEQ file_load
  lda #1
  sta FILE_MODE
- jmp @serialize
+ jmp serialize_source
 @save:
  ldx #1
  jsr $ffc9
  JCS file_fail
  lda #0
  sta FILE_MODE
-@serialize:
+serialize_source:
  jsr export_map
  lda #$ff
  sta FILE_CRC
@@ -233,12 +233,22 @@ file_command:
  lda FILE_MAP+1
  sta PTR+1
  jsr command_free
+ lda #0
+ sta FILE_MAP
+ sta FILE_MAP+1
+ lda MEM_IO
+ beq file_close
+ rts
 file_close:
+ lda MEM_IO
+ JNE clean_complete
  jsr $ffcc
  lda #1
  jsr $ffc3
  rts
 file_fail:
+ lda MEM_IO
+ JNE clean_fail
  jsr $ffcc
  lda #1
  jsr $ffc3
@@ -261,6 +271,8 @@ file_put:
  tax
  rts
 transport_put:
+ ldx MEM_IO
+ JNE memory_put
  ldx FILE_MODE
  bne @verify
  jmp $ffd2
@@ -474,7 +486,7 @@ file_get:
  lda $90
  and #$40
  JNE load_fail
- jsr $ffcf
+ jsr transport_get
  sta FILE_BYTE
  txa
  pha
@@ -629,10 +641,10 @@ file_load:
  sta FILE_ANCHOR+1
  jmp @line
 @crc:
- jsr $ffcf
+ jsr transport_get
  cmp FILE_CRC
  bne load_fail
- jsr $ffcf
+ jsr transport_get
  cmp FILE_CRC+1
  bne load_fail
  lda $90
@@ -779,11 +791,15 @@ validate_tokens:
  JCS @direct
  cmp #$70
  JCS @small
- cmp #$68
+ cmp #$6a
  JCS load_fail
  cmp #$20
  bcs @keyword
  cmp #$1a
+ JEQ @small
+ cmp #$1b
+ JEQ @small
+ cmp #$1c
  JCS load_fail
  cmp #$19
  JEQ @extended

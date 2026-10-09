@@ -1,16 +1,16 @@
 {
   "rom_bytes": 16384,
-  "rom_sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe",
+  "rom_sha256": "56e546ce0b5da160b75542170639513b49c29b1c5bb7ffed63b66cf7045d3fb0",
   "runtime_run_address": 58368,
-  "runtime_used_bytes": 6549,
-  "runtime_packed_bytes": 4871,
+  "runtime_used_bytes": 6765,
+  "runtime_packed_bytes": 5043,
   "runtime_budget_bytes": 7162,
   "gateway_used_bytes": 392,
   "gateway_budget_bytes": 768,
   "workspace_bytes": 3072,
   "arena_spans": [
     [
-      5120,
+      11264,
       53248
     ],
     [
@@ -18,17 +18,23 @@
       58368
     ]
   ],
-  "arena_raw_bytes": 49152,
+  "arena_raw_bytes": 43008,
+  "compiler_run_address": 5120,
+  "compiler_used_bytes": 5411,
+  "compiler_packed_bytes": 3807,
+  "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
     "RECOVERY": 4,
-    "COMMAND": 7746,
+    "COMMAND": 6791,
     "GATEWAY": 392,
-    "COMPILER": 3217,
-    "RUNTIME": 6549,
-    "PACKED": 4871
+    "COMPILER": 5411,
+    "RUNTIME": 6765,
+    "COMPILER_PACKED0": 768,
+    "COMPILER_PACKED": 3039,
+    "PACKED": 5043
   },
-  "rom_used_bytes": 16239,
-  "rom_spare_bytes": 145,
-  "runtime_abi": 2
+  "rom_used_bytes": 16046,
+  "rom_spare_bytes": 338,
+  "runtime_abi": 3
 }

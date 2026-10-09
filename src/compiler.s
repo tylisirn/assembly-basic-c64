@@ -28,6 +28,13 @@ emit_call:
  ; A/X fixed helper address.
  sta VALUE
  stx VALUE+1
+ cmp #<unsupported_word
+ bne @supported
+ cpx #>unsupported_word
+ bne @supported
+ lda #ERR_UNSUPPORTED
+ sta COMPILE_ERROR
+@supported:
  lda #$20
  jsr emit
  jmp emit_word
@@ -82,6 +89,28 @@ emit_context:
  ldx #>poll_break
  jmp emit_call
 compile_payload:
+ lda #0
+ sta COMPILE_ERROR
+ sta TOKEN_POS
+@validate_lexemes:
+ lda TOKEN_POS
+ cmp TOKEN_LEN
+ bcs @size
+ jsr token_peek
+ cmp #$17
+ beq @numeric_error
+ cmp #$18
+ bne @advance
+ lda #ERR_SYNTAX
+ bne @diagnostic
+@numeric_error:
+ lda #ERR_QUANTITY
+@diagnostic:
+ sta COMPILE_ERROR
+@advance:
+ jsr skip_token
+ jmp @validate_lexemes
+@size:
  lda #0
  sta EMIT_PASS
  sta CODE_PTR
@@ -148,6 +177,7 @@ compile_body:
  stx COMPILER_SP
  lda #0
  sta IF_COUNT
+ sta IF_PENDING
  sta TOKEN_POS
  sta PARSE_DEPTH
  sta IF_PATCH
@@ -155,24 +185,32 @@ compile_body:
 @statement:
  jsr emit_context
  jsr compile_statement
+@after_statement:
  bcs @trailer
  lda TOKEN_POS
  cmp TOKEN_LEN
  bcs @trailer
  jsr token_peek
+ cmp #$68
+ beq @else
  cmp #0
  bne @syntax
  inc TOKEN_POS
  jmp @statement
+@else:
+ inc TOKEN_POS
+ jsr compile_else
+ jmp @after_statement
 @syntax:
  lda #ERR_SYNTAX
  jsr emit_trap
 @trailer:
  jmp compile_tail
 compile_recover:
+ lda #ERR_SYNTAX
+compile_abort:
  ldx COMPILER_SP
  txs
- lda #ERR_SYNTAX
  jsr emit_trap
 compile_tail:
  lda EMIT_PASS
@@ -199,6 +237,7 @@ compile_tail:
  ldx SUCCESSOR+1
  jmp emit_jump
 emit_trap:
+ sta COMPILE_ERROR
  pha
  lda #$a9
  jsr emit
@@ -349,6 +388,8 @@ compile_statement:
  JEQ compile_return
  cmp #$2b
  JEQ compile_if
+ cmp #$68
+ JEQ compile_else
  cmp #$20
  JEQ compile_end
  cmp #$30
@@ -611,6 +652,11 @@ compile_if:
  jmp emit_trap
 @then:
  jsr emit_if_test
+ jmp conditional_body
+@goto:
+ jsr emit_if_test
+ jmp compile_goto
+conditional_body:
  jsr token_peek
  cmp #$70
  bcc @decimal
@@ -623,28 +669,75 @@ compile_if:
  cmp #$11
  JEQ compile_goto
  jmp compile_statement
-@goto:
- jsr emit_if_test
- jmp compile_goto
+compile_else:
+ ldx IF_PENDING
+ beq @bad
+ dex
+ stx IF_PENDING
+ lda LEX_BUFFER+64,x
+ pha
+ lda #$4c
+ jsr emit
+ lda CODE_PTR
+ sta IF_PATCH
+ lda CODE_PTR+1
+ sta IF_PATCH+1
+ lda #0
+ jsr emit
+ lda #0
+ jsr emit
+ pla
+ tax
+ lda EMIT_PASS
+ beq @replace
+ lda LEX_BUFFER+128,x
+ sta DEST
+ lda LEX_BUFFER+129,x
+ sta DEST+1
+ ldy #0
+ lda CODE_PTR
+ sta (DEST),y
+ iny
+ lda CODE_PTR+1
+ sta (DEST),y
+@replace:
+ lda IF_PATCH
+ sta LEX_BUFFER+128,x
+ lda IF_PATCH+1
+ sta LEX_BUFFER+129,x
+ jmp conditional_body
+@bad:
+ lda #ERR_SYNTAX
+ jmp emit_trap
 emit_if_test:
+ ldx IF_PENDING
+ cpx #32
+ bcs @complex
+ lda IF_COUNT
+ cmp #128
+ bcs @complex
  lda #<pop_number
  ldx #>pop_number
  jsr emit_call
- lda #$86 ; STX zp RIGHT+1
+ lda #$86
  jsr emit
  lda #RIGHT+1
  jsr emit
- lda #$05 ; ORA zp
+ lda #$05
  jsr emit
  lda #RIGHT+1
  jsr emit
- lda #$d0 ; BNE +3 / JMP trailer
+ lda #$d0
  jsr emit
  lda #3
  jsr emit
  lda #$4c
  jsr emit
- ldx IF_COUNT
+ ldx IF_PENDING
+ lda IF_COUNT
+ sta LEX_BUFFER+64,x
+ inc IF_PENDING
+ tax
  lda CODE_PTR
  sta LEX_BUFFER+128,x
  inx
@@ -656,11 +749,16 @@ emit_if_test:
  jsr emit
  lda #0
  jmp emit
+@complex:
+ lda #ERR_STACK
+ jmp compile_abort
 compile_print:
  lda #0
  sta PRINT_LAST
 @item:
  jsr token_peek
+ cmp #$68
+ beq @done
  cmp #0
  beq @done
  lda TOKEN_POS
@@ -792,6 +890,8 @@ expression:
 :
  sta LEX_BUFFER,x
  inc PARSE_DEPTH
+ jsr optimize_left_power
+ bcs @operator
  jsr primary
 @operator:
  jsr token_peek
@@ -806,6 +906,10 @@ expression:
  ldx PARSE_DEPTH
  dex
  sta OP_STACK,x
+ jsr optimize_power
+ bcs @operator
+ ldx PARSE_DEPTH
+ dex
  lda LEX_BUFFER+32,x
  clc
  adc #1 ; BASIC binary operators, including power, associate left.
@@ -818,7 +922,169 @@ expression:
 @done:
  dec PARSE_DEPTH
  rts
+parse_constant:
+ ; Recognize a binary immediate with optional redundant parentheses/unary plus.
+ lda #0
+ sta SCRATCH+45
+@open:
+ jsr token_peek
+ cmp #5
+ beq @plus
+ cmp #3
+ bne @number
+ inc SCRATCH+45
+@plus:
+ inc TOKEN_POS
+ jmp @open
+@number:
+ jsr parse_immediate
+ bcs @done
+@close:
+ lda SCRATCH+45
+ beq @ok
+ jsr token_take
+ cmp #4
+ bne @bad
+ dec SCRATCH+45
+ jmp @close
+@ok:
+ clc
+@done:
+ rts
+@bad:
+ sec
+ rts
+optimize_left_power:
+ ldx PARSE_DEPTH
+ dex
+ lda LEX_BUFFER,x
+ cmp #8
+ bcs @no
+ lda TOKEN_POS
+ pha
+ jsr parse_constant
+ bcs @restore
+ jsr token_peek
+ cmp #7
+ bne @restore
+ lda VALUE
+ ora VALUE+1
+ beq @restore
+ lda #0
+ sta SCRATCH+44
+@bit:
+ lsr VALUE+1
+ ror VALUE
+ bcs @one
+ inc SCRATCH+44
+ jmp @bit
+@one:
+ lda VALUE
+ ora VALUE+1
+ bne @restore
+ pla
+ inc TOKEN_POS
+ lda SCRATCH+44
+ pha
+ lda #8
+ jsr expression
+ pla
+ sta VALUE
+ lda #0
+ sta VALUE+1
+ jsr emit_ax
+ lda #<push_number
+ ldx #>push_number
+ jsr emit_call
+ lda #<shift_left_word
+ ldx #>shift_left_word
+ jsr emit_call
+ sec
+ rts
+@restore:
+ pla
+ sta TOKEN_POS
+@no:
+ clc
+ rts
+optimize_power:
+ ; Only fold a complete literal RHS: a tighter operator must remain in Pratt.
+ lda OP_STACK,x
+ cmp #7
+ beq @try
+ cmp #8
+ bne @no
+@try:
+ lda TOKEN_POS
+ pha
+ jsr parse_constant
+ bcs @restore
+ lda VALUE
+ ora VALUE+1
+ beq @restore
+ lda #0
+ sta SCRATCH+44
+@bit:
+ lsr VALUE+1
+ ror VALUE
+ bcs @one
+ inc SCRATCH+44
+ jmp @bit
+@one:
+ lda VALUE
+ ora VALUE+1
+ bne @restore
+ jsr token_peek
+ jsr precedence
+ bcc @fold
+ ldx PARSE_DEPTH
+ dex
+ cmp LEX_BUFFER+32,x
+ beq @fold
+ bcs @restore
+@fold:
+ pla
+ lda SCRATCH+44
+ sta VALUE
+ lda #0
+ sta VALUE+1
+ jsr emit_ax
+ lda #<push_number
+ ldx #>push_number
+ jsr emit_call
+ ldx PARSE_DEPTH
+ dex
+ lda OP_STACK,x
+ cmp #7
+ beq @multiply
+ lda SCRATCH+44
+ cmp #15
+ beq @negative_divisor
+ lda #<divide_power_word
+ ldx #>divide_power_word
+ bne @emit
+@negative_divisor:
+ lda #<divide_negative_power_word
+ ldx #>divide_negative_power_word
+ bne @emit
+@multiply:
+ lda #<shift_left_word
+ ldx #>shift_left_word
+@emit:
+ jsr emit_call
+ sec
+ rts
+@restore:
+ pla
+ sta TOKEN_POS
+@no:
+ clc
+ rts
 precedence:
+ cmp #$1a
+ beq @shift
+ cmp #$1b
+ beq @shift
  cmp #$4c
  beq @or
  cmp #$4b
@@ -851,13 +1117,16 @@ precedence:
 @compare: lda #4
  sec
  rts
-@add: lda #5
+@shift: lda #5
  sec
  rts
-@multiply: lda #6
+@add: lda #6
  sec
  rts
-@power: lda #8
+@multiply: lda #7
+ sec
+ rts
+@power: lda #9
  sec
  rts
 primary:
@@ -949,11 +1218,11 @@ primary:
  jmp emit_call
 @plus:
  inc TOKEN_POS
- lda #7
+ lda #8
  jmp expression
 @minus:
  inc TOKEN_POS
- lda #7
+ lda #8
  jsr expression
  lda #<negate_word
  ldx #>negate_word
@@ -1066,6 +1335,10 @@ primary:
  lda #ERR_UNSUPPORTED
  jmp emit_trap
 emit_operator:
+ cmp #$1a
+ beq @left
+ cmp #$1b
+ beq @right
  cmp #$4b
  beq @and
  cmp #$4c
@@ -1088,17 +1361,25 @@ emit_operator:
  lda #<or_word
  ldx #>or_word
  jmp emit_call
+@left:
+ lda #<shift_left_word
+ ldx #>shift_left_word
+ jmp emit_call
+@right:
+ lda #<shift_right_word
+ ldx #>shift_right_word
+ jmp emit_call
 operator_table:
 .word add_word_runtime, subtract_word, multiply_word, divide_word, power_word
 .word equal_word, less_word, greater_word, le_word, ge_word, ne_word
 function_table:
 .word sgn_word,int_word,abs_word,usr_word,fre_word,pos_word
-.word unsupported_word,unsupported_word,unsupported_word,unsupported_word
+.word unsupported_word,rnd_word,unsupported_word,unsupported_word
 .word unsupported_word,unsupported_word,unsupported_word,unsupported_word
 .word peek_word,len_word,str_word,val_word,asc_word,chr_word
 .word unsupported_word,unsupported_word,unsupported_word
 
-.segment "COMMAND"
+.segment "COMPILER"
 compile_dim:
  jsr parse_name
  jsr bind_array

@@ -1,25 +1,29 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.4",
-  "runtime_abi": 2,
+  "design_revision": "0.5",
+  "runtime_abi": 3,
   "source_version": 1,
-  "validated_tests": 45,
+  "validated_tests": 58,
   "artifacts": {
     "abi.json": {
-      "bytes": 4045,
-      "sha256": "71272e5ccda6343937e07898ea72fc919b526c2cfac5c1e0b605c1436bdbd11b"
+      "bytes": 4329,
+      "sha256": "6a7ff061b1e049874207fc7c27a0f773f653e5ccfd1c0945d4d4925f59ab3e00"
     },
     "assembly-basic.bin": {
       "bytes": 16384,
-      "sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe"
+      "sha256": "56e546ce0b5da160b75542170639513b49c29b1c5bb7ffed63b66cf7045d3fb0"
     },
     "assembly-basic.crt": {
       "bytes": 16464,
-      "sha256": "05576576244c427f5631855e83db790e269fee639176fa0a17befe6d951d20ef"
+      "sha256": "f6d5403db8b0ac28430476d0dc8521919707fa3f372e5ad3a2a9e43e594252a2"
     },
     "examples/hello.ab": {
       "bytes": 62,
       "sha256": "f846e3cf938d7ff57912658cf838afacd9695dc1521b332640606bc80b07309a"
+    },
+    "examples/revision05.ab": {
+      "bytes": 163,
+      "sha256": "12ab4a933a76d1924823022ae1e3585b7b5f0df36101bacd068c356b4fc65d8a"
     },
     "examples/strings_arrays.ab": {
       "bytes": 175,
@@ -30,12 +34,12 @@
       "sha256": "017dab3c7d0cc8d033de0c5328574257d487769e95e8fa535b8d8992830a5246"
     },
     "size-report.json": {
-      "bytes": 681,
-      "sha256": "b2d9427f7775fcfbda3e8bcbd97c90a3f1ff3b68d5faf43e65c2d39d591dce10"
+      "bytes": 869,
+      "sha256": "8d33bc96ad652fc16b9d41eceaaa94ecc82a176dead1e4867343b54d4bb5162d"
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "900b9ed14c57c2569b3bf7bdb071110872bc394f5b44ded28d32fb3ffdff494c"
+      "sha256": "7c26f01a3b0b5909274df263ce71a00344041292a6b7d4acd1c3de2ccf5d6eca"
     }
   }
 }
