@@ -16,7 +16,7 @@ python3 tools/test.py
 
 With an existing toolchain, use `python3 tools/build.py --toolchain /path/to/cc65/bin` and install `py65==1.2.0` into your Python environment. The build produces `build/assembly-basic.crt`, the raw 16 KiB `build/assembly-basic.bin`, assembler listing, linker map, labels, raw and compressed runtime images, and `build/size-report.json`. Checked-in development cartridge artifacts are in [dist](dist).
 
-The CRT is a standard type-zero cartridge with two 8 KiB CHIP packets and both GAME and EXROM low. Load it as a cartridge in a C64 emulator. For example, with VICE installed:
+The CRT is a standard type-zero cartridge with one 16 KiB CHIP packet at `$8000` and both GAME and EXROM low. This packet layout is compatible with VICE's generic cartridge loader; two 8 KiB packets at `$8000` and `$A000` are rejected by VICE 3.7.1's loader. In VICE, use “Attach CRT image” for the `.crt`, or “Attach generic 16KB cartridge” for the raw `.bin`. For example, with VICE installed:
 
 ```sh
 x64sc -cartcrt dist/assembly-basic.crt

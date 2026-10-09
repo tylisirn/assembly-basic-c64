@@ -54,11 +54,10 @@ def build(toolchain=None):
     runtime = labels['__RUNTIME_SIZE__']
     if gateway > 768 or runtime > 7162:
         raise SystemExit('RAM budget exceeded')
-    # Standard CRT type 0, /EXROM=0 /GAME=0, two 8-KiB ROM packets.
+    # VICE 3.7.1's generic loader treats a second packet as Ultimax ROM. Use one
+    # contiguous 16-KiB packet for the normal $8000-$BFFF cartridge instead.
     header = b'C64 CARTRIDGE   '+struct.pack('>IHHBB',64,0x100,0,0,0)+bytes(6)+b'ASSEMBLY BASIC'.ljust(32,b'\0')
-    crt = header
-    for addr,start in ((0x8000,0),(0xa000,8192)):
-        crt += b'CHIP'+struct.pack('>IHHHH',8208,0,0,addr,8192)+rom[start:start+8192]
+    crt = header+b'CHIP'+struct.pack('>IHHHH',16400,0,0,0x8000,16384)+rom
     (build/'assembly-basic.crt').write_bytes(crt)
     report = {'rom_bytes':len(rom),'rom_sha256':hashlib.sha256(rom).hexdigest(),'runtime_run_address':0xe400,'runtime_used_bytes':runtime,'runtime_packed_bytes':len(packed),'runtime_budget_bytes':7162,'gateway_used_bytes':gateway,'gateway_budget_bytes':768,'workspace_bytes':3072,'arena_spans':[[0x1400,0xd000],[0xe000,0xe400]],'arena_raw_bytes':49152}
     segments={}

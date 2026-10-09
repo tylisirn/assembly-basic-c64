@@ -3,7 +3,7 @@
   "design_revision": "0.4",
   "runtime_abi": 2,
   "source_version": 1,
-  "validated_tests": 44,
+  "validated_tests": 45,
   "artifacts": {
     "abi.json": {
       "bytes": 4045,
@@ -14,8 +14,8 @@
       "sha256": "8afb6fbd2e2be81953eda93b6e22fbe7d9db24a95aa11a50428779dbf30f67fe"
     },
     "assembly-basic.crt": {
-      "bytes": 16480,
-      "sha256": "cd2f44da51d59bef786357226f2c912b5ac4b3a8f91129bcbf2a84c396e0336f"
+      "bytes": 16464,
+      "sha256": "05576576244c427f5631855e83db790e269fee639176fa0a17befe6d951d20ef"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -35,7 +35,7 @@
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "8c778ba0a1a68d5126d1ff3346a01bc438b2ce3619808094b9764e48fdb58bc5"
+      "sha256": "900b9ed14c57c2569b3bf7bdb071110872bc394f5b44ded28d32fb3ffdff494c"
     }
   }
 }
