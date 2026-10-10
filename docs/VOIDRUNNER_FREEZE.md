@@ -72,3 +72,28 @@ build's `build/assembly-basic.lbl` to identify collector instruction addresses;
 addresses from the previous ROM no longer identify the same routines. Screen
 copy or a snapshot can capture the evidence; VICE 2.4 lacks the newer monitor
 logging commands suggested earlier.
+
+## Gameplay retest and remaining latency — 10 October 2026
+
+Following the revision 0.6 Magic Desk conversion, the user reports successful
+loading of Void Runner from disk into VICE, followed by running and playing the
+game. Garbage collection completes, but periodically pauses gameplay for roughly
+0.25–0.5 seconds. The following maze workload also runs, with collection pauses
+of approximately one second:
+
+```basic
+10 PRINT CHR$(205 + (ABS(RND(1)) >> 14));:GOTO 10
+```
+
+These are user-observed estimates rather than instrumented timings; the VICE
+version, timing configuration and test duration were not restated. They establish
+successful disk-load/gameplay behavior for the retest, while collection latency
+remains open. No collector change is made in response to this report yet.
+
+The maze's CHR$ creates a fresh one-byte heap string every iteration, which PRINT
+consumes immediately. This is a useful temporary-allocation stress workload even
+with a very small source program. Future profiling should compare its allocation
+count and collection phases with Void Runner. Candidate improvements include
+avoiding transient strings in supported PRINT expressions and reducing worst
+collection latency. Incremental collection needs a defined root/mutation
+protocol; preserve stationary code, reservations and live descriptors throughout.

@@ -22,7 +22,7 @@ The CRT uses Magic Desk type 19 with eight 8 KiB CHIP packets at `$8000`, GAME h
 x64sc -cartcrt dist/assembly-basic.crt
 ```
 
-VICE and physical PAL/NTSC machine validation remain pending; see the status document before treating this as a hardware release.
+The user has successfully loaded Void Runner from disk and played it in VICE with this conversion. Collection still causes visible pauses (roughly 0.25–0.5 seconds in the game and one second in the maze stress workload). Broader emulator acceptance and physical PAL/NTSC validation remain pending; see the [recorded validation and backlog](docs/IMPLEMENTATION_STATUS.md).
 
 ## Bank layout
 
