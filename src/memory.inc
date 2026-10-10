@@ -1,4 +1,4 @@
-; Assembly BASIC ABI 3: fixed RAM entry points, documented NMOS instructions.
+; Assembly BASIC ABI 4: fixed RAM entry points, documented NMOS instructions.
 PORT = $01
 PTR = $02
 PTR2 = $04
@@ -203,3 +203,10 @@ GC_PAGE = SIZE ; Cached high byte rounded down to a 2-KiB window.
 ; Allocating string helpers recompute SIZE after collection.
 GC_FREE_PREV = PREV
 GC_FREE_NEXT = WALK
+
+; Classic Magic Desk: eight 8-KiB ROM banks; select while executing in common RAM.
+CART_REGISTER = $de00
+CART_BANK = STATE+227 ; Software shadow of the write-only bank register.
+BANK_COMMAND = 0
+BANK_COMPILER = 1
+BANK_RUNTIME = 2

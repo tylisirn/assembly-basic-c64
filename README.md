@@ -1,8 +1,8 @@
 # Assembly BASIC for the Commodore 64
 
-A standard 16 KiB autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
+A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.5, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.6, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -14,15 +14,21 @@ python3 tools/build.py
 python3 tools/test.py
 ```
 
-With an existing toolchain, use `python3 tools/build.py --toolchain /path/to/cc65/bin` and install `py65==1.2.0` into your Python environment. The build produces `build/assembly-basic.crt`, the raw 16 KiB `build/assembly-basic.bin`, assembler listing, linker map, labels, raw and compressed runtime/compiler images, and `build/size-report.json`. Checked-in development cartridge artifacts are in [dist](dist).
+With an existing toolchain, use `python3 tools/build.py --toolchain /path/to/cc65/bin` and install `py65==1.2.0` into your Python environment. The build produces `build/assembly-basic.crt`, the raw 64 KiB `build/assembly-basic.bin`, assembler listing, linker map, labels, raw runtime/compiler images, and `build/size-report.json`. Checked-in development cartridge artifacts are in [dist](dist).
 
-The CRT is a standard type-zero cartridge with one 16 KiB CHIP packet at `$8000` and both GAME and EXROM low. This packet layout is compatible with VICE's generic cartridge loader; two 8 KiB packets at `$8000` and `$A000` are rejected by VICE 3.7.1's loader. In VICE, use “Attach CRT image” for the `.crt`, or “Attach generic 16KB cartridge” for the raw `.bin`. For example, with VICE installed:
+The CRT uses Magic Desk type 19 with eight 8 KiB CHIP packets at `$8000`, GAME high and EXROM low. VICE cartconv accepts it and converts it back to the identical ROM. In VICE, use “Attach CRT image” for the `.crt`. A raw `.bin` must be attached as Magic Desk; the former generic 16KB attachment setting no longer applies. For example, with VICE installed:
 
 ```sh
 x64sc -cartcrt dist/assembly-basic.crt
 ```
 
 VICE and physical PAL/NTSC machine validation remain pending; see the status document before treating this as a hardware release.
+
+## Bank layout
+
+Bank 0 contains the current command/editor code, bank 1 the raw compiler image and bank 2 the raw runtime image. Banks 3–7 reserve space for the improved editor/PRG conversion, 16.8 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
+
+Firmware revision 0.6 changes runtime ABI to 4; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
@@ -44,7 +50,7 @@ Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THE
 
 `<<` and `>>` are arithmetic shifts. Counts must be 0–255; left shifts wrap, right shifts preserve the sign, and counts of 16 or more yield zero or the right-shift sign fill. Shifts bind below addition and above comparisons. Literal power-of-two multiplication uses a left shift; division uses a biased right shift to retain truncation toward zero (`-5/2` is -2, while `-5>>1` is -3).
 
-`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The standard 16 KiB cartridge uses runtime ABI 3, reserves 6 KiB at `$1400–$2BFF` for a compiler image decompressed at startup, and has a 42 KiB raw program arena.
+`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The Magic Desk cartridge uses runtime ABI 4, reserves 6 KiB at `$1400–$2BFF` for a compiler image copied at startup, and has a 42 KiB raw program arena.
 
 `RESERVE address,bytes` declares RAM for graphics or machine code before the
 compiler allocates it. Both arguments must be unsigned numeric literals aligned
@@ -102,4 +108,4 @@ PYTHONPATH=host:.tools/py65 python3 -m ab64 repl
 - [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md): implementation report requested with the project.
 - [Assembly_BASIC_C64_Design.docx](Assembly_BASIC_C64_Design.docx): synchronized design; Appendix B records implementation status and differences.
 
-After changing the firmware, run the build and tests, then `python3 tools/measure.py` and `python3 tools/update_design.py` to refresh the measured documentation. Copy the validated ROM, CRT and size report into `dist` when publishing a new development artifact.
+After changing the firmware, run the build and tests, then `python3 tools/measure.py` and `python3 tools/update_design.py` to refresh the measured documentation. Run `python3 tools/package.py` to publish matching ROM, CRT, ABI, example containers and validation metadata into `dist`. Before testing, copy the current build ROM/CRT into `dist` because cartridge-format tests check both locations.

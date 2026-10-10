@@ -1,8 +1,8 @@
 {
-  "design_revision": "0.5",
-  "runtime_abi": 3,
-  "design_sha256": "9f3eeaf8ad66228419888e5c7294dbbfa58f1e1bdb9d7efcd163ff965002c438",
-  "rom_sha256": "ea014de7205b22965ab8f0eef1c934b04ed7e856229eeb9e94aed25176418343",
+  "design_revision": "0.6",
+  "runtime_abi": 4,
+  "design_sha256": "2569bcbce606175193aad2967759c4858c15b52e31d778f7537c9b3f4d9528cb",
+  "rom_sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc",
   "runtime_run_address": 58368,
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,

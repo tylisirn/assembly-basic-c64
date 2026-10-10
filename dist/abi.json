@@ -1,6 +1,109 @@
 {
-  "runtime_abi": 3,
-  "rom_sha256": "ea014de7205b22965ab8f0eef1c934b04ed7e856229eeb9e94aed25176418343",
+  "runtime_abi": 4,
+  "rom_sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc",
+  "cartridge_type": 19,
+  "cartridge_format": "classic Magic Desk",
+  "bank_register": 56832,
+  "bank_shadow": 3043,
+  "banks": [
+    {
+      "bank": 0,
+      "offset": 0,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "boot, command editor, tokenizer, LIST and source transport",
+      "used_bytes": 6994,
+      "spare_bytes": 1198,
+      "reserved": false
+    },
+    {
+      "bank": 1,
+      "offset": 8192,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "raw resident compiler image",
+      "used_bytes": 6125,
+      "spare_bytes": 2067,
+      "reserved": false
+    },
+    {
+      "bank": 2,
+      "offset": 16384,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "raw RAM execution runtime image",
+      "used_bytes": 6783,
+      "spare_bytes": 1409,
+      "reserved": false
+    },
+    {
+      "bank": 3,
+      "offset": 24576,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: improved editor and BASIC PRG conversion",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 4,
+      "offset": 32768,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: 16.8 fixed-point and PRINT formatting extensions",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 5,
+      "offset": 40960,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: sprite, VIC and SID commands",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 6,
+      "offset": 49152,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: numeric tables, fonts and optional resources",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 7,
+      "offset": 57344,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: expansion and diagnostics",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    }
+  ],
+  "command_bank": 0,
   "command_port_bits": 7,
   "execution_port_bits": 5,
   "runtime_base": 58368,
@@ -16,12 +119,32 @@
     5120,
     11264
   ],
+  "image_loads": {
+    "compiler": {
+      "bank": 1,
+      "rom_address": 32777,
+      "run_address": 5120,
+      "bytes": 6116,
+      "encoding": "raw"
+    },
+    "runtime": {
+      "bank": 2,
+      "rom_address": 32777,
+      "run_address": 58368,
+      "bytes": 6774,
+      "encoding": "raw"
+    }
+  },
   "gateways": {
     "kernal_gate": 2048,
-    "enter_ready": 2226,
-    "sys_gateway": 2367,
-    "usr_gateway": 2401,
-    "file_entry": 2343
+    "enter_ready": 2240,
+    "sys_gateway": 2404,
+    "usr_gateway": 2438,
+    "file_entry": 2377,
+    "select_command_bank": 2480,
+    "copy_bank_image": 2512,
+    "bank_cold": 2489,
+    "bank_warm": 2496
   },
   "runtime_entries": {
     "abs_word": 60428,

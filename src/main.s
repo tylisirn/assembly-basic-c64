@@ -1,13 +1,11 @@
 .setcpu "6502"
 .include "memory.inc"
 .import __GATEWAY_LOAD__, __GATEWAY_RUN__, __GATEWAY_SIZE__
-.import __COMPILER_RUN__, __COMPILER_SIZE__
+.import __COMPILER_LOAD__, __COMPILER_RUN__, __COMPILER_SIZE__
 .import __RUNTIME_LOAD__, __RUNTIME_RUN__, __RUNTIME_SIZE__
 .segment "HEADER"
 .word cold_start, cartridge_warm
 .byte $c3,$c2,$cd,$38,$30
-.segment "RECOVERY"
-.word cold_start, warm_ready
 .segment "COMMAND"
 cold_start:
  sei
@@ -38,8 +36,9 @@ cold_start:
  lda #>__GATEWAY_SIZE__
  sta COUNT+1
  jsr copy_image
- jsr unpack_runtime
- jsr unpack_compiler
+ jsr select_command_bank
+ jsr load_runtime
+ jsr load_compiler
  lda #<ram_nmi
  sta $fffa
  lda #>ram_nmi
@@ -86,6 +85,7 @@ cartridge_warm:
  lda PORT
  ora #7
  sta PORT
+ jsr select_command_bank
  jmp warm_ready
 copy_image:
  ldy #0
@@ -231,7 +231,7 @@ direct_command:
  sta ENTRY+1
  jmp run_entry
 command_run:
- jsr unpack_runtime
+ jsr load_runtime
  jsr clear_values
  lda #0
  sta CONT_PC
@@ -270,7 +270,7 @@ command_cont:
  lda CONT_GEN+1
  cmp GENERATION+1
  bne @bad
- jsr unpack_runtime
+ jsr load_runtime
  lda CONT_PC
  sta ENTRY
  lda CONT_PC+1
@@ -298,7 +298,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.5",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.6",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
@@ -377,7 +377,7 @@ clear_values:
  sta gateway_call+2
  jmp call_ram
 
-; Stopped command helpers share the compressed resident image to fit ROM.
+; Stopped command helpers share the resident compiler image in bank 1.
 .segment "COMPILER"
 report_error:
  pha
@@ -430,22 +430,18 @@ command_free:
 .include "reserve.s"
 .include "runtime.s"
 
-.segment "COMPILER_PACKED0"
-compiler_packed:
-.incbin "compiler0.lz"
-compiler_first_end:
-.segment "COMPILER_PACKED"
-compiler_remaining:
-.incbin "compiler.lz"
-.segment "PACKED"
-runtime_packed:
-.incbin "runtime.lz"
+; Every auxiliary bank has a recovery header pointing into common RAM. This
+; lets KERNAL cartridge NMI dispatch recover even during a banked image copy.
+.repeat 7, I
+.segment .sprintf("HEADER%d", I+1)
+.word bank_cold, bank_warm
+.byte $c3,$c2,$cd,$38,$30
+.endrepeat
 .segment "COMMAND"
-; Decompress the fixed-address execution image through a common-RAM read gate.
-unpack_compiler:
- lda #<compiler_packed
+load_compiler:
+ lda #<__COMPILER_LOAD__
  sta SOURCE
- lda #>compiler_packed
+ lda #>__COMPILER_LOAD__
  sta SOURCE+1
  lda #<__COMPILER_RUN__
  sta DEST
@@ -455,11 +451,12 @@ unpack_compiler:
  sta COUNT
  lda #>__COMPILER_SIZE__
  sta COUNT+1
- jmp unpack_image
-unpack_runtime:
- lda #<runtime_packed
+ lda #BANK_COMPILER
+ jmp copy_bank_image
+load_runtime:
+ lda #<__RUNTIME_LOAD__
  sta SOURCE
- lda #>runtime_packed
+ lda #>__RUNTIME_LOAD__
  sta SOURCE+1
  lda #<__RUNTIME_RUN__
  sta DEST
@@ -469,92 +466,5 @@ unpack_runtime:
  sta COUNT
  lda #>__RUNTIME_SIZE__
  sta COUNT+1
-unpack_image:
-@group:
- jsr packed_byte
- sta SCRATCH+38
- lda #8
- sta SCRATCH+39
-@item:
- lsr SCRATCH+38
- bcc @match
- jsr packed_byte
- jsr unpack_byte
- jmp @next
-@match:
- jsr packed_byte
- sta TMP
- jsr packed_byte
- pha
- and #15
- sta TMP+1
- inc TMP
- bne :+
- inc TMP+1
-:
- sec
- lda DEST
- sbc TMP
- sta PTR
- lda DEST+1
- sbc TMP+1
- sta PTR+1
- pla
- lsr
- lsr
- lsr
- lsr
- clc
- adc #3
- sta SCRATCH+40
-@copy:
- ldy #0
- jsr read_ram
- jsr unpack_byte
- inc PTR
- bne :+
- inc PTR+1
-:
- dec SCRATCH+40
- bne @copy
-@next:
- lda COUNT
- ora COUNT+1
- beq @done
- dec SCRATCH+39
- bne @item
- jmp @group
-@done:
- rts
-packed_byte:
- lda SOURCE
- cmp #<compiler_first_end
- bne @read
- lda SOURCE+1
- cmp #>compiler_first_end
- bne @read
- lda #<compiler_remaining
- sta SOURCE
- lda #>compiler_remaining
- sta SOURCE+1
-@read:
- ldy #0
- lda (SOURCE),y
- inc SOURCE
- bne :+
- inc SOURCE+1
-:
- rts
-unpack_byte:
- ldy #0
- sta (DEST),y
- inc DEST
- bne :+
- inc DEST+1
-:
- lda COUNT
- bne :+
- dec COUNT+1
-:
- dec COUNT
- rts
+ lda #BANK_RUNTIME
+ jmp copy_bank_image

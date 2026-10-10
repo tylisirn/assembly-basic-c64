@@ -61,10 +61,15 @@ def synchronize():
             break
     replacements={
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.5  |  9 October 2026',
+        'Design specification  |  Version 0.6  |  10 October 2026',
+        'Design specification  |  Version 0.5  |  9 October 2026':
+        'Design specification  |  Version 0.6  |  10 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.5', 'runtime ABI 2':'runtime ABI 3', 'ABI 2':'ABI 3',
+        'Version 0.4':'Version 0.6', 'runtime ABI 2':'runtime ABI 4', 'ABI 2':'ABI 4',
+        'runtime ABI 3':'runtime ABI 4', 'ABI 3':'ABI 4',
+        'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
+        'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
         'roughly 379 such lines':'roughly 322 such lines',
         '6138 bytes':'7162 bytes', '6138':'7162',
         'proposed $E800 base':'implemented $E400 base',
@@ -126,6 +131,78 @@ def synchronize():
         'declarations. Identical bounds are idempotent; occupied/overlapping bounds fail safely. '
         'Removing source or a failed import may leave a reservation until NEW. $C000 is not implicit '
         'scratch RAM, and stock BASIC memory-top POKEs at 55/56 do not configure this allocator.')
+    # Revision 0.6 changes the hardware/load contract while preserving source semantics.
+    image=('Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident '
+           'compiler for $1400-$2BFF (runtime ABI 4). Store raw load images in Magic Desk banks '
+           '2 and 1 respectively. Copy the complete dependency closures through common RAM at '
+           'cold start; refresh the runtime at RUN and CONT. The linker supplies separate load '
+           'and run addresses, so internal instructions already name their RAM addresses. '
+           'There is no decompression or arbitrary instruction relocation.')
+    for key in ('Link the execution image for its fixed run addresses',
+                'Link the execution image for fixed run addresses',
+                'Link the execution runtime for fixed run addresses'):
+        rewrites[key]=image
+    for key in ('The allocator therefore has two spans:', 'The implemented allocator has two spans:'):
+        rewrites[key]=rewrites[key].replace('decompressed at startup','copied from bank 1 at startup')
+    budget=(f"These are ABI 4 build limits. The 65536-byte cartridge has eight 8192-byte banks. "
+            f"Runtime helpers occupy {report['runtime_used_bytes']} of 7162 bytes at $E400-$FFF9; "
+            f"the compiler occupies {report['compiler_used_bytes']} of 6144 bytes at $1400-$2BFF; "
+            f"the gateway occupies {report['gateway_used_bytes']} of 768 bytes. ROM-off execution "
+            'remains required. No allocation may cross the I/O hole or overlap firmware. '
+            'Future RAM-layout changes require a new ABI and source recompilation.')
+    for key in ('These sizes are proposed budgets.', 'These are ABI 3 build limits.',
+                'These are ABI 4 build limits.'):
+        rewrites[key]=budget
+    measured=('The preceding subdivision is the current bank allocation. Exact measured link '
+              'sizes are recorded in Appendix B and dist/size-report.json. Compiler and runtime '
+              'load images are raw. The build enforces a 65536-byte cartridge, each 8192-byte '
+              'bank, a 768-byte gateway, a 6144-byte resident compiler and a 7162-byte RAM runtime. '
+              'Reserved banks anticipate future features; they do not imply those features exist '
+              'or enlarge the current 43008-byte raw program arena.')
+    for key in ('These are planning allocations, not measured sizes.',
+                'The preceding subdivision is the original planning allocation.',
+                'The preceding subdivision is the current bank allocation.'):
+        rewrites[key]=measured
+    rewrites.update({
+        'Implement Assembly BASIC as a normal 16 KB':
+        'Implement Assembly BASIC as a 64 KiB classic Magic Desk autostart cartridge containing '
+        'the command/editor firmware, tokenizer, compiler and an execution runtime load image. '
+        'Copy compiler/runtime helpers to fixed RAM and execute native programs with cartridge, '
+        'BASIC and KERNAL ROM hidden. Retain custom tokens beside native code and link each body '
+        'through its final successor JMP. LIST expands source tokens into canonical PETSCII.',
+        'Standard 16 KB cartridge with':
+        '64 KiB classic Magic Desk cartridge, eight 8 KiB ROML banks selected through $DE00; '
+        '/EXROM low and /GAME high. No cartridge RAM is required.',
+        'Use a standard 16 KB cartridge decoding':
+        'Use a 64 KiB classic Magic Desk cartridge with eight banks at $8000-$9FFF, /EXROM low '
+        'and /GAME high. $DE00 selects banks 0..7; its write-only latch is shadowed at $0BE3. '
+        'The command map sets LORAM, HIRAM and CHAREN: bank 0, stock BASIC at $A000-$BFFF, '
+        'I/O and KERNAL are visible. No stock BASIC routines are called. Preserve cassette '
+        'control bits and configure direction bits 0..2 as outputs. See docs/MAGIC_DESK_BANKS.md '
+        'and the VICE Magic Desk format specification.',
+        'Cartridge at $8000-$BFFF;':
+        'Selected Magic Desk bank at $8000-$9FFF; BASIC ROM at $A000-$BFFF; I/O at $D000-$DFFF; KERNAL at $E000-$FFFF.',
+        'With a normal 16 KB cartridge,':
+        'With classic Magic Desk, $35 hides ROML, BASIC and KERNAL while retaining I/O; $34 '
+        'hides I/O too. Writes beneath visible ROM reach underlying RAM. Keep the cartridge '
+        'enabled and select RAM through $01 rather than writing $80 to $DE00, since some '
+        'physical variants latch disable until reset. VIC visibility follows its separate map.',
+        'The KERNAL recognizes this signature':
+        'The KERNAL recognizes CBM80 at $8004 before initialization. Bank 0 has cold/warm '
+        'entry vectors at $8000/$8002. Every auxiliary bank has the same signature and vectors '
+        'to common-RAM recovery helpers installed at startup; these select bank 0 before '
+        'returning to command ROM. The previous $A000 recovery words are removed because '
+        'stock BASIC ROM occupies that window in the command map.',
+        'Save the caller’s low three mapping bits':
+        'KERNAL gateways save low mapping bits, interrupt state and the bank shadow. Expose '
+        'I/O before selecting bank 0, preserve service arguments/results and carry, and restore '
+        'the bank before restoring the map. Preserve the current upper port bits for device '
+        'services. Image-copy gateways instead mask IRQs for the complete copy and restore '
+        'the full saved port, bank and flags. Every $DE00 selection and its return path must '
+        'execute in common RAM. NMI stays in common RAM and leaves the bank unchanged.',
+        '16 KB ROM/.CRT;':
+        '64 KiB Magic Desk ROM/.CRT; eight 8 KiB CHIP packets, autostart, $37/$35 mapping, raw image copies, bank-preserving low-RAM gateways and RAM vectors validated.',
+    })
     paragraphs=list(body.iter(f'{{{W}}}p'))
     for p in paragraphs:
         nodes=list(p.iter(f'{{{W}}}t'))
@@ -152,7 +229,7 @@ def synchronize():
             cells=row.findall('w:tc',NS)
             values=[''.join(c.itertext()) for c in cells]
             if values[0]=='$1400-$7FFF':
-                for c,text in zip(cells,('$1400-$2BFF','6 KB','Resident compiler, decompressed at cold start; excluded from user allocation.')):set_cell(c,text)
+                for c,text in zip(cells,('$1400-$2BFF','6 KB','Resident compiler, copied from bank 1 at cold start; excluded from user allocation.')):set_cell(c,text)
                 new=copy.deepcopy(row)
                 for c,text in zip(new.findall('w:tc',NS),('$2C00-$7FFF','21 KB','Common user arena; stable anchors, names and bindings allocate here.')):set_cell(c,text)
                 table.insert(list(table).index(row)+1,new)
@@ -166,6 +243,19 @@ def synchronize():
         rows=table.findall('w:tr',NS)
         header=''.join(rows[0].itertext())
         contents=''.join(table.itertext())
+        if header.startswith('Cartridge contents'):
+            template=copy.deepcopy(rows[-1])
+            for old in rows[1:]:table.remove(old)
+            set_cell(rows[0].findall('w:tc',NS)[1],'Bank budget / measured used bytes')
+            for bank in report['banks']:
+                new=copy.deepcopy(template)
+                for c,text in zip(new.findall('w:tc',NS),
+                                  (f"Bank {bank['bank']}: {bank['role']}",
+                                   f"8192 / {bank['used_bytes']} bytes")):set_cell(c,text)
+                table.append(new)
+            new=copy.deepcopy(template)
+            for c,text in zip(new.findall('w:tc',NS),('Hard cartridge limit','64 KiB (65536 bytes)')):set_cell(c,text)
+            table.append(new)
         if 'Punctuation or operator' in header and '$1A' not in contents:
             new=copy.deepcopy(rows[-1])
             for c,text in zip(new.findall('w:tc',NS),('$1A','<<','$1B','>>')):set_cell(c,text)
@@ -185,9 +275,13 @@ def synchronize():
         if address=='$E000-$E3FF':
             ts=list(cells[1].iter(f'{{{W}}}t'));ts[0].text='1 KB RAM'
             for t in ts[1:]:t.text=''
-    marker='Appendix B — implementation status, revision 0.5'
+        elif address=='$1400-$2BFF':
+            set_cell(cells[-1],'Resident compiler, copied from bank 1 at cold start; excluded from user allocation.')
+        elif address=='$8000-$BFFF':
+            set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
+    marker='Appendix B — implementation status, revision 0.6'
     additions=[paragraph(marker,True),paragraph(
-        'This appendix records the development implementation on 9 October 2026. '
+        'This appendix records the development implementation on 10 October 2026. '
         'The full version-one contract is not yet complete. Original release '
         'requirements above remain the target unless an architectural choice is '
         'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.'),
@@ -196,7 +290,7 @@ def synchronize():
                   f"{tests['runtime_instructions_checked']} documented runtime instructions checked. "
                   'Environment: instruction-level py65 with deterministic KERNAL stubs; '
                   'this is not cycle-accurate or physical-machine acceptance evidence.'),
-        paragraph('Source/container version 1 and runtime ABI 3 are distinct. '
+        paragraph('Source/container version 1 and runtime ABI 4 are distinct. '
                   'Language zero page is $02-$78; common workspace is $0800-$13FF. '
                   'Function activations currently use a guarded hardware stack with depth eight. '
                   'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Division applies a negative-operand bias to preserve truncation toward zero. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')]
@@ -207,7 +301,7 @@ def synchronize():
     collection=json.loads((ROOT/'docs/voidrunner-collection.json').read_text())
     assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
     additions.append(paragraph('Captured Void Runner collection replay: '+json.dumps(collection,sort_keys=True)))
-    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()
+    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()
     for line in status.splitlines():
         if not line or line.startswith('| ---'):continue
         if line.startswith('#'):additions.append(paragraph(line.lstrip('# '),True))
@@ -227,8 +321,8 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='5'
-                    if n.tag.endswith('}modified'):n.text='2026-10-09T00:00:00Z'
+                    if n.tag.endswith('}revision'):n.text='6'
+                    if n.tag.endswith('}modified'):n.text='2026-10-10T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
     with zipfile.ZipFile(temporary) as z:
@@ -241,12 +335,12 @@ def synchronize():
                    for p in root.iter(f'{{{W}}}p'))+'\n'
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.5','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.6','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.5 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.6 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()

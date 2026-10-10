@@ -1964,7 +1964,7 @@ clear_next:
  stx WALK
  rts
 runtime_stamp:
-.byte "AB64",3
+.byte "AB64",4
 
 format_source:
  sta LEFT

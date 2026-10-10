@@ -1,21 +1,22 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.5",
-  "runtime_abi": 3,
+  "design_revision": "0.6",
+  "runtime_abi": 4,
+  "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 70,
+  "validated_tests": 78,
   "artifacts": {
     "abi.json": {
-      "bytes": 4328,
-      "sha256": "a3ef4e79f4b87e8a982f0bd6a9d685bf5e4bef7e128d6d791f99e51c1fa30109"
+      "bytes": 6856,
+      "sha256": "21530722c058ae3b2aeefd1029aa2736829fcf9e402b04e121003322ff348aaf"
     },
     "assembly-basic.bin": {
-      "bytes": 16384,
-      "sha256": "ea014de7205b22965ab8f0eef1c934b04ed7e856229eeb9e94aed25176418343"
+      "bytes": 65536,
+      "sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc"
     },
     "assembly-basic.crt": {
-      "bytes": 16464,
-      "sha256": "40832bb55858182d84c94ea8941c4bcb12621979c70c86207fe537bcad891e23"
+      "bytes": 65728,
+      "sha256": "f6aab5e063ff1771a826ce2ead7ea33ee6e75b7299ae95288e5fe08413ed47a2"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -38,12 +39,12 @@
       "sha256": "be638587bc42bfcef31e8c72d21111fa0e09c851c3949f1c0ee979c29edefa37"
     },
     "size-report.json": {
-      "bytes": 868,
-      "sha256": "9c722d074d4aa157ce538774f37da44b9e0a688e900acdd388c75af3104c7f56"
+      "bytes": 3056,
+      "sha256": "6750534b481a9e0fe9b3f25401bb951cb5109be5ce2f11601f0fa42810c2c0df"
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "119d3348dbf349e4cbe66808d3b5d6f3f4dad79845251953e9e9253e67481eed"
+      "sha256": "eb2c37aa95154c62d5f539880e5b55a2b1d410270aaa100922822d00f1a4f4d5"
     }
   }
 }

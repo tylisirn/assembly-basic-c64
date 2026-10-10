@@ -1,11 +1,115 @@
 {
-  "rom_bytes": 16384,
-  "rom_sha256": "ea014de7205b22965ab8f0eef1c934b04ed7e856229eeb9e94aed25176418343",
+  "rom_bytes": 65536,
+  "rom_sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc",
+  "cartridge_type": 19,
+  "cartridge_format": "classic Magic Desk",
+  "bank_bytes": 8192,
+  "bank_register": 56832,
+  "banks": [
+    {
+      "bank": 0,
+      "offset": 0,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "boot, command editor, tokenizer, LIST and source transport",
+      "used_bytes": 6994,
+      "spare_bytes": 1198,
+      "reserved": false
+    },
+    {
+      "bank": 1,
+      "offset": 8192,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "raw resident compiler image",
+      "used_bytes": 6125,
+      "spare_bytes": 2067,
+      "reserved": false
+    },
+    {
+      "bank": 2,
+      "offset": 16384,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "raw RAM execution runtime image",
+      "used_bytes": 6783,
+      "spare_bytes": 1409,
+      "reserved": false
+    },
+    {
+      "bank": 3,
+      "offset": 24576,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: improved editor and BASIC PRG conversion",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 4,
+      "offset": 32768,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: 16.8 fixed-point and PRINT formatting extensions",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 5,
+      "offset": 40960,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: sprite, VIC and SID commands",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 6,
+      "offset": 49152,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: numeric tables, fonts and optional resources",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    },
+    {
+      "bank": 7,
+      "offset": 57344,
+      "window": [
+        32768,
+        40960
+      ],
+      "role": "reserved: expansion and diagnostics",
+      "used_bytes": 9,
+      "spare_bytes": 8183,
+      "reserved": true
+    }
+  ],
+  "runtime_abi": 4,
   "runtime_run_address": 58368,
   "runtime_used_bytes": 6774,
-  "runtime_packed_bytes": 5055,
+  "runtime_rom_bytes": 6774,
+  "runtime_image_encoding": "raw",
   "runtime_budget_bytes": 7162,
-  "gateway_used_bytes": 392,
+  "gateway_used_bytes": 538,
   "gateway_budget_bytes": 768,
   "workspace_bytes": 3072,
   "arena_spans": [
@@ -21,20 +125,23 @@
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,
   "compiler_used_bytes": 6116,
-  "compiler_packed_bytes": 4337,
+  "compiler_rom_bytes": 6116,
+  "compiler_image_encoding": "raw",
   "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
-    "RECOVERY": 4,
-    "COMMAND": 6586,
-    "GATEWAY": 392,
+    "COMMAND": 6447,
+    "GATEWAY": 538,
     "COMPILER": 6116,
     "RUNTIME": 6774,
-    "COMPILER_PACKED0": 1205,
-    "COMPILER_PACKED": 3132,
-    "PACKED": 5055
+    "HEADER1": 9,
+    "HEADER2": 9,
+    "HEADER3": 9,
+    "HEADER4": 9,
+    "HEADER5": 9,
+    "HEADER6": 9,
+    "HEADER7": 9
   },
-  "rom_used_bytes": 16383,
-  "rom_spare_bytes": 1,
-  "runtime_abi": 3
+  "rom_used_bytes": 19947,
+  "rom_spare_bytes": 45589
 }

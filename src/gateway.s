@@ -10,12 +10,15 @@ kernal_gate:
  sta IO_STATUS
  sta GATE_FLAGS
  sei
+ lda CART_BANK
+ pha
  lda PORT
  and #7
  sta IO_MAP
  lda PORT
  ora #7
  sta PORT
+ jsr select_command_bank
  lda IO_STATUS
  pha
  plp
@@ -31,6 +34,9 @@ service_call:
  pla
  sta IO_STATUS
  sei
+ pla
+ sta CART_BANK
+ sta CART_REGISTER
  lda PORT
  and #$f8
  ora IO_MAP
@@ -115,6 +121,7 @@ enter_ready:
  lda PORT
  ora #7
  sta PORT
+ jsr select_command_bank
  lda #0
  sta RUNNING
  cld
@@ -134,9 +141,12 @@ ram_irq:
  lda PORT
  and #7
  pha
+ lda CART_BANK
+ pha
  lda PORT
  ora #7
  sta PORT
+ jsr select_command_bank
  lda #>irq_complete
  pha
  lda #<irq_complete
@@ -158,6 +168,9 @@ ram_irq:
  pla
  rti
 irq_complete:
+ pla
+ sta CART_BANK
+ sta CART_REGISTER
  pla
  sta IO_MAP
  lda PORT
@@ -194,6 +207,7 @@ sys_return:
  and #$f8
  ora #5
  sta PORT
+ jsr select_command_bank
  cld
  cli
  rts
@@ -202,6 +216,7 @@ file_entry:
  lda PORT
  ora #7
  sta PORT
+ jsr select_command_bank
  cld
  cli
  jsr file_command
@@ -246,8 +261,77 @@ usr_call:
  and #$f8
  ora #5
  sta PORT
+ jsr select_command_bank
  cld
  cli
  lda IO_A
  ldx IO_X
+ rts
+
+; These routines must remain in common RAM: selecting a bank replaces $8000.
+select_command_bank:
+ lda #BANK_COMMAND
+ sta CART_BANK
+ sta CART_REGISTER
+ rts
+bank_cold:
+ sei
+ jsr recovery_map
+ jmp cold_start
+bank_warm:
+ sei
+ jsr recovery_map
+ jmp cartridge_warm
+recovery_map:
+ lda PORT
+ ora #7
+ sta PORT
+ jmp select_command_bank
+
+; A = source bank; SOURCE/DEST/COUNT describe its raw fixed-address image.
+; Preserve bank, full $01 and interrupt flags before returning to the caller.
+copy_bank_image:
+ php
+ sei
+ pha
+ lda PORT
+ pha
+ lda CART_BANK
+ pha
+ lda PORT
+ ora #7
+ sta PORT
+ tsx
+ lda $0103,x
+ sta CART_BANK
+ sta CART_REGISTER
+ ldy #0
+@loop:
+ lda COUNT
+ ora COUNT+1
+ beq @done
+ lda (SOURCE),y
+ sta (DEST),y
+ inc SOURCE
+ bne :+
+ inc SOURCE+1
+:
+ inc DEST
+ bne :+
+ inc DEST+1
+:
+ lda COUNT
+ bne :+
+ dec COUNT+1
+:
+ dec COUNT
+ jmp @loop
+@done:
+ pla
+ sta CART_BANK
+ sta CART_REGISTER
+ pla
+ sta PORT
+ pla
+ plp
  rts

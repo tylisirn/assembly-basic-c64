@@ -1,10 +1,10 @@
-# Implementation status — design revision 0.5
+# Implementation status — design revision 0.6
 
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 
 | Area | Implemented behavior | Remaining work |
 | --- | --- | --- |
-| Platform | Standard 16 KiB ROM/CRT, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame | Cycle-accurate VICE, stock ROM integration, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts |
+| Platform | 64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame | Cycle-accurate VICE, stock ROM integration, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts |
 | Editing and storage | Seven-byte stable anchors in 250-byte slabs, exact adjacent tokens/native bodies, final successor JMP, sorted insertion/replacement/deletion, tombstones, coalescing allocator with payloads allocated from the high end, staged failed edits, page-based graphics/machine-code RESERVE declarations, direct CLEAN rebuild of dense slabs and symbols with complete native rebinding | General arena sliding compaction, full graph-integrity preflight before every traversal, complete name-allocation rollback on failed edits |
 | Source | Custom Appendix A vocabulary, binary words and hexadecimal radix, whole/full identifiers up to 255 imported bytes, shifted-letter abbreviations, raw comments/strings/DATA, dense export dictionary, ranged LIST on a fresh line, entry diagnostics while retaining malformed source | Exact firmware LIST whitespace normalization and every malformed text-recovery case; host period abbreviations are an extra host convenience |
 | Compilation | Bounded two-pass Pratt parser, real 6502 machine code, stable scalar cells, native branch/line linkage, IF/THEN/ELSE with nearest-IF binding and line targets, context and deferred error stubs, literal power-of-two shift lowering | Helper-heavy expression code lacks the proposed inline scalar arithmetic optimizations; no stock-ROM differential corpus yet |
@@ -19,12 +19,19 @@ The implemented cartridge is a development build. The revision 0.3 version-one c
 ## Recorded architectural decisions
 
 - Stable anchors/bindings allocate from the low end of free spans; payloads and runtime heap objects allocate from the high end, preserving common RAM for future anchor slabs. Common allocations are checked against the `$8000` boundary even for whole free blocks.
-- Runtime ABI **3** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
-- The fixed-address runtime and resident compiler are linked separately and stored as a deterministic LZSS load image in the cartridge. Cold start decompresses both images; RUN and CONT refresh the runtime image without moving user code. The link output proves its RAM addresses; no runtime relocation is assumed.
+- Runtime ABI **4** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
+- The fixed-address runtime and resident compiler occupy raw images in banks 2 and 1. Cold start copies both images through common RAM; RUN and CONT refresh the runtime image without moving user code. The link output proves its RAM addresses; no runtime relocation is assumed.
 - String collection is **nonmoving mark-and-sweep**, followed by free-list coalescing, rather than the proposed compacting collector. Roots include line/slab/name/binding objects, arrays, functions, direct code, descriptors, expression temporaries and live helper string pointers. It marks roots once per 2 KiB window using a 256-byte bitmap over inactive lexer scratch, and sweeps the sorted free list with monotonic cursors. It avoids descriptor pointer rewriting but can leave fragmented free space.
 - Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
 - Language zero page is `$02–$78`; KERNAL service state uses `$90–$FF`. Common workspace is `$0800–$13FF`. A supported stock KERNAL audit remains a release requirement.
 - Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+
+## Revision 0.6 cartridge conversion
+
+- Bank 0 supplies commands/editing and the common-RAM gateway load image; bank 1 supplies the resident compiler; bank 2 supplies the execution runtime. Banks 3–7 contain recovery headers and otherwise erased space reserved for future features. [The bank plan](MAGIC_DESK_BANKS.md) records placement and transition contracts.
+- Bank selections update `$DE00` and the common-RAM shadow at `$0BE3`. Image copies run with IRQs masked, restore the complete port and bank, and preserve interrupt flags. KERNAL and IRQ paths preserve bank state; NMI stays in RAM. SYS/USR and command recovery establish bank 0 after restoring I/O visibility.
+- The runtime ABI is 4; `.AB` source version is still 1. Native code from earlier cartridges must be regenerated after hard reset. No additional RAM arena space is claimed.
+- Improved editing, stock PRG import/export, 16.8 fixed-point, custom PRINT and sprite/VIC/SID commands are planned extension roles, not current language features. Moving compiler/runtime helpers into banked ROM requires a separate call ABI and RAM-budget review.
 
 ## Revision 0.5 semantics
 
@@ -38,10 +45,10 @@ The implemented cartridge is a development build. The revision 0.3 version-one c
 
 - RESERVE (token $6A) is a compile-time declaration outside IF. Its unsigned literal address/count must be multiples of 256, with a nonempty range wholly inside one arena span. The allocator removes a wholly free range atomically, preserving free fragments of at least four bytes; up to eight ranges live in fixed common state, outside the writable user regions. Collection skips these regions without reading user bytes as headers. Duplicate bounds are harmless; occupied/overlapping regions fail safely. RUN, CLR, edits and CLEAN preserve reservations; NEW releases them. SAVE/LOAD retain numbered declarations. Removing source or failed import does not release reservations before NEW.
 - Void Runner previously used $C200–$C217 as star data while compiled BASIC lines 400/410 occupied the same bytes, causing execution of overwritten instructions and a CPU JAM. Its first line now reserves $3C00–$3DFF and $C000–$C2FF. The stock BASIC memory-top POKEs at decimal 55/56 have been replaced; this language has separate zero-page ownership.
-- The compatible LZSS packer now minimizes encoded size including flag-byte overhead. Program reset/clear helpers also reside in the compressed compiler image; memory boundaries, runtime ABI and container version are unchanged.
+- Program reset/clear helpers reside in the compiler image. Revision 0.6 replaces the earlier compressed images with raw banked copies.
 
 - The later Void Runner freeze was a very long collection pause on a valid heap. Captured-heap replay now takes 1,269,365 simulated CPU cycles for a full collection versus 137,980,792 cycles for only the old collector's remaining work. Both produce the same nine free blocks and 5,651 free bytes, preserving all live allocations and reserved game regions. See [the investigation](VOIDRUNNER_FREEZE.md) and [measurements](voidrunner-collection.json).
-- Error output and command allocator wrappers share the compressed resident compiler image. The build computes the packed compiler prefix from available first-bank space; collector code is grouped with allocator helpers for compression. No memory boundary or container/ABI version changes.
+- Error output and command allocator wrappers share the resident compiler image. Its RAM reservation remains unchanged in revision 0.6.
 
 ## Releasing version one
 

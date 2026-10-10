@@ -1,6 +1,7 @@
 """Instruction-level C64 cartridge harness; KERNAL services are deterministic stubs.
 
-This models PLA visibility/write-through, not VIC cycles, IEC or real IRQ timing.
+This models classic Magic Desk banks and PLA visibility/write-through, not VIC
+cycles, IEC or real IRQ timing.
 """
 from pathlib import Path
 import re
@@ -11,7 +12,14 @@ class Memory:
     def __init__(self):
         self.ram = bytearray(65536)
         self.rom = (ROOT/'build/assembly-basic.bin').read_bytes()
+        if len(self.rom) != 65536:
+            raise ValueError('Expected a 64-KiB classic Magic Desk ROM')
+        self.bank = 0
+        self.cart_enabled = True
+        self.bank_writes = []
         self.ram[0], self.ram[1] = 0x2f, 0x37
+        self.basic = bytearray([0xea]*8192)
+        self.character = bytearray([0xea]*4096)
         self.kernal = bytearray([0xea]*8192)
         # Stock NMI entry shape: SEI; JMP ($0318), before register saves.
         self.kernal[0x1e43:0x1e47]=bytes.fromhex('786c1803')
@@ -20,13 +28,27 @@ class Memory:
         if isinstance(i,slice):
             return [self[j] for j in range(i.start or 0,i.stop or 65536,i.step or 1)]
         mode = self.ram[1] & 7
-        if mode == 7 and 0x8000 <= i < 0xc000:
-            return self.rom[i-0x8000]
+        if mode & 3 == 3:
+            if self.cart_enabled and 0x8000 <= i < 0xa000:
+                return self.rom[self.bank*8192+i-0x8000]
+            if 0xa000 <= i < 0xc000:
+                return self.basic[i-0xa000]
+        if mode & 3 and 0xd000 <= i < 0xe000:
+            if not mode & 4:
+                return self.character[i-0xd000]
+            if 0xde00 <= i <= 0xdeff:
+                return 0xff  # Write-only IO1 bank latch; open bus is not modelled.
         if mode & 2 and i >= 0xe000:
             return self.kernal[i-0xe000]
         return self.ram[i]
     def __setitem__(self,i,v):
-        self.ram[i] = v & 255
+        mode = self.ram[1] & 7
+        if mode & 4 and mode & 3 and 0xde00 <= i <= 0xdeff:
+            self.bank = v & 7
+            self.cart_enabled = not bool(v & 128)
+            self.bank_writes.append(v & 255)
+        else:
+            self.ram[i] = v & 255
 
 class Machine:
     def __init__(self):
