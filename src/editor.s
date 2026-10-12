@@ -556,7 +556,20 @@ bind_name:
  tay
  dey
  lda (PTR2),y
+ pha
+ lda #0
+ sta NAME_KIND
+ pla
+ cmp #'%'
+ bne :+
+ ldx #$80
+ stx NAME_KIND
+:
  cmp #'$'
+ bne :+
+ inc NAME_KIND
+:
+ cmp #'$' ; Restore parse_name's string Z result after setting the kind.
  rts
 
 bind_array:
@@ -567,12 +580,7 @@ bind_array:
  lda VALUE+1
  sta SCRATCH+21
  plp
- beq @string
- lda #0
- beq @numeric
-@string:
- lda #1
-@numeric:
+ lda NAME_KIND
  sta SCRATCH+22
  lda ARRAY_HEAD
  sta WALK

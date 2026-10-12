@@ -1,4 +1,4 @@
-; Assembly BASIC ABI 4: fixed RAM entry points, documented NMOS instructions.
+; Assembly BASIC ABI 5: fixed RAM entry points, documented NMOS instructions.
 PORT = $01
 PTR = $02
 PTR2 = $04
@@ -210,3 +210,7 @@ CART_BANK = STATE+227 ; Software shadow of the write-only bank register.
 BANK_COMMAND = 0
 BANK_COMPILER = 1
 BANK_RUNTIME = 2
+
+; Expression tags: signed=0, string=1, unsigned=$80.
+NUM_TYPE = STATE+228
+NAME_KIND = STATE+229

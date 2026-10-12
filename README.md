@@ -2,7 +2,7 @@
 
 A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.6, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.7, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -28,11 +28,11 @@ The user has successfully loaded Void Runner from disk and played it in VICE wit
 
 Bank 0 contains the current command/editor code, bank 1 the raw compiler image and bank 2 the raw runtime image. Banks 3–7 reserve space for the improved editor/PRG conversion, 16.8 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
 
-Firmware revision 0.6 changes runtime ABI to 4; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
+Firmware revision 0.7 uses runtime ABI 5; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
-At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Enter advances the screen cursor before processing each command or numbered line. Numbered entry and deletion resume input without another READY prompt. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits and display signed decimal. Hexadecimal constants preserve their radix in LIST.
+At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Enter advances the screen cursor before processing each command or numbered line. Numbered entry and deletion resume input without another READY prompt. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits. Unsuffixed variables are signed; `%` variables are unsigned. Numeric literals remain signed words. Hexadecimal constants preserve their radix in LIST.
 
 ```basic
 10 VIDEO=$D000
@@ -50,7 +50,11 @@ Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THE
 
 `<<` and `>>` are arithmetic shifts. Counts must be 0–255; left shifts wrap, right shifts preserve the sign, and counts of 16 or more yield zero or the right-shift sign fill. Shifts bind below addition and above comparisons. Literal power-of-two multiplication uses a left shift; division uses a biased right shift to retain truncation toward zero (`-5/2` is -2, while `-5>>1` is -3).
 
-`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The Magic Desk cartridge uses runtime ABI 4, reserves 6 KiB at `$1400–$2BFF` for a compiler image copied at startup, and has a 42 KiB raw program arena.
+`A%` is an unsigned word (0–65535), including `%` array elements and DEF FN results/parameters. Unsuffixed names remain signed (-32768–32767). Assignment copies all 16 bits without overflow: `U%=65535:S=U%` makes `S=-1`, and `U%=S` restores 65535. PRINT and STR$ use the expression's numeric type. Two unsigned operands produce unsigned arithmetic/comparisons; **mixed signed/unsigned operations use signed arithmetic**, including signed word literals. Thus `U%=65535:D%=2:PRINT U%/D%` prints 32767, while `PRINT U%/2` prints 0. Comparisons return signed -1/0. Both types retain wrapping arithmetic and arithmetic right shifts. See [the unsigned example](examples/unsigned.bas).
+
+`FRE()` collects unreachable objects, coalesces adjacent free blocks and returns an unsigned free-byte count. `FRE(argument)` remains supported; its numeric argument is ignored. It is safe inside programs and preserves variables, arrays, source/code, reservations and CONT. It reports the sum of free physical arena bytes, including free-block headers, rather than the largest possible allocation. For example, `FREE%=FRE():PRINT FREE%`. Direct CLEAN still rebuilds source and clears values.
+
+`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The Magic Desk cartridge uses runtime ABI 5, reserves 6 KiB at `$1400–$2BFF` for a compiler image copied at startup, and has a 42 KiB raw program arena.
 
 `RESERVE address,bytes` declares RAM for graphics or machine code before the
 compiler allocates it. Both arguments must be unsigned numeric literals aligned

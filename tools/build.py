@@ -84,7 +84,7 @@ def build(toolchain=None):
     used = sum(bank['used_bytes'] for bank in banks)
     report = {'rom_bytes': len(rom), 'rom_sha256': hashlib.sha256(rom).hexdigest(),
               'cartridge_type': 19, 'cartridge_format': 'classic Magic Desk', 'bank_bytes': 8192,
-              'bank_register': 0xde00, 'banks': banks, 'runtime_abi': 4,
+              'bank_register': 0xde00, 'banks': banks, 'runtime_abi': 5,
               'runtime_run_address': 0xe400, 'runtime_used_bytes': runtime,
               'runtime_rom_bytes': runtime, 'runtime_image_encoding': 'raw', 'runtime_budget_bytes': 7162,
               'gateway_used_bytes': gateway, 'gateway_budget_bytes': 768, 'workspace_bytes': 3072,

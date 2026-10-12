@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc",
+  "rom_sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 6994,
-      "spare_bytes": 1198,
+      "used_bytes": 7073,
+      "spare_bytes": 1119,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 6125,
-      "spare_bytes": 2067,
+      "used_bytes": 6116,
+      "spare_bytes": 2076,
       "reserved": false
     },
     {
@@ -38,8 +38,8 @@
         40960
       ],
       "role": "raw RAM execution runtime image",
-      "used_bytes": 6783,
-      "spare_bytes": 1409,
+      "used_bytes": 7011,
+      "spare_bytes": 1181,
       "reserved": false
     },
     {
@@ -103,10 +103,10 @@
       "reserved": true
     }
   ],
-  "runtime_abi": 4,
+  "runtime_abi": 5,
   "runtime_run_address": 58368,
-  "runtime_used_bytes": 6774,
-  "runtime_rom_bytes": 6774,
+  "runtime_used_bytes": 7002,
+  "runtime_rom_bytes": 7002,
   "runtime_image_encoding": "raw",
   "runtime_budget_bytes": 7162,
   "gateway_used_bytes": 538,
@@ -124,16 +124,16 @@
   ],
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,
-  "compiler_used_bytes": 6116,
-  "compiler_rom_bytes": 6116,
+  "compiler_used_bytes": 6107,
+  "compiler_rom_bytes": 6107,
   "compiler_image_encoding": "raw",
   "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
-    "COMMAND": 6447,
+    "COMMAND": 6526,
     "GATEWAY": 538,
-    "COMPILER": 6116,
-    "RUNTIME": 6774,
+    "COMPILER": 6107,
+    "RUNTIME": 7002,
     "HEADER1": 9,
     "HEADER2": 9,
     "HEADER3": 9,
@@ -142,6 +142,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 19947,
-  "rom_spare_bytes": 45589
+  "rom_used_bytes": 20245,
+  "rom_spare_bytes": 45291
 }

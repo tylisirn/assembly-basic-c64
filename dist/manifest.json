@@ -1,22 +1,22 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.6",
-  "runtime_abi": 4,
+  "design_revision": "0.7",
+  "runtime_abi": 5,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 78,
+  "validated_tests": 86,
   "artifacts": {
     "abi.json": {
-      "bytes": 6856,
-      "sha256": "21530722c058ae3b2aeefd1029aa2736829fcf9e402b04e121003322ff348aaf"
+      "bytes": 7055,
+      "sha256": "4e48f928ffb16c4efae5d44d1c8368f7b9f9bc7d5eeaff5106aa7c05a8697814"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc"
+      "sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "f6aab5e063ff1771a826ce2ead7ea33ee6e75b7299ae95288e5fe08413ed47a2"
+      "sha256": "bd74e6d42de02c8e04b380f307d43115f39df13a317d247e473a4f696ebfd012"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -30,6 +30,10 @@
       "bytes": 175,
       "sha256": "7e911508a918dd4b95220abec8aea6d8a9a1eeaaad00efdb5f850e084b94b081"
     },
+    "examples/unsigned.ab": {
+      "bytes": 289,
+      "sha256": "d0217e6ed1ab6195c7799f5eda1171fbd08315b5476eadf1d4fc5b4bfb3351b6"
+    },
     "examples/video.ab": {
       "bytes": 58,
       "sha256": "017dab3c7d0cc8d033de0c5328574257d487769e95e8fa535b8d8992830a5246"
@@ -40,11 +44,11 @@
     },
     "size-report.json": {
       "bytes": 3056,
-      "sha256": "6750534b481a9e0fe9b3f25401bb951cb5109be5ce2f11601f0fa42810c2c0df"
+      "sha256": "da2d85e15ec3d8c460c1937b6fd472971257ad192eda85d73f54e77775215b80"
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "eb2c37aa95154c62d5f539880e5b55a2b1d410270aaa100922822d00f1a4f4d5"
+      "sha256": "a02a4e1f9594caba8709c85e6230973a80b4687985e3f70ecde7925dd47e646a"
     }
   }
 }

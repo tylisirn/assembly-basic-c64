@@ -1,12 +1,12 @@
 {
-  "rom_sha256": "a3726d5beb34c857aa0e9423571461bda2086109a18b769b1d0d0961990c7fbc",
+  "rom_sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596",
   "environment": "instruction-level py65; no IRQ/VIC timing",
   "captured_physical_blocks": 1636,
   "initial_free_blocks": 253,
   "old_remaining_instructions": 44268554,
   "old_remaining_cpu_cycles": 137980792,
-  "new_full_instructions": 393741,
-  "new_full_cpu_cycles": 1269365,
+  "new_full_instructions": 394049,
+  "new_full_cpu_cycles": 1269981,
   "final_free_blocks": 9,
   "final_free_bytes": 5651
 }

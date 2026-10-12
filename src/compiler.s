@@ -1183,6 +1183,18 @@ primary:
  pha
  lda #3
  jsr expect
+ lda SCRATCH+7
+ cmp #$51 ; FRE accepts both FRE() and the compatible FRE(argument).
+ bne @argument
+ jsr token_peek
+ cmp #4
+ bne @argument
+ inc TOKEN_POS
+ pla
+ lda #<fre_collect_word
+ ldx #>fre_collect_word
+ jmp emit_call
+@argument:
  lda #0
  jsr expression
  lda #4
@@ -1270,6 +1282,12 @@ primary:
  inc VALUE+1
 :
  jsr emit_word
+ lda NAME_KIND
+ beq @signed_name
+ lda #<push_unsigned
+ ldx #>push_unsigned
+ jmp emit_call
+@signed_name:
  lda #<push_number
  ldx #>push_number
  jmp emit_call
@@ -1679,9 +1697,12 @@ compile_def:
 @type:
  lda #ERR_TYPE
  jmp emit_trap
+.segment "COMMAND"
 compile_fn:
  inc TOKEN_POS
  jsr parse_name
+ lda NAME_KIND
+ pha
  jsr bind_function
  lda FUNCTION_RECORD
  pha
@@ -1698,10 +1719,16 @@ compile_fn:
  pla
  sta VALUE
  jsr emit_ax
+ pla
+ beq @signed
+ lda #<fn_unsigned_word
+ ldx #>fn_unsigned_word
+ jmp emit_call
+@signed:
  lda #<fn_word
  ldx #>fn_word
  jmp emit_call
-
+.segment "COMPILER"
 compile_tab:
  inc TOKEN_POS
  lda #0
@@ -2015,6 +2042,7 @@ compile_read_array:
  sta WALK
  ldy #7
  lda (WALK),y
+ and #1
  beq @number
  lda #<read_string
  ldx #>read_string

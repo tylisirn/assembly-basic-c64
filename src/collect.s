@@ -182,7 +182,8 @@ gc_roots:
  cpy GC_INDEX
  beq @names
  lda EXPR_STACK,y
- beq @stack_next
+ cmp #1
+ bne @stack_next
  lda EXPR_STACK+2,y
  ldx EXPR_STACK+3,y
  jsr gc_mark
@@ -281,6 +282,7 @@ gc_roots:
  beq @next_array
  ldy #7
  lda (SOURCE),y
+ and #1
  beq @next_array
  lda CPTR
  sec

@@ -35,8 +35,8 @@ Instruction-level replay of the first captured heap gives:
 
 | Measurement | Old collector, remaining work at first halt | Revised collector, complete collection |
 | --- | ---: | ---: |
-| Instructions | 44,268,554 | 393,741 |
-| CPU cycles | 137,980,792 | 1,269,365 |
+| Instructions | 44,268,554 | 394,049 |
+| CPU cycles | 137,980,792 | 1,269,981 |
 | Resulting free blocks | 9 | 9 |
 | Resulting free physical bytes | 5,651 | 5,651 |
 

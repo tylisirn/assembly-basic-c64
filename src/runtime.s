@@ -335,9 +335,22 @@ poll_break:
  sta CONT_PC
  sta CONT_PC+1
  jmp enter_ready
+push_unsigned:
+ sta RIGHT
+ stx RIGHT+1
+ lda #$80
+ bne push_type
+push_typed:
+ sta RIGHT
+ stx RIGHT+1
+ lda NUM_TYPE
+ jmp push_type
 push_number:
  sta RIGHT
  stx RIGHT+1
+ lda #0
+push_type:
+ sta NUM_TYPE
  lda EXPR_TOP
  cmp #32
  bcc :+
@@ -347,9 +360,10 @@ push_number:
  asl
  asl
  tay
- lda #0
+ lda NUM_TYPE
  sta EXPR_STACK,y
  iny
+ lda #0
  sta EXPR_STACK,y
  iny
  lda RIGHT
@@ -371,6 +385,8 @@ pop_number:
  asl
  tay
  lda EXPR_STACK,y
+ sta NUM_TYPE
+ and #$7f
  beq :+
  lda #ERR_TYPE
  jmp runtime_error
@@ -382,9 +398,15 @@ binary_operands:
  jsr pop_number
  sta RIGHT
  stx RIGHT+1
+ lda NUM_TYPE
+ pha
  jsr pop_number
  sta LEFT
  stx LEFT+1
+ lda NUM_TYPE
+ pla
+ and NUM_TYPE ; Both operands must be unsigned; mixed operations are signed.
+ sta NUM_TYPE
  rts
 add_word_runtime:
  lda EXPR_TOP
@@ -394,7 +416,8 @@ add_word_runtime:
  asl
  tay
  lda EXPR_STACK,y
- JNE concat_string
+ cmp #1
+ JEQ concat_string
  jsr binary_operands
  clc
  lda LEFT
@@ -404,7 +427,7 @@ add_word_runtime:
  adc RIGHT+1
  tax
  pla
- jmp push_number
+ jmp push_typed
 subtract_word:
  jsr binary_operands
  sec
@@ -415,7 +438,7 @@ subtract_word:
  sbc RIGHT+1
  tax
  pla
- jmp push_number
+ jmp push_typed
 negate_word:
  jsr pop_number
  sta RIGHT
@@ -428,7 +451,7 @@ negate_word:
  sbc RIGHT+1
  tax
  pla
- jmp push_number
+ jmp push_typed
 not_word:
  jsr pop_number
  eor #$ff
@@ -437,7 +460,7 @@ not_word:
  eor #$ff
  tax
  pla
- jmp push_number
+ jmp push_typed
 and_word:
  jsr binary_operands
  lda LEFT+1
@@ -445,7 +468,7 @@ and_word:
  tax
  lda LEFT
  and RIGHT
- jmp push_number
+ jmp push_typed
 or_word:
  jsr binary_operands
  lda LEFT+1
@@ -453,13 +476,15 @@ or_word:
  tax
  lda LEFT
  ora RIGHT
- jmp push_number
+ jmp push_typed
 rnd_word:
  jsr pop_number
  sta VALUE
  stx VALUE+1
  ora VALUE+1
  beq @last
+ lda NUM_TYPE
+ bne @positive
  txa
  bpl @positive
  sta RANDOM_STATE+1
@@ -537,13 +562,15 @@ shift_loop:
 shift_result:
  lda LEFT
  ldx LEFT+1
- jmp push_number
+ jmp push_typed
 ; Constant power-of-two word divisors become biased arithmetic right shifts.
 divide_negative_power_word:
  jsr divide_power_word
  jmp negate_word
 divide_power_word:
  jsr binary_operands
+ lda NUM_TYPE
+ bne @shift
  lda LEFT+1
  bpl @shift
  lda #$ff
@@ -573,7 +600,7 @@ divide_power_word:
 multiply_word:
  jsr binary_operands
  jsr multiply_ax
- jmp push_number
+ jmp push_typed
 multiply_ax:
  lda #0
  sta VALUE
@@ -606,6 +633,10 @@ divide_word:
  lda #ERR_DIVZERO
  jmp runtime_error
 :
+ lda #0
+ sta NUM_SIGN
+ lda NUM_TYPE
+ bne @divide
  lda LEFT+1
  eor RIGHT+1
  and #$80
@@ -639,6 +670,7 @@ divide_word:
  rol LEFT+1
  rol VALUE
  rol VALUE+1
+ bcs @overflow
  sec
  lda VALUE
  sbc RIGHT
@@ -646,6 +678,16 @@ divide_word:
  lda VALUE+1
  sbc RIGHT+1
  bcc @next
+ jmp @accept
+@overflow:
+ ; A seventeenth remainder bit guarantees subtraction, even if SBC borrows.
+ sec
+ lda VALUE
+ sbc RIGHT
+ tay
+ lda VALUE+1
+ sbc RIGHT+1
+@accept:
  sta VALUE+1
  sty VALUE
  inc LEFT
@@ -662,15 +704,18 @@ divide_word:
  sbc LEFT+1
  tax
  pla
- jmp push_number
+ jmp push_typed
 @positive:
  lda LEFT
  ldx LEFT+1
- jmp push_number
+ jmp push_typed
 power_word:
  jsr binary_operands
+ lda NUM_TYPE
+ bne :+
  lda RIGHT+1
  bmi @bad
+:
  lda RIGHT
  sta FRAME_LIMIT
  lda RIGHT+1
@@ -720,7 +765,7 @@ power_word:
 @done:
  lda FRAME_CELL
  ldx FRAME_CELL+1
- jmp push_number
+ jmp push_typed
 @bad:
  lda #ERR_QUANTITY
  jmp runtime_error
@@ -733,13 +778,17 @@ compare_numbers:
  asl
  tay
  lda EXPR_STACK,y
- JNE compare_strings
+ cmp #1
+ JEQ compare_strings
  jsr binary_operands
- lda LEFT+1
+ lda NUM_TYPE
  eor #$80
+ sta TMP+1
+ lda LEFT+1
+ eor TMP+1
  sta TMP
  lda RIGHT+1
- eor #$80
+ eor TMP+1
  sta TMP+1
  lda TMP
  cmp TMP+1
@@ -783,9 +832,11 @@ true_word:
  jmp push_number
 int_word:
  jsr pop_number
- jmp push_number
+ jmp push_typed
 abs_word:
  jsr int_word
+ lda NUM_TYPE
+ bne @done
  lda EXPR_TOP
  sec
  sbc #1
@@ -802,8 +853,11 @@ sgn_word:
  stx RIGHT+1
  ora RIGHT+1
  beq false_word
+ lda NUM_TYPE
+ bne :+
  txa
  bmi true_word
+:
  lda #1
  ldx #0
  jmp push_number
@@ -877,6 +931,7 @@ sys_word:
  jmp sys_gateway
 fre_word:
  jsr pop_number
+fre_collect_word:
  jsr collect
  lda #0
  sta FRAME_LIMIT
@@ -909,7 +964,7 @@ fre_word:
 @done:
  lda FRAME_LIMIT
  ldx FRAME_LIMIT+1
- jmp push_number
+ jmp push_unsigned
 pos_word:
  jsr pop_number
  lda $d3
@@ -963,9 +1018,10 @@ print_value:
  asl
  tay
  lda EXPR_STACK,y
- JNE print_string
+ cmp #1
+ JEQ print_string
  jsr pop_number
- jsr format_signed
+ jsr format_number
  lda NUM_SIGN
  beq @positive
  lda #'-'
@@ -986,6 +1042,14 @@ print_value:
  bne @loop
  lda #' '
  jmp char_out
+format_number:
+ bit NUM_TYPE
+ bpl format_signed
+ sta LEFT
+ stx LEFT+1
+ lda #0
+ sta NUM_SIGN
+ jmp format_unsigned
 format_signed:
  sta LEFT
  stx LEFT+1
@@ -1090,7 +1154,8 @@ pop_string:
  asl
  tay
  lda EXPR_STACK,y
- bne :+
+ cmp #1
+ beq :+
  lda #ERR_TYPE
  jmp runtime_error
 :
@@ -1314,7 +1379,7 @@ chr_word:
  jmp push_string
 str_word:
  jsr pop_number
- jsr format_signed
+ jsr format_number
  lda NUM_SIGN
  beq @positive
  lda #'-'
@@ -1772,6 +1837,10 @@ next_word:
  cmp STRING_CELL+1
  bne @find
 @matched:
+ lda PTR
+ ldx PTR+1
+ jsr cell_numeric_type
+ sta NUM_TYPE
  ldy #3
  lda (CPTR),y
  sta RIGHT
@@ -1801,10 +1870,33 @@ next_word:
  adc FRAME_STEP+1
  sta (PTR),y
  sta LEFT+1
+ php ; Carry distinguishes unsigned wrap/underflow from an ordinary step.
+ lda NUM_TYPE
+ beq @signed_step
+ lda FRAME_STEP+1
+ bmi @down_step
+ pla
+ and #1
+ bne @done
+ beq @compare_step
+@down_step:
+ pla
+ and #1
+ beq @done
+ bne @compare_step
+@signed_step:
+ pla
+@compare_step:
+ lda LEFT+1
+ sta TMP
+ lda NUM_TYPE
  eor #$80
+ sta TMP+1
+ lda TMP
+ eor TMP+1
  sta TMP
  lda RIGHT+1
- eor #$80
+ eor TMP+1
  sta TMP+1
  lda TMP
  cmp TMP+1
@@ -1964,7 +2056,7 @@ clear_next:
  stx WALK
  rts
 runtime_stamp:
-.byte "AB64",4
+.byte "AB64",5
 
 format_source:
  sta LEFT
@@ -2083,6 +2175,7 @@ allocate_array:
  rol FRAME_LIMIT+1
  JCS array_bad
  lda ARRAY_TYPE
+ and #1
  beq @size
  asl FRAME_LIMIT
  rol FRAME_LIMIT+1
@@ -2272,6 +2365,7 @@ array_address:
  asl FRAME_LIMIT
  rol FRAME_LIMIT+1
  lda ARRAY_TYPE
+ and #1
  beq :+
  asl FRAME_LIMIT
  rol FRAME_LIMIT+1
@@ -2295,11 +2389,14 @@ array_address:
 array_load:
  jsr array_setup
  jsr array_address
+ lda ARRAY_TYPE
+ sta NUM_TYPE
  lda STRING_CELL
  sta PTR
  lda STRING_CELL+1
  sta PTR+1
  lda ARRAY_TYPE
+ and #1
  bne @string
  ldy #0
  lda (PTR),y
@@ -2308,7 +2405,7 @@ array_load:
  lda (PTR),y
  tax
  pla
- jmp push_number
+ jmp push_typed
 @string:
  lda STRING_CELL
  ldx STRING_CELL+1
@@ -2355,6 +2452,7 @@ array_store:
  bne @restore_rhs
  inc EXPR_TOP
  lda ARRAY_TYPE
+ and #1
  bne @string
  lda STRING_CELL
  ldx STRING_CELL+1
@@ -2778,6 +2876,10 @@ activate_function:
  adc #0
  sta ENTRY+1
  jmp (ENTRY)
+fn_unsigned_word:
+ jsr fn_word
+ jsr pop_number
+ jmp push_unsigned
 fn_word:
  pha
  lda FN_DEPTH
@@ -3365,3 +3467,23 @@ empty_string:
  sta STRING_PTR
  sta STRING_PTR+1
  jmp push_string
+
+cell_numeric_type:
+ sta PTR2
+ stx PTR2+1
+ ldy #4
+ lda (PTR2),y
+ clc
+ adc PTR2
+ sta PTR2
+ bcc :+
+ inc PTR2+1
+:
+ lda (PTR2),y
+ cmp #'%'
+ beq :+
+ lda #0
+ rts
+:
+ lda #$80
+ rts
