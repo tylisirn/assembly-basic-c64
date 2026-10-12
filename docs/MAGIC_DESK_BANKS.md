@@ -1,10 +1,10 @@
-# Magic Desk cartridge architecture — revision 0.7
+# Magic Desk cartridge architecture — revision 0.8
 
 The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF`. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the [VICE cartridge specification](https://vice-emu.sourceforge.io/vice_17.html); VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
 
 | Bank | Current contents | Used / available bytes | Extension role |
 | --- | --- | --- | --- |
-| 0 | Autostart, command editor, tokenizer, LIST, source transport, gateway load image | 7,073 / 8,192 | Command dispatch and shared entry points |
+| 0 | Autostart, command editor, tokenizer, LIST, source transport, gateway load image | 7,201 / 8,192 | Command dispatch and shared entry points |
 | 1 | Raw resident compiler load image | 6,116 / 8,192 | Compiler and native emitter growth |
 | 2 | Raw RAM execution runtime load image | 7,011 / 8,192 | Existing integer/string/array/control helpers |
 | 3 | Recovery header; otherwise erased | 9 / 8,192 | Improved editor and stock BASIC PRG import/export |
@@ -13,7 +13,7 @@ The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF
 | 6 | Recovery header; otherwise erased | 9 / 8,192 | Numeric tables, fonts and optional resources |
 | 7 | Recovery header; otherwise erased | 9 / 8,192 | Expansion and diagnostics |
 
-The reserved roles guide future allocation; they do not add new language features in this revision. Total linked ROM use is 20,245 bytes, leaving 45,291 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 37 unused bytes and the runtime's has 160; additional ROM capacity does not enlarge those reservations.
+The reserved roles guide future allocation; they do not add new language features in this revision. Total linked ROM use is 20,373 bytes, leaving 45,163 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 37 unused bytes and the runtime's has 160; additional ROM capacity does not enlarge those reservations.
 
 ## Maps and bank ownership
 

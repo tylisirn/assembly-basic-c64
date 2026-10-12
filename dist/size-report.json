@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596",
+  "rom_sha256": "14a71c11028d6b9bceb057c3d55db6cc7ec5e78a43efb5304706072725a1291c",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 7073,
-      "spare_bytes": 1119,
+      "used_bytes": 7201,
+      "spare_bytes": 991,
       "reserved": false
     },
     {
@@ -130,7 +130,7 @@
   "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
-    "COMMAND": 6526,
+    "COMMAND": 6654,
     "GATEWAY": 538,
     "COMPILER": 6107,
     "RUNTIME": 7002,
@@ -142,6 +142,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 20245,
-  "rom_spare_bytes": 45291
+  "rom_used_bytes": 20373,
+  "rom_spare_bytes": 45163
 }

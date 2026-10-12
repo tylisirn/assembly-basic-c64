@@ -60,16 +60,18 @@ def synchronize():
                 if old.tag!=f'{{{W}}}sectPr':body.remove(old)
             break
     replacements={
+        'Design specification  |  Version 0.7  |  12 October 2026':
+        'Design specification  |  Version 0.8  |  12 October 2026',
         'Design specification  |  Version 0.6  |  10 October 2026':
-        'Design specification  |  Version 0.7  |  12 October 2026',
+        'Design specification  |  Version 0.8  |  12 October 2026',
         'ABI 4':'ABI 5',
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.7  |  12 October 2026',
+        'Design specification  |  Version 0.8  |  12 October 2026',
         'Design specification  |  Version 0.5  |  9 October 2026':
-        'Design specification  |  Version 0.7  |  12 October 2026',
+        'Design specification  |  Version 0.8  |  12 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.7', 'runtime ABI 2':'runtime ABI 5', 'ABI 2':'ABI 5',
+        'Version 0.4':'Version 0.8', 'runtime ABI 2':'runtime ABI 5', 'ABI 2':'ABI 5',
         'runtime ABI 3':'runtime ABI 5', 'ABI 3':'ABI 5',
         'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
         'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
@@ -232,6 +234,18 @@ def synchronize():
         'A nine-byte FOR frame stores':
         'A nine-byte FOR frame stores a tag, scalar cell address, word limit, signed word step and native continuation PC. Unsuffixed and % loop variables are supported; string/subscripted variables are rejected. Initialization/limit/step are evaluated once. NEXT compares using the loop variable interpretation, with signed STEP direction. Unsigned NEXT detects wrap or underflow so loops ending at 65535 or zero terminate. Existing signed boundary wrap and STEP-zero nontermination remain; polling stays active.',
     })
+    rewrites['LIST traverses the live trailer chain'] = (
+        'LIST traverses the live trailer chain, prints decimal line numbers and expands tokens '
+        'with canonical spacing. Calls and array/DEF FN argument lists attach the opening '
+        'parenthesis to the name; opening/closing delimiters have no interior padding. Keep '
+        'spaces around assignment/arithmetic/comparison/logical operators, so TAB ( 11 ) '
+        'becomes TAB(11), CHR$ (147) becomes CHR$(147), and X=(1+2)*3 becomes X = (1 + 2) * 3. '
+        'No gap precedes comma/semicolon; ordinary separators remain between arguments and '
+        'statements. Expand keyword abbreviations and preserve complete identifier spelling. '
+        'String, REM and DATA payload bytes are preserved; signed DATA values keep their sign '
+        'attached. Decimal immediates retain unsigned source magnitude and hex prints $ plus '
+        'four uppercase digits. PRINT/STR$ still use expression-directed runtime formatting. '
+        'Both target/host tokenizers accept whitespace before TAB/SPC opening parentheses.')
     paragraphs=list(body.iter(f'{{{W}}}p'))
     for p in paragraphs:
         nodes=list(p.iter(f'{{{W}}}t'))
@@ -308,7 +322,7 @@ def synchronize():
             set_cell(cells[-1],'Resident compiler, copied from bank 1 at cold start; excluded from user allocation.')
         elif address=='$8000-$BFFF':
             set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
-    marker='Appendix B — implementation status, revision 0.7'
+    marker='Appendix B — implementation status, revision 0.8'
     additions=[paragraph(marker,True),paragraph(
         'This appendix records the development implementation on 12 October 2026. '
         'The full version-one contract is not yet complete. Original release '
@@ -350,7 +364,7 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='7'
+                    if n.tag.endswith('}revision'):n.text='8'
                     if n.tag.endswith('}modified'):n.text='2026-10-12T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
@@ -364,12 +378,12 @@ def synchronize():
                    for p in root.iter(f'{{{W}}}p'))+'\n'
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.7','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.8','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.7 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.8 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()

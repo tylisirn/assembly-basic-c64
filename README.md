@@ -2,7 +2,7 @@
 
 A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.7, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.8, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -28,7 +28,7 @@ The user has successfully loaded Void Runner from disk and played it in VICE wit
 
 Bank 0 contains the current command/editor code, bank 1 the raw compiler image and bank 2 the raw runtime image. Banks 3–7 reserve space for the improved editor/PRG conversion, 16.8 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
 
-Firmware revision 0.7 uses runtime ABI 5; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
+Firmware revision 0.8 uses runtime ABI 5; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
@@ -45,6 +45,10 @@ RUN
 Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THEN/ELSE, DATA/READ/RESTORE and STOP/CONT are implemented. `SAVE "PROGRAM.AB",8`, `LOAD "PROGRAM.AB",8` and `VERIFY "PROGRAM.AB",8` use the custom sequential source container, not stock tokenized PRG files. Tape and RS-232 transports are explicitly unsupported. LOAD stages a second program and preserves the old source on failure; `NEW` can free space before loading a large file.
 
 `LIST 10` lists one line; `LIST 10-50` lists an inclusive range. `LIST -50` and `LIST 10-` accept open endpoints. LIST starts on a new screen line.
+
+LIST and host decoding use compact function/array delimiters while retaining operator spacing: `TAB ( 11 )` becomes `TAB(11)`, `CHR$ (147)` becomes `CHR$(147)`, and `X=(1+2)*3` becomes `X = (1 + 2) * 3`. Nested calls, array subscripts and DEF FN parameter lists follow the same rule. Commas/semicolons have no preceding gap, commas retain a following separator, and literal string/comment/DATA bytes are preserved. Spaced TAB/SPC calls are recognized by both tokenizers, so Void Runner's game-over TAB(11) no longer becomes an out-of-range array reference.
+
+For an older `.AB` file that already stored TAB/SPC as array-name tokens, re-encode its text or reenter the affected lines. Loading those stored tokens does not run the text tokenizer again. The refreshed [Void Runner container](dist/examples/voidrunner.ab) contains the corrected function tokens.
 
 `IF condition THEN statements ELSE statements` selects one arm for the rest of the physical line. ELSE binds to the nearest unmatched IF; either arm can be a literal line target. `RND(n)` returns a random 16-bit word, displayed as a signed integer: positive arguments advance the generator, zero repeats the last word, and negative arguments reseed it reproducibly. The first positive call seeds from the KERNAL jiffy clock.
 

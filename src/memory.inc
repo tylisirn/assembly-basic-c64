@@ -214,3 +214,6 @@ BANK_RUNTIME = 2
 ; Expression tags: signed=0, string=1, unsigned=$80.
 NUM_TYPE = STATE+228
 NAME_KIND = STATE+229
+
+; LIST formatting state, inactive during lexing and native execution.
+LIST_CURRENT = STATE+230

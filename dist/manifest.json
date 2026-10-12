@@ -1,22 +1,22 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.7",
+  "design_revision": "0.8",
   "runtime_abi": 5,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 86,
+  "validated_tests": 90,
   "artifacts": {
     "abi.json": {
-      "bytes": 7055,
-      "sha256": "4e48f928ffb16c4efae5d44d1c8368f7b9f9bc7d5eeaff5106aa7c05a8697814"
+      "bytes": 7054,
+      "sha256": "3aa1c6abde85beb63bbe49dc1977aa1b9f69ecda8be023d79cec2e822d173a06"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596"
+      "sha256": "14a71c11028d6b9bceb057c3d55db6cc7ec5e78a43efb5304706072725a1291c"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "bd74e6d42de02c8e04b380f307d43115f39df13a317d247e473a4f696ebfd012"
+      "sha256": "23b1f243e77115f4c26deda5c746d15aa71d5f6c9353df28a18ca37cd57495f5"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -39,16 +39,16 @@
       "sha256": "017dab3c7d0cc8d033de0c5328574257d487769e95e8fa535b8d8992830a5246"
     },
     "examples/voidrunner.ab": {
-      "bytes": 7035,
-      "sha256": "be638587bc42bfcef31e8c72d21111fa0e09c851c3949f1c0ee979c29edefa37"
+      "bytes": 7019,
+      "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
     "size-report.json": {
-      "bytes": 3056,
-      "sha256": "da2d85e15ec3d8c460c1937b6fd472971257ad192eda85d73f54e77775215b80"
+      "bytes": 3055,
+      "sha256": "71186e358703e9b09fd62107d9618903615c38f50bca7742ca74d6a0cf2a46ee"
     },
     "test-report.json": {
       "bytes": 265,
-      "sha256": "a02a4e1f9594caba8709c85e6230973a80b4687985e3f70ecde7925dd47e646a"
+      "sha256": "af243948e5f6ff03740052ff242112734afb1d572e3e2eec7a74209a91d72377"
     }
   }
 }

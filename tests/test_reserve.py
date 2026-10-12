@@ -131,6 +131,31 @@ class ReserveTests(unittest.TestCase):
                 self.assertTrue(any(m.memory.ram[0x3c00:0x3d80]))
                 for lo, hi, code in bodies:
                     self.assertEqual(bytes(m.memory.ram[lo:hi]), code, f'Overwritten body ${lo:04X}')
+                # Exercise both reported game-over triggers, rather than stopping
+                # the test before the formerly mis-tokenized TAB (11) executes.
+                if method == 'load':
+                    m.input.extend(b'q')
+                else:
+                    name = m.state('name_head')
+                    while name:
+                        spelling = bytes(m.memory.ram[name+9:name+9+m.memory.ram[name+8]])
+                        if spelling == b'LI':
+                            m.memory.ram[name+4:name+6] = b'\0\0'
+                            break
+                        name = m.word(name)
+                    self.assertNotEqual(name, 0)
+                for _ in range(1000000):
+                    if m.word(m.state('line')+3) == 7090:
+                        break
+                    if not m.step():
+                        self.fail(f'Game-over stopped early: {bytes(m.output[-120:])!r}')
+                else:
+                    self.fail('Game-over did not reach its fire/space wait')
+                self.assertEqual(m.errors, [])
+                self.assertIn(b'mission ended', bytes(m.output).lower())
+                self.assertIn(b'high  ', bytes(m.output).lower())
+                for lo, hi, code in bodies:
+                    self.assertEqual(bytes(m.memory.ram[lo:hi]), code, f'Overwritten body ${lo:04X}')
                 # Abort at the next BASIC poll, then collect the arbitrary ML
                 # bytes and rebuild the stopped program under the same bounds.
                 m.memory.ram[0x77] = 1

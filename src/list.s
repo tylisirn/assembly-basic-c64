@@ -116,10 +116,16 @@ list_line:
  lda #0
  sta TOKEN_POS
  sta SCRATCH+43
+ lda #$ff
+ sta LIST_PREVIOUS
 @token:
  lda TOKEN_POS
  cmp LIST_END
  JCS @next
+ ldy TOKEN_POS
+ lda TOKENS,y
+ sta LIST_CURRENT
+ jsr list_separator
  jsr list_data_spelling
  bcs @token
  jsr token_take
@@ -304,8 +310,6 @@ list_line:
  dec LIST_POS
  bne @kw_char
 @space:
- lda #' '
- jsr $ffd2
  jmp @token
 @next:
  lda #13
@@ -321,6 +325,60 @@ list_advance:
  lda WALK+1
  sta LIST_ANCHOR+1
  jmp list_line
+list_separator:
+ ; Prefix spacing keeps raw payload bytes intact and emits no trailing gap.
+ lda LIST_PREVIOUS
+ cmp #$ff
+ beq @done
+ cmp #3
+ beq @done
+ cmp #$44 ; TAB( and SPC( include their opening parenthesis.
+ beq @done
+ cmp #$47
+ beq @done
+ lda LIST_CURRENT
+ cmp #1
+ beq @done
+ cmp #2
+ beq @done
+ cmp #4
+ beq @done
+ cmp #3
+ bne @data_sign
+ lda LIST_PREVIOUS
+ cmp #$80
+ bcs @done ; Array or DEF FN name followed by an argument list.
+ cmp #$19
+ beq @done
+ cmp #$4d
+ bcc @space
+ cmp #$64
+ bcc @done ; Builtin expression functions SGN through MID$.
+@data_sign:
+ lda SCRATCH+43
+ beq @space
+ lda LIST_PREVIOUS
+ cmp #5
+ beq @number
+ cmp #6
+ bne @space
+@number:
+ lda LIST_CURRENT
+ cmp #$10
+ bcc @space
+ cmp #$13
+ bcc @done
+ cmp #$70
+ bcc @space
+ cmp #$80
+ bcc @done
+@space:
+ lda #' '
+ jsr $ffd2
+@done:
+ lda LIST_CURRENT
+ sta LIST_PREVIOUS
+ rts
 list_raw:
  jsr token_take
  sta LIST_POS

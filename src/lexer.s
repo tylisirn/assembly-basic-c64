@@ -453,6 +453,7 @@ tokenize_input:
  inc INPUT_POS
  jmp @keyword_code
 @keyword_parenthesis:
+ jsr skip_spaces
  jsr input_peek
  cmp #'('
  bne @keyword_code
@@ -493,6 +494,7 @@ tokenize_input:
  lda LEX_LEN
  cmp #3
  bne @intern
+ jsr skip_spaces
  jsr input_peek
  cmp #'('
  bne @intern
@@ -582,6 +584,10 @@ find_keyword:
  bne @abbreviation_ready
 @punctuated:
  sta LEX_CODE
+ cmp #'('
+ bne :+
+ jsr skip_spaces
+:
  jsr input_peek
  cmp LEX_CODE
  bne @skip

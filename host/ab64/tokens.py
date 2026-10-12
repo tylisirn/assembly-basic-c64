@@ -218,6 +218,12 @@ def _data_field(s):
     return raw(DATA_TEXT, s)
 
 
+def _opening_parenthesis(source, position):
+    while position < len(source) and source[position] in ' \t':
+        position += 1
+    return position if position < len(source) and source[position] == '(' else None
+
+
 def tokenize(source, names, interactive=False):
     if interactive and len(source) > 80:
         raise SourceError('interactive line exceeds 80 characters')
@@ -249,26 +255,35 @@ def tokenize(source, names, interactive=False):
                 p+=1
                 choices=[k for k in KEYWORDS if k.startswith(prefix)
                          and (not k.endswith(('#','(')) or
-                              (p<len(source) and source[p]==k[-1]))]
+                              (_opening_parenthesis(source,p) is not None if k.endswith('(') else
+                               p<len(source) and source[p]==k[-1]))]
                 if choices and (p==len(source) or not source[p].isalnum()):
                     spelling=choices[0]
                 else:
                     out+=raw(BADTEXT,prefix)
                     continue
-                if spelling.endswith(('#','(')):
+                if spelling.endswith('('):
+                    p=_opening_parenthesis(source,p)+1
+                elif spelling.endswith('#'):
                     p+=1
             if p < len(source) and source[p] == '#' and spelling in ('PRINT', 'INPUT', 'GET'):
                 spelling += '#'
                 p += 1
-            if spelling in ('TAB', 'SPC') and p < len(source) and source[p] == '(':
-                spelling += '('
-                p += 1
+            if spelling in ('TAB', 'SPC'):
+                opening = _opening_parenthesis(source,p)
+                if opening is not None:
+                    spelling += '('
+                    p = opening+1
             # Text shortcut P., G., etc; PETSCII shifted final letter also supported.
             if p < len(source) and source[p] == '.':
                 choices = [k for k in KEYWORDS if k.startswith(spelling)]
                 if choices and (p+1 == len(source) or not source[p+1].isalnum()):
                     spelling = choices[0]
                     p += 1
+                    if spelling.endswith('('):
+                        opening = _opening_parenthesis(source,p)
+                        if opening is not None:
+                            p=opening+1
             if spelling in CODES:
                 out.append(CODES[spelling])
                 if spelling == 'REM':
@@ -332,6 +347,8 @@ def tokenize(source, names, interactive=False):
 def listing(stream, names):
     ts = decode(stream, names)
     parts, i, data = [], 0, False
+    def append(text, token):
+        parts.append((text, token.code))
     while i < len(ts):
         t = ts[i]
         if t.code == CODES['DATA']:
@@ -343,12 +360,12 @@ def listing(stream, names):
             if t.code in (5, 6) and end < len(ts) and is_number(ts[end]):
                 end += 1
             if end < len(ts) and ts[end].code == DATA_SPELLING:
-                parts.append(ts[end].value.decode('latin-1'))
+                append(ts[end].value.decode('latin-1'),t)
                 i = end+1
                 continue
             s = _numeric_field(ts[i:end])
             if s is not None:
-                parts.append(s)
+                append(s,t)
                 i = end
                 continue
         if is_number(t):
@@ -361,21 +378,18 @@ def listing(stream, names):
             s = t.value.decode('latin-1')
         else:
             s = t.spelling
-        parts.append(s)
+        append(s,t)
         i += 1
-    # Whitespace is generated only between tokens, never inside payloads.
+    # Use categories so strings/comments containing punctuation retain every byte.
     result = ''
     previous = None
-    for s in parts:
-        if previous is None:
-            result = s
-        elif s in (')', ',', ';'):
-            result += s
-        elif previous in ('(', 'TAB(', 'SPC('):
-            result += s
-        else:
-            result += ' ' + s
-        previous = s
+    for text, code in parts:
+        tight = (previous is None or code in (1, 2, 4) or
+                 previous in (3, CODES['TAB('], CODES['SPC(']) or
+                 code == 3 and (previous >= 0x80 or previous == NAME16 or
+                                0x4d <= previous < 0x64))
+        result += ('' if tight else ' ') + text
+        previous = code
     return result
 
 

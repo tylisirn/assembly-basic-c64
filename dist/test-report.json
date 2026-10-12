@@ -1,9 +1,9 @@
 {
-  "tests_run": 86,
+  "tests_run": 90,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
   "runtime_instructions_checked": 3404,
-  "rom_sha256": "4ce2a8af6429b7c562863097c20ef359935c75188f7fe0c8a4822b10ab827596",
+  "rom_sha256": "14a71c11028d6b9bceb057c3d55db6cc7ec5e78a43efb5304706072725a1291c",
   "environment": "instruction-level py65, deterministic KERNAL stubs"
 }
