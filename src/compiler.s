@@ -1798,6 +1798,7 @@ compile_substring:
  ldx #>right_word
  jmp emit_call
 
+.segment "COMMAND"
 compile_file:
  pha
  lda #0
@@ -1808,7 +1809,7 @@ compile_file:
  inc TOKEN_POS
  lda #0
  jsr expression
- jmp @operation
+ jmp @secondary
 @default:
  lda #8
  sta VALUE
@@ -1818,6 +1819,27 @@ compile_file:
  lda #<push_number
  ldx #>push_number
  jsr emit_call
+@secondary:
+ jsr token_peek
+ cmp #1
+ bne @boundary
+ inc TOKEN_POS
+ lda #0
+ jsr expression
+ ; .AB files carry source, not a load address. Accept a byte compatibility
+ ; argument, then discard it; the sequential transport keeps channel 2.
+ lda #<byte_quantity
+ ldx #>byte_quantity
+ jsr emit_call
+@boundary:
+ jsr token_peek
+ cpx TOKEN_LEN ; $ff can also be a real compact name token (ID 127).
+ bcs @operation
+ cmp #0
+ beq @operation
+ cmp #$68 ; ELSE terminates an IF arm.
+ JEQ @operation
+ jmp compile_recover ; Never append the file call before validating its syntax.
 @operation:
  lda #$a9
  jsr emit
@@ -1829,6 +1851,7 @@ compile_file:
  clc
  rts
 
+.segment "COMPILER"
 compile_open:
  lda #0
  jsr expression

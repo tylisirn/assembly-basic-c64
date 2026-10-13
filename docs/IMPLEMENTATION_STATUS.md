@@ -1,4 +1,4 @@
-# Implementation status — design revision 0.8
+# Implementation status — design revision 0.9
 
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 
@@ -33,6 +33,12 @@ Future work should profile both workloads, reduce temporary-string allocation wh
 - Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
 - Language zero page is `$02–$78`; KERNAL service state uses `$90–$FF`. Common workspace is `$0800–$13FF`. A supported stock KERNAL audit remains a release requirement.
 - Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+
+## Revision 0.9 file argument validation — 13 October 2026
+
+- SAVE, LOAD and VERIFY accept `filename[,device[,secondary]]` with default device 8. The secondary expression is evaluated once, checked as a byte 0..255 and ignored for the source-only .AB format. The sequential transport remains channel 2 and does not select a PRG load address or native-code format.
+- The previous parser consumed filename/device only, emitted the file operation and then appended a syntax trap for the remaining `,1`. SAVE completed before the trap ran; LOAD returned to READY after publishing its new graph and skipped the trap. The parser now consumes the optional third argument and checks the complete statement boundary before emitting the file call.
+- Extra/missing arguments and invalid secondary values fail before opening or overwriting a file. Colon and ELSE remain valid statement/arm boundaries. The enlarged file-argument parser resides in command bank 0 to stay within the compiler's RAM reservation. The execution runtime remains byte-identical at ABI 5; source-container version and arena boundaries are unchanged.
 
 ## Revision 0.8 canonical function calls — 12 October 2026
 
