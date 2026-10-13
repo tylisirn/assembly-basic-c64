@@ -1,4 +1,4 @@
-# Implementation status — design revision 0.9
+# Implementation status — design revision 0.10
 
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 
@@ -27,12 +27,22 @@ Future work should profile both workloads, reduce temporary-string allocation wh
 ## Recorded architectural decisions
 
 - Stable anchors/bindings allocate from the low end of free spans; payloads and runtime heap objects allocate from the high end, preserving common RAM for future anchor slabs. Common allocations are checked against the `$8000` boundary even for whole free blocks.
-- Runtime ABI **5** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
+- Runtime ABI **6** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
 - The fixed-address runtime and resident compiler occupy raw images in banks 2 and 1. Cold start copies both images through common RAM; RUN and CONT refresh the runtime image without moving user code. The link output proves its RAM addresses; no runtime relocation is assumed.
 - String collection is **nonmoving mark-and-sweep**, followed by free-list coalescing, rather than the proposed compacting collector. Roots include line/slab/name/binding objects, arrays, functions, direct code, descriptors, expression temporaries and live helper string pointers. It marks roots once per 2 KiB window using a 256-byte bitmap over inactive lexer scratch, and sweeps the sorted free list with monotonic cursors. It avoids descriptor pointer rewriting but can leave fragmented free space.
 - Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
 - Language zero page is `$02–$78`; KERNAL service state uses `$90–$FF`. Common workspace is `$0800–$13FF`. A supported stock KERNAL audit remains a release requirement.
 - Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+
+## Revision 0.10 integer arithmetic — 13 October 2026
+
+- Implements [the integer arithmetic specification](integer_arithmetic_design.md). Nonnegative constants are unsigned, negative literals are signed, and typed binary evaluation follows precedence/associativity independently of the destination. Representable naked literals adopt the local typed operand; computed constant subexpressions retain their types. Mixed arithmetic remains signed. Assignment copies the low 16 bits without range checking.
+- `PRINT 20000+20000` prints 40000; assigning it to A stores -25536. `4-5` is unsigned 65535 and `(4-5)/2` is 32767. `U%=40000:B=2` gives unsigned 20000 for U%/2 and signed -12768 for U%/B; B=-2 changes the latter to 12768. PRINT/STR$, ordering and division consume the expression's type. VAL and declared function results retain their types.
+- Power-of-two multiplication/division uses shifts in either signed or unsigned expressions. Signed division retains truncation toward zero; unsigned division uses zero fill, including operands above 32767. Literal $8000 means unsigned 32768; a mixed signed division reinterprets it as -32768. General constant folding remains unimplemented.
+- Runtime ABI is 6; source version, two-byte cells/array elements, expression tags and RAM/arena boundaries remain unchanged. Compiler strength-reduction routines moved to command bank 0 to preserve RAM headroom. Hard-reset and reload/recompile source for changed native helper addresses and literal semantics.
+- The specification's A# 16.16 fixed-point type remains planned. Integer arithmetic is the scope of this revision; fixed-point conversions and a remainder operator are not added.
+
+Historical revision notes below describe their original behavior; this section supersedes earlier literal-typing rules.
 
 ## Revision 0.9 file argument validation — 13 October 2026
 

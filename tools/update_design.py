@@ -60,21 +60,25 @@ def synchronize():
                 if old.tag!=f'{{{W}}}sectPr':body.remove(old)
             break
     replacements={
+        'Design specification  |  Version 0.9  |  13 October 2026':
+        'Design specification  |  Version 0.10  |  13 October 2026',
+        'ABI 5':'ABI 6',
+        '16.8 fixed-point':'16.16 fixed-point',
         'Design specification  |  Version 0.8  |  12 October 2026':
-        'Design specification  |  Version 0.9  |  13 October 2026',
+        'Design specification  |  Version 0.10  |  13 October 2026',
         'Design specification  |  Version 0.7  |  12 October 2026':
-        'Design specification  |  Version 0.9  |  13 October 2026',
+        'Design specification  |  Version 0.10  |  13 October 2026',
         'Design specification  |  Version 0.6  |  10 October 2026':
-        'Design specification  |  Version 0.9  |  13 October 2026',
-        'ABI 4':'ABI 5',
+        'Design specification  |  Version 0.10  |  13 October 2026',
+        'ABI 4':'ABI 6',
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.9  |  13 October 2026',
+        'Design specification  |  Version 0.10  |  13 October 2026',
         'Design specification  |  Version 0.5  |  9 October 2026':
-        'Design specification  |  Version 0.9  |  13 October 2026',
+        'Design specification  |  Version 0.10  |  13 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.9', 'runtime ABI 2':'runtime ABI 5', 'ABI 2':'ABI 5',
-        'runtime ABI 3':'runtime ABI 5', 'ABI 3':'ABI 5',
+        'Version 0.4':'Version 0.10', 'runtime ABI 2':'runtime ABI 6', 'ABI 2':'ABI 6',
+        'runtime ABI 3':'runtime ABI 6', 'ABI 3':'ABI 6',
         'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
         'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
         'roughly 379 such lines':'roughly 322 such lines',
@@ -140,7 +144,7 @@ def synchronize():
         'scratch RAM, and stock BASIC memory-top POKEs at 55/56 do not configure this allocator.')
     # Revision 0.6 changes the hardware/load contract while preserving source semantics.
     image=('Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident '
-           'compiler for $1400-$2BFF (runtime ABI 5). Store raw load images in Magic Desk banks '
+           'compiler for $1400-$2BFF (runtime ABI 6). Store raw load images in Magic Desk banks '
            '2 and 1 respectively. Copy the complete dependency closures through common RAM at '
            'cold start; refresh the runtime at RUN and CONT. The linker supplies separate load '
            'and run addresses, so internal instructions already name their RAM addresses. '
@@ -151,14 +155,14 @@ def synchronize():
         rewrites[key]=image
     for key in ('The allocator therefore has two spans:', 'The implemented allocator has two spans:'):
         rewrites[key]=rewrites[key].replace('decompressed at startup','copied from bank 1 at startup')
-    budget=(f"These are ABI 5 build limits. The 65536-byte cartridge has eight 8192-byte banks. "
+    budget=(f"These are ABI 6 build limits. The 65536-byte cartridge has eight 8192-byte banks. "
             f"Runtime helpers occupy {report['runtime_used_bytes']} of 7162 bytes at $E400-$FFF9; "
             f"the compiler occupies {report['compiler_used_bytes']} of 6144 bytes at $1400-$2BFF; "
             f"the gateway occupies {report['gateway_used_bytes']} of 768 bytes. ROM-off execution "
             'remains required. No allocation may cross the I/O hole or overlap firmware. '
             'Future RAM-layout changes require a new ABI and source recompilation.')
     for key in ('These sizes are proposed budgets.', 'These are ABI 3 build limits.',
-                'These are ABI 4 build limits.', 'These are ABI 5 build limits.'):
+                'These are ABI 4 build limits.', 'These are ABI 5 build limits.', 'These are ABI 6 build limits.'):
         rewrites[key]=budget
     measured=('The preceding subdivision is the current bank allocation. Exact measured link '
               'sizes are recorded in Appendix B and dist/size-report.json. Compiler and runtime '
@@ -226,16 +230,20 @@ def synchronize():
     })
     rewrites.update({
         'Each numeric value is a 16-bit word.':
-        'Each numeric value stores a 16-bit word plus an expression interpretation. Unsuffixed names and literals are signed; % names and FRE results are unsigned. The signed interpretation of bits u is u below 32768, otherwise u-65536. Unsigned interpretation is u in 0..65535. Assignment between numeric types copies the word: U%=65535:S=U% makes S=-1, and U%=S restores 65535. Decimal/hex literal magnitudes remain 0..65535 and literal expressions are signed words. Leading signs are unary operations; reject larger magnitudes rather than reducing an oversized constant.',
+        'Each numeric value stores a 16-bit word plus an expression interpretation. Unsuffixed names are signed; % names and FRE results are unsigned. Nonnegative decimal/hex constants, including zero, are unsigned; negative literals are signed, including -32768. Literal magnitudes above 65535 are rejected. Signed interpretation of word u is u below 32768, otherwise u-65536; unsigned interpretation is u. Evaluation follows the expression tree independently of the destination. Assignment and parameter/result conversion preserve all 16 bits without range checks. PRINT 20000+20000 produces 40000, whereas assigning it to A produces -25536 and to A% produces 40000. The integer contract is detailed in docs/integer_arithmetic_design.md; A# fixed point is a future extension.',
         'Division interprets both operand words as signed integers':
-        'Binary operations use unsigned interpretation only when both operands are unsigned; mixed signed/unsigned expressions use signed interpretation. Unsigned division returns the floor quotient; signed division truncates toward zero. For U%=65535:D%=2, U%/D% is 32767, while U%/2 is 0 because the literal is signed. Division by zero raises ?DIVISION BY ZERO. Quotients wrap to 16 bits. Comparisons follow the selected interpretation but return signed -1 or 0. Unary negation and NOT preserve type and wrap; INT and ABS preserve unsigned values, SGN returns 0 or 1 for unsigned. Signed ABS(-32768) remains -32768. Power requires a nonnegative exponent under the selected binary interpretation, and x^0 is 1. Arithmetic >> retains sign fill for both word types; mixed shifts produce signed results.',
+        'Binary operations use unsigned interpretation only when both operands are unsigned; mixed operations reinterpret both words as signed. A naked literal adopts the directly combined typed expression interpretation when representable. A computed constant subexpression retains its type; context never changes earlier operations. For U%=40000:B=2, U%/2 is unsigned 20000, U%/B is signed -12768, and with B=-2 it is 12768. Constant-only 4-5 wraps unsigned to 65535; (4-5)/2 is 32767. Addition, subtraction and multiplication retain the low 16 bits at every operation. Signed division truncates toward zero; unsigned division returns the floor quotient. Zero divisors raise ?DIVISION BY ZERO; quotients wrap. Comparisons return signed -1/0. Typed unary minus and NOT preserve type; negative literals are signed. INT and ABS preserve type; signed ABS(-32768) remains -32768. Power requires a nonnegative exponent under the selected interpretation, and x^0 is 1. Explicit arithmetic >> retains sign fill for both word types.',
         'PRINT and STR$ display signed decimal values':
-        'PRINT and STR$ select decimal formatting from the expression type: unsigned values print 0..65535, signed values print -32768..32767, with the existing Commodore positive-space/separator conventions. PRINT $D000 still displays -12288 because literals are signed; assigning the word to V% and printing V% displays 53248. INPUT and READ copy parsed word bits into the declared target type. VAL still returns a signed word using the shared decimal/hex decoder and longest-prefix policy; malformed hex, oversized magnitudes, fractional and scientific continuations remain rejected.',
+        'PRINT and STR$ select decimal formatting from the expression type: unsigned values print 0..65535, signed values print -32768..32767, using the existing Commodore positive-space/separator conventions. PRINT $D000 displays 53248; V=$D000:PRINT V displays -12288. INPUT and READ copy parsed word bits into the declared target type. VAL still returns a signed word using the shared decimal/hex decoder and longest-prefix policy; malformed hex, oversized magnitudes, fractional and scientific continuations remain rejected.',
         'Signed interpretation still governs comparisons, division, loop limits':
         'Two unsigned operands select unsigned comparisons/division; mixed operations remain signed. FOR limits use the declared loop variable interpretation with signed STEP direction. Byte arguments to POKE, WAIT and CHR$ must be in 0..255 for either numeric type. Subscripts, DIM sizes and allocation counts retain semantic bounds and checked wider products; wrapped numeric arithmetic never permits pointer or allocator overflow. USR still uses its configured vector and word A/X convention.',
         'A nine-byte FOR frame stores':
         'A nine-byte FOR frame stores a tag, scalar cell address, word limit, signed word step and native continuation PC. Unsuffixed and % loop variables are supported; string/subscripted variables are rejected. Initialization/limit/step are evaluated once. NEXT compares using the loop variable interpretation, with signed STEP direction. Unsigned NEXT detects wrap or underflow so loops ending at 65535 or zero terminate. Existing signed boundary wrap and STEP-zero nontermination remain; polling stays active.',
     })
+    # Also recognize paragraphs produced by earlier synchronizations.
+    rewrites['Each numeric value stores a 16-bit word'] = rewrites['Each numeric value is a 16-bit word.']
+    rewrites['Binary operations use unsigned interpretation'] = rewrites['Division interprets both operand words as signed integers']
+    rewrites['PRINT and STR$ select decimal formatting'] = rewrites['PRINT and STR$ display signed decimal values']
     rewrites['LIST traverses the live trailer chain'] = (
         'LIST traverses the live trailer chain, prints decimal line numbers and expands tokens '
         'with canonical spacing. Calls and array/DEF FN argument lists attach the opening '
@@ -335,7 +343,7 @@ def synchronize():
             set_cell(cells[-1],'Resident compiler, copied from bank 1 at cold start; excluded from user allocation.')
         elif address=='$8000-$BFFF':
             set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
-    marker='Appendix B — implementation status, revision 0.9'
+    marker='Appendix B — implementation status, revision 0.10'
     additions=[paragraph(marker,True),paragraph(
         'This appendix records the development implementation on 13 October 2026. '
         'The full version-one contract is not yet complete. Original release '
@@ -346,10 +354,10 @@ def synchronize():
                   f"{tests['runtime_instructions_checked']} documented runtime instructions checked. "
                   'Environment: instruction-level py65 with deterministic KERNAL stubs; '
                   'this is not cycle-accurate or physical-machine acceptance evidence.'),
-        paragraph('Source/container version 1 and runtime ABI 5 are distinct. '
+        paragraph('Source/container version 1 and runtime ABI 6 are distinct. '
                   'Language zero page is $02-$78; common workspace is $0800-$13FF. '
                   'Function activations currently use a guarded hardware stack with depth eight. '
-                  'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Division applies a negative-operand bias to preserve truncation toward zero. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')]
+                  'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')]
     measurements=json.loads((ROOT/'docs/measurements.json').read_text())
     assert measurements['rom_sha256']==report['rom_sha256'], 'Measurements refer to a different cartridge'
     additions.append(paragraph('Instruction-level measurements and capacity scenario: '+
@@ -357,7 +365,7 @@ def synchronize():
     collection=json.loads((ROOT/'docs/voidrunner-collection.json').read_text())
     assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
     additions.append(paragraph('Captured Void Runner collection replay: '+json.dumps(collection,sort_keys=True)))
-    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()
+    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()+'\n'+(ROOT/'docs/integer_arithmetic_design.md').read_text(encoding='utf-8-sig')
     for line in status.splitlines():
         if not line or line.startswith('| ---'):continue
         if line.startswith('#'):additions.append(paragraph(line.lstrip('# '),True))
@@ -377,7 +385,7 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='9'
+                    if n.tag.endswith('}revision'):n.text='10'
                     if n.tag.endswith('}modified'):n.text='2026-10-13T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
@@ -391,12 +399,12 @@ def synchronize():
                    for p in root.iter(f'{{{W}}}p'))+'\n'
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.9','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.10','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.9 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.10 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()

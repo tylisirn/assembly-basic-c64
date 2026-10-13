@@ -956,6 +956,7 @@ parse_constant:
 @bad:
  sec
  rts
+.segment "COMMAND"
 optimize_left_power:
  ldx PARSE_DEPTH
  dex
@@ -995,8 +996,8 @@ optimize_left_power:
  lda #0
  sta VALUE+1
  jsr emit_ax
- lda #<push_number
- ldx #>push_number
+ lda #<push_unsigned
+ ldx #>push_unsigned
  jsr emit_call
  lda #<shift_left_word
  ldx #>shift_left_word
@@ -1051,8 +1052,8 @@ optimize_power:
  lda #0
  sta VALUE+1
  jsr emit_ax
- lda #<push_number
- ldx #>push_number
+ lda #<push_unsigned
+ ldx #>push_unsigned
  jsr emit_call
  ldx PARSE_DEPTH
  dex
@@ -1082,6 +1083,7 @@ optimize_power:
 @no:
  clc
  rts
+.segment "COMPILER"
 precedence:
  cmp #$1a
  beq @shift
@@ -1236,8 +1238,28 @@ primary:
  jmp expression
 @minus:
  inc TOKEN_POS
+ ; Recognize a negative literal before typing its magnitude independently.
+ ; Parentheses around a literal are allowed. Computed expressions and declared
+ ; values instead retain their type under unary minus. Power keeps precedence.
+ lda TOKEN_POS
+ pha
+ jsr parse_constant
+ php
+ pla
+ tax
+ pla
+ sta TOKEN_POS
+ txa
+ pha
  lda #8
  jsr expression
+ pla
+ and #1
+ bne @typed_minus
+ lda #<negate_signed_word
+ ldx #>negate_signed_word
+ jmp emit_call
+@typed_minus:
  lda #<negate_word
  ldx #>negate_word
  jmp emit_call
@@ -1257,8 +1279,8 @@ primary:
 @number:
  jsr parse_immediate
  jsr emit_ax
- lda #<push_number
- ldx #>push_number
+ lda #<push_unsigned
+ ldx #>push_unsigned
  jmp emit_call
 @name:
  jsr parse_name

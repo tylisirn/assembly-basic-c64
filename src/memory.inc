@@ -1,4 +1,4 @@
-; Assembly BASIC ABI 5: fixed RAM entry points, documented NMOS instructions.
+; Assembly BASIC ABI 6: fixed RAM entry points, documented NMOS instructions.
 PORT = $01
 PTR = $02
 PTR2 = $04

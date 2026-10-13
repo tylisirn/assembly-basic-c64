@@ -1,26 +1,30 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.9",
-  "runtime_abi": 5,
+  "design_revision": "0.10",
+  "runtime_abi": 6,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 95,
+  "validated_tests": 101,
   "artifacts": {
     "abi.json": {
-      "bytes": 7054,
-      "sha256": "62ce9b05368be37152ccb6c5eb9f5e87b83cebb89deafea48ca85fe2cbb97617"
+      "bytes": 7112,
+      "sha256": "ac5a633f8dd48782d4b275b134c6020f35c1002e90f6d278eb443212c0c4ea81"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "adbb5c7e7657c228e53b52c75903abfdca423e71184ec5c755828cbe016e34e5"
+      "sha256": "b187b9ae7894ae3f9525c15098c6cc62f286b67240d4007a30086ac21ca1c489"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "2651dad100d9a2f3de324bcdb0f72a00d34f6544548dcff89e041492eedcf83d"
+      "sha256": "5bc4c882c28483e7a154cdb5b9f333c506a0cb57118801d1efd818d2e4013e56"
     },
     "examples/hello.ab": {
       "bytes": 62,
       "sha256": "f846e3cf938d7ff57912658cf838afacd9695dc1521b332640606bc80b07309a"
+    },
+    "examples/integer_arithmetic.ab": {
+      "bytes": 355,
+      "sha256": "1e25ff3c3cdd56ee0db3f508e78d51985baf1e2159d4c25e596a7a8679a1b679"
     },
     "examples/revision05.ab": {
       "bytes": 163,
@@ -31,8 +35,8 @@
       "sha256": "7e911508a918dd4b95220abec8aea6d8a9a1eeaaad00efdb5f850e084b94b081"
     },
     "examples/unsigned.ab": {
-      "bytes": 289,
-      "sha256": "d0217e6ed1ab6195c7799f5eda1171fbd08315b5476eadf1d4fc5b4bfb3351b6"
+      "bytes": 322,
+      "sha256": "ce79fd870209358ac8ac7bbf9e9c5ef1b6b3b46846d6ccf9b9ee606e23346fc9"
     },
     "examples/video.ab": {
       "bytes": 58,
@@ -43,12 +47,12 @@
       "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
     "size-report.json": {
-      "bytes": 3055,
-      "sha256": "d099dcddb03cdee48cac78214bed63681b1c67d8a4be4de8333a1d7dca8f3e0f"
+      "bytes": 3056,
+      "sha256": "8f2971e7cf9ae6eb699fad323431f055c680c79f86b9e7d5613f667c0d53f941"
     },
     "test-report.json": {
-      "bytes": 265,
-      "sha256": "5765fa8bf3f19fd2e35dd842ea142451e362af6d8df17d36c788c34b6275993a"
+      "bytes": 266,
+      "sha256": "6863543dba5117d17b59b4def55c1a1784170b9e7bb355af28679832a28034af"
     }
   }
 }

@@ -15,7 +15,7 @@ class NativeTests(unittest.TestCase):
             self.assertLessEqual(m.labels[f'__{section}_SIZE__'],budget)
         self.assertEqual(m.memory.ram[1]&7,7)
     def test_word_semantics(self):
-        cases={'32767+1':-32768,'65535+1':0,'$FFFF*2':-2,'-5/2':-2,'65535/2':0,'-32768/-1':-32768,'ABS(-32768)':-32768,'2^3^2':64,'-2^2':-4,'0^0':1,'NOT 1=1':0,'$D000<0':-1,'SGN($FFFF)':-1,'INT(2)':2}
+        cases={'32767+1':32768,'65535+1':0,'$FFFF*2':65534,'-5/2':-2,'65535/2':32767,'-32768/-1':-32768,'ABS(-32768)':-32768,'2^3^2':64,'-2^2':-4,'0^0':1,'NOT 1=1':0,'$D000<0':0,'SGN($FFFF)':1,'INT(2)':2}
         for source,expected in cases.items():
             self.assertEqual(self.expression(source),f'{expected: d} ',source)
     def test_required_poke_examples(self):
@@ -44,7 +44,7 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(self.expression('LEN("A:B")'),' 3 ')
         self.assertEqual(self.expression('ASC("Z")'),' 90 ')
         self.assertEqual(self.expression('CHR$(65)'),'A')
-        self.assertEqual(self.expression('STR$($D000)'),'-12288')
+        self.assertEqual(self.expression('STR$($D000)'),' 53248')
         self.assertEqual(self.expression('VAL("-$FFFF")'),' 1 ')
         self.assertEqual(self.expression('VAL("$1E2")'),' 482 ')
         self.assertIn('?ILLEGAL QUANTITY',m.command('PRINT VAL("65536")'))

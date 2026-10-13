@@ -111,8 +111,8 @@ class Revision05Tests(unittest.TestCase):
         self.assertIn('?TYPE MISMATCH', self.m.command('PRINT RND("A")'))
 
     def test_arithmetic_shifts_precedence_and_checked_counts(self):
-        cases = {'1<<15': -32768, '-5>>1': -3, '$8000>>15': -1,
-                 '$FFFF<<1': -2, '7>>0': 7, '1<<16': 0, '-1>>255': -1,
+        cases = {'1<<15': 32768, '-5>>1': -3, '$8000>>15': 65535,
+                 '$FFFF<<1': 65534, '7>>0': 7, '1<<16': 0, '-1>>255': -1,
                  '1+2<<2': 12, '1<<1+2': 8, '8>>1>>1': 2,
                  '1<<2=4': -1, 'NOT 1<<2=4': 0, '-2^2>>1': -2}
         for source, expected in cases.items():
@@ -132,7 +132,7 @@ class Revision05Tests(unittest.TestCase):
             divisor = 1 << power
             quotient = abs(value) // divisor * (-1 if value < 0 else 1)
             self.assertEqual(self.result(f'{value}/{divisor}'), f'{quotient: d} ')
-            self.assertEqual(self.result(f'{value}*{divisor}'), f'{signed(value * divisor): d} ')
+            self.assertEqual(self.result(f'{value}*{divisor}'), f'{signed(value * divisor) if value < 0 else (value * divisor) & 65535: d} ')
         for source, helper in (('A*8', 'shift_left_word'), ('8*A', 'shift_left_word'),
                                ('A/8', 'divide_power_word'), ('A/(8)', 'divide_power_word'),
                                ('(8)*A', 'shift_left_word'), ('A*+(8)', 'shift_left_word'),

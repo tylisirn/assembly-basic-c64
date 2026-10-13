@@ -405,6 +405,9 @@ binary_operands:
  stx LEFT+1
  lda NUM_TYPE
  pla
+ ; Small nonnegative literals may adopt a signed neighbor, but the resulting
+ ; bits/type are identical to this mixed rule. Larger literals stay unsigned;
+ ; computed subexpressions retain their own tag. No destination/global promotion.
  and NUM_TYPE ; Both operands must be unsigned; mixed operations are signed.
  sta NUM_TYPE
  rts
@@ -441,6 +444,7 @@ subtract_word:
  jmp push_typed
 negate_word:
  jsr pop_number
+negate_ax:
  sta RIGHT
  stx RIGHT+1
  sec
@@ -452,6 +456,11 @@ negate_word:
  tax
  pla
  jmp push_typed
+negate_signed_word:
+ jsr pop_number
+ ldy #0
+ sty NUM_TYPE
+ jmp negate_ax
 not_word:
  jsr pop_number
  eor #$ff
@@ -552,8 +561,14 @@ shift_loop:
  rol LEFT+1
  jmp @next
 @right:
+ cmp #2
+ beq @logical
  lda LEFT+1
  cmp #$80
+ jmp @rotate
+@logical:
+ clc
+@rotate:
  ror LEFT+1
  ror LEFT
 @next:
@@ -563,10 +578,16 @@ shift_result:
  lda LEFT
  ldx LEFT+1
  jmp push_typed
-; Constant power-of-two word divisors become biased arithmetic right shifts.
+; Power-of-two division: signed operands use a bias and arithmetic shift;
+; unsigned operands use zero fill. Count 15 represents literal unsigned $8000,
+; whose word is a negative divisor only after mixed signed interpretation.
 divide_negative_power_word:
  jsr divide_power_word
+ bit NUM_TYPE
+ bmi @unsigned
  jmp negate_word
+@unsigned:
+ rts
 divide_power_word:
  jsr binary_operands
  lda NUM_TYPE
@@ -595,7 +616,12 @@ divide_power_word:
  adc LEFT+1
  sta LEFT+1
 @shift:
+ bit NUM_TYPE
+ bmi @logical
  lda #1
+ jmp shift_mode
+@logical:
+ lda #2
  jmp shift_mode
 multiply_word:
  jsr binary_operands
@@ -2056,7 +2082,7 @@ clear_next:
  stx WALK
  rts
 runtime_stamp:
-.byte "AB64",5
+.byte "AB64",6
 
 format_source:
  sta LEFT

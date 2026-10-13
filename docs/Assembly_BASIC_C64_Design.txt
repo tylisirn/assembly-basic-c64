@@ -1,7 +1,7 @@
 Assembly BASIC for the Commodore 64
 Implementation design for an integer and string BASIC ROM cartridge
 Implementation status: working development cartridge; the full version-one release is not complete. See Appendix B for measured implementation facts, explicit differences and pending acceptance work.
-Design specification  |  Version 0.9  |  13 October 2026
+Design specification  |  Version 0.10  |  13 October 2026
 Implement Assembly BASIC as a 64 KiB classic Magic Desk autostart cartridge containing the command/editor firmware, tokenizer, compiler and an execution runtime load image. Copy compiler/runtime helpers to fixed RAM and execute native programs with cartridge, BASIC and KERNAL ROM hidden. Retain custom tokens beside native code and link each body through its final successor JMP. LIST expands source tokens into canonical PETSCII.
 Use a seven-byte stable anchor per line and a single allocation containing its tokens and native body. Bind full identifiers to an interned name dictionary. Keywords, operators and the first 128 name references each occupy one byte; valid integer immediates are binary values. Runtime calls use fixed addresses in the copied RAM image. A small gateway in permanently visible RAM handles ROM access, KERNAL calls and interrupt transitions.
 Version 0.3 replaces the earlier ROM-resident execution model, 32-byte nodes and stock BASIC token storage. It adds RAM beneath both cartridge ROM and KERNAL to the allocation map, removes persistent statement and relocation tables, and adopts the custom source format specified in Appendix A. Source and file tokens have no binary compatibility requirement with stock BASIC. Familiar BASIC syntax, integer/string behavior and device interaction remain the compatibility goals.
@@ -49,11 +49,11 @@ Machine-code interaction
 SYS/USR enter the RAM map; KERNAL services require the documented bank gateway. Stock BASIC internals and unguarded ROM calls are outside the contract.
 
 Word literals and integer semantics
-Each numeric value stores a 16-bit word plus an expression interpretation. Unsuffixed names and literals are signed; % names and FRE results are unsigned. The signed interpretation of bits u is u below 32768, otherwise u-65536. Unsigned interpretation is u in 0..65535. Assignment between numeric types copies the word: U%=65535:S=U% makes S=-1, and U%=S restores 65535. Decimal/hex literal magnitudes remain 0..65535 and literal expressions are signed words. Leading signs are unary operations; reject larger magnitudes rather than reducing an oversized constant.
+Each numeric value stores a 16-bit word plus an expression interpretation. Unsuffixed names are signed; % names and FRE results are unsigned. Nonnegative decimal/hex constants, including zero, are unsigned; negative literals are signed, including -32768. Literal magnitudes above 65535 are rejected. Signed interpretation of word u is u below 32768, otherwise u-65536; unsigned interpretation is u. Evaluation follows the expression tree independently of the destination. Assignment and parameter/result conversion preserve all 16 bits without range checks. PRINT 20000+20000 produces 40000, whereas assigning it to A produces -25536 and to A% produces 40000. The integer contract is detailed in docs/integer_arithmetic_design.md; A# fixed point is a future extension.
 Hexadecimal immediates use $ followed by one through four hexadecimal digits, accepting A-F in either case. $D000, $d000 and decimal 53248 produce the identical word. Hex constants are allowed wherever a numeric expression is allowed, including POKE values, subscripts, DATA numeric fields and function arguments. A bare $ or an attached nonhex character raises ?SYNTAX ERROR; more than four digits raises ?ILLEGAL QUANTITY. Require a delimiter after the digits. A trailing $ on an identifier still marks a string variable, so VALUE$=$D000 is a type mismatch rather than a different numeric declaration.
 Addition, subtraction, multiplication, unary negation and nonnegative-integer exponentiation return the low 16 bits of the mathematical result. This modulo-65536 rule is uniform for variables and constants: 32767+1 becomes -32768, 65535+1 becomes 0, and $FFFF*2 becomes -2. Arithmetic wrap is normal behavior and does not raise ?OVERFLOW. Constant folding uses the same reductions at each operation. The low word of a signed and an unsigned product is identical, so multiplication shares a bit-level helper; the expression tag determines result interpretation.
-Binary operations use unsigned interpretation only when both operands are unsigned; mixed signed/unsigned expressions use signed interpretation. Unsigned division returns the floor quotient; signed division truncates toward zero. For U%=65535:D%=2, U%/D% is 32767, while U%/2 is 0 because the literal is signed. Division by zero raises ?DIVISION BY ZERO. Quotients wrap to 16 bits. Comparisons follow the selected interpretation but return signed -1 or 0. Unary negation and NOT preserve type and wrap; INT and ABS preserve unsigned values, SGN returns 0 or 1 for unsigned. Signed ABS(-32768) remains -32768. Power requires a nonnegative exponent under the selected binary interpretation, and x^0 is 1. Arithmetic >> retains sign fill for both word types; mixed shifts produce signed results.
-PRINT and STR$ select decimal formatting from the expression type: unsigned values print 0..65535, signed values print -32768..32767, with the existing Commodore positive-space/separator conventions. PRINT $D000 still displays -12288 because literals are signed; assigning the word to V% and printing V% displays 53248. INPUT and READ copy parsed word bits into the declared target type. VAL still returns a signed word using the shared decimal/hex decoder and longest-prefix policy; malformed hex, oversized magnitudes, fractional and scientific continuations remain rejected.
+Binary operations use unsigned interpretation only when both operands are unsigned; mixed operations reinterpret both words as signed. A naked literal adopts the directly combined typed expression interpretation when representable. A computed constant subexpression retains its type; context never changes earlier operations. For U%=40000:B=2, U%/2 is unsigned 20000, U%/B is signed -12768, and with B=-2 it is 12768. Constant-only 4-5 wraps unsigned to 65535; (4-5)/2 is 32767. Addition, subtraction and multiplication retain the low 16 bits at every operation. Signed division truncates toward zero; unsigned division returns the floor quotient. Zero divisors raise ?DIVISION BY ZERO; quotients wrap. Comparisons return signed -1/0. Typed unary minus and NOT preserve type; negative literals are signed. INT and ABS preserve type; signed ABS(-32768) remains -32768. Power requires a nonnegative exponent under the selected interpretation, and x^0 is 1. Explicit arithmetic >> retains sign fill for both word types.
+PRINT and STR$ select decimal formatting from the expression type: unsigned values print 0..65535, signed values print -32768..32767, using the existing Commodore positive-space/separator conventions. PRINT $D000 displays 53248; V=$D000:PRINT V displays -12288. INPUT and READ copy parsed word bits into the declared target type. VAL still returns a signed word using the shared decimal/hex decoder and longest-prefix policy; malformed hex, oversized magnitudes, fractional and scientific continuations remain rejected.
 Preserve eager integer evaluation and BASIC precedence with shifts inserted below addition and above comparisons. Highest to lowest: power (left associative), unary +/- , multiplication/division, addition/subtraction, << and >> (left associative), comparisons, NOT, AND, OR. Relational results are -1 or 0. Shift counts are checked unsigned bytes 0..255. Left shifts wrap the word; arithmetic right shifts repeat its sign bit. Counts of 16 or more produce zero or sign fill. Numeric/string mixing requires explicit conversion; string comparisons use unsigned PETSCII order then length.
 Unsigned addresses and special values
 PEEK, POKE, WAIT and SYS evaluate their address expression with the ordinary word rules and reinterpret its final 16 bits as an unsigned address from $0000 through $FFFF. They must not reject a negative signed representation or sign-extend it into a larger address. No address-only literal exception is needed. The same rule works for direct constants, variables, array elements and computed expressions, including POKE 53248+33,1 and POKE $D000+$21,$01.
@@ -99,7 +99,7 @@ With classic Magic Desk, $35 hides ROML, BASIC and KERNAL while retaining I/O; $
 The KERNAL recognizes CBM80 at $8004 before initialization. Bank 0 has cold/warm entry vectors at $8000/$8002. Every auxiliary bank has the same signature and vectors to common-RAM recovery helpers installed at startup; these select bank 0 before returning to command ROM. The previous $A000 recovery words are removed because stock BASIC ROM occupies that window in the command map.
 Cold start and copying the execution image
 Disable IRQs, clear decimal mode and establish a bounded hardware stack. Set the port direction and command map, preserving cassette control bits. Perform the audited IOINIT, RAMTAS, RESTOR and CINT startup sequence. Allocate language state and install hooks only after RAMTAS has cleared its work areas. Use explicit language memory boundaries rather than accepting the cartridge-aware RAM test as the allocator limit. [3, 6]
-Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident compiler for $1400-$2BFF (runtime ABI 5). Store raw load images in Magic Desk banks 2 and 1 respectively. Copy the complete dependency closures through common RAM at cold start; refresh the runtime at RUN and CONT. The linker supplies separate load and run addresses, so internal instructions already name their RAM addresses. There is no decompression or arbitrary instruction relocation.
+Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident compiler for $1400-$2BFF (runtime ABI 6). Store raw load images in Magic Desk banks 2 and 1 respectively. Copy the complete dependency closures through common RAM at cold start; refresh the runtime at RUN and CONT. The linker supplies separate load and run addresses, so internal instructions already name their RAM addresses. There is no decompression or arbitrary instruction relocation.
 Copy the common-RAM gateway image into its reserved workspace, and write the six RAM hardware-vector bytes at $FFFA-$FFFF underneath KERNAL. The vector targets are common-RAM interrupt entries. Finish all copies and validate their build stamp/checksum before enabling IRQs. The top RAM reservation is permanent, including while the ROM is visible; allocation must never use it as temporary editing space.
 Before RUN, verify the runtime image and refresh it from ROM when required. CONT uses the same fixed helper addresses and may refresh identical bytes, but an ABI/build change or structural program change invalidates continuation. A helper copy does not recompile already valid user bodies. Hardware RESET performs cold initialization and does not promise retention.
 Common RAM gateways
@@ -159,7 +159,7 @@ $FFFA-$FFFF
 RAM hardware vectors beneath KERNAL.
 
 The implemented allocator has two spans: [$2C00,$D000) and [$E000,$E400). Their raw total is 42 KiB (43008 bytes), before anchors, names, source, generated code, arrays, strings and free-block overhead. The $1400-$2BFF range is permanently reserved for a 6 KiB compiler image copied from bank 1 at startup. The $E000-$E3FF shadow span supplies 1 KiB; $E400-$FFFF is permanently reserved for the runtime and six vector bytes. This is the lower-runtime-base adjustment permitted by the original design.
-These are ABI 5 build limits. The 65536-byte cartridge has eight 8192-byte banks. Runtime helpers occupy 7002 of 7162 bytes at $E400-$FFF9; the compiler occupies 6048 of 6144 bytes at $1400-$2BFF; the gateway occupies 538 of 768 bytes. ROM-off execution remains required. No allocation may cross the I/O hole or overlap firmware. Future RAM-layout changes require a new ABI and source recompilation.
+These are ABI 6 build limits. The 65536-byte cartridge has eight 8192-byte banks. Runtime helpers occupy 7037 of 7162 bytes at $E400-$FFF9; the compiler occupies 5848 of 6144 bytes at $1400-$2BFF; the gateway occupies 538 of 768 bytes. ROM-off execution remains required. No allocation may cross the I/O hole or overlap firmware. Future RAM-layout changes require a new ABI and source recompilation.
 Fixed workspace within $0800-$13FF
 Bytes
 Language state, arena heads and saved context
@@ -390,14 +390,14 @@ Do not save machine code in version 1. A future native cache must include a cart
 Cartridge contents
 Bank budget / measured used bytes
 Bank 0: boot, command editor, tokenizer, LIST and source transport
-8192 / 7302 bytes
+8192 / 7529 bytes
 Bank 1: raw resident compiler image
-8192 / 6057 bytes
+8192 / 5857 bytes
 Bank 2: raw RAM execution runtime image
-8192 / 7011 bytes
+8192 / 7046 bytes
 Bank 3: reserved: improved editor and BASIC PRG conversion
 8192 / 9 bytes
-Bank 4: reserved: 16.8 fixed-point and PRINT formatting extensions
+Bank 4: reserved: 16.16 fixed-point and PRINT formatting extensions
 8192 / 9 bytes
 Bank 5: reserved: sprite, VIC and SID commands
 8192 / 9 bytes
@@ -814,14 +814,14 @@ The container deliberately separates name spelling from occurrences and excludes
 A7 Canonical validation and invariants
 Valid binary streams use the smallest decimal encoding, direct name codes for IDs below 128, and nonzero payload lengths for BADTEXT, NUMTEXT and DATA_SPELLING. Require REM followed by exactly one REMTEXT token. Check DATA-only forms in context, reject delimiter bytes in DATA_TEXT and require numeric fields to use binary values rather than hiding them in DATA_TEXT. Validate syntax separately from lexical structure: safe tokens may still compile to a reached BASIC syntax error. Reserved codes, out-of-range IDs or payload overruns cannot enter the live graph.
 Keep source tokens authoritative. Constant folding modifies native code only. Canonical LIST and the text importer must preserve numeric magnitude/radix, full names, signs, literal bytes and DATA spelling semantics. A format version change is required before reassigning any code or altering its payload interpretation.
-Appendix B — implementation status, revision 0.9
+Appendix B — implementation status, revision 0.10
 This appendix records the development implementation on 13 October 2026. The full version-one contract is not yet complete. Original release requirements above remain the target unless an architectural choice is explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.
-Measured linked build: {"arena_raw_bytes": 43008, "arena_spans": [[11264, 53248], [57344, 58368]], "bank_bytes": 8192, "bank_register": 56832, "banks": [{"bank": 0, "offset": 0, "reserved": false, "role": "boot, command editor, tokenizer, LIST and source transport", "spare_bytes": 890, "used_bytes": 7302, "window": [32768, 40960]}, {"bank": 1, "offset": 8192, "reserved": false, "role": "raw resident compiler image", "spare_bytes": 2135, "used_bytes": 6057, "window": [32768, 40960]}, {"bank": 2, "offset": 16384, "reserved": false, "role": "raw RAM execution runtime image", "spare_bytes": 1181, "used_bytes": 7011, "window": [32768, 40960]}, {"bank": 3, "offset": 24576, "reserved": true, "role": "reserved: improved editor and BASIC PRG conversion", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 4, "offset": 32768, "reserved": true, "role": "reserved: 16.8 fixed-point and PRINT formatting extensions", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 5, "offset": 40960, "reserved": true, "role": "reserved: sprite, VIC and SID commands", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 6, "offset": 49152, "reserved": true, "role": "reserved: numeric tables, fonts and optional resources", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 7, "offset": 57344, "reserved": true, "role": "reserved: expansion and diagnostics", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}], "cartridge_format": "classic Magic Desk", "cartridge_type": 19, "compiler_budget_bytes": 6144, "compiler_image_encoding": "raw", "compiler_rom_bytes": 6048, "compiler_run_address": 5120, "compiler_used_bytes": 6048, "gateway_budget_bytes": 768, "gateway_used_bytes": 538, "rom_bytes": 65536, "rom_sha256": "adbb5c7e7657c228e53b52c75903abfdca423e71184ec5c755828cbe016e34e5", "rom_spare_bytes": 45121, "rom_used_bytes": 20415, "runtime_abi": 5, "runtime_budget_bytes": 7162, "runtime_image_encoding": "raw", "runtime_rom_bytes": 7002, "runtime_run_address": 58368, "runtime_used_bytes": 7002, "segments": {"COMMAND": 6755, "COMPILER": 6048, "GATEWAY": 538, "HEADER": 9, "HEADER1": 9, "HEADER2": 9, "HEADER3": 9, "HEADER4": 9, "HEADER5": 9, "HEADER6": 9, "HEADER7": 9, "RUNTIME": 7002}, "workspace_bytes": 3072}
-Automated validation: 95 tests passed, 3404 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
-Source/container version 1 and runtime ABI 5 are distinct. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Division applies a negative-operand bias to preserve truncation toward zero. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
-Instruction-level measurements and capacity scenario: {"capacity_scenario": {"accepted_lines": 690, "failure": "?OUT OF MEMORY\r\rREADY.\r", "first_rejected_line": 691, "note": "Cold NEW, one scalar; common-span anchor exhaustion and fragmentation can limit capacity before all raw bytes are used.", "remaining_free_physical_bytes": 46, "source_template": "<number> A=A+1"}, "cold_start_instructions": 178494, "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing", "rom_sha256": "adbb5c7e7657c228e53b52c75903abfdca423e71184ec5c755828cbe016e34e5", "workloads": {"integer_loop": {"entry_instructions": 24631, "lines": [{"line": 10, "native_bytes": 203, "payload_physical_bytes": 229, "token_bytes": 23}], "output": " 5050 \r\rREADY.\r", "run_instructions": 146968}, "shadow_address": {"entry_instructions": 19568, "lines": [{"line": 10, "native_bytes": 140, "payload_physical_bytes": 168, "token_bytes": 25}], "output": "-12288  1 \r\rREADY.\r", "run_instructions": 93834}, "strings_arrays": {"entry_instructions": 45405, "lines": [{"line": 10, "native_bytes": 169, "payload_physical_bytes": 206, "token_bytes": 34}, {"line": 20, "native_bytes": 141, "payload_physical_bytes": 171, "token_bytes": 27}], "output": " 246 ROOT\r\rREADY.\r", "run_instructions": 97597}}}
-Captured Void Runner collection replay: {"captured_physical_blocks": 1636, "environment": "instruction-level py65; no IRQ/VIC timing", "final_free_blocks": 9, "final_free_bytes": 5651, "initial_free_blocks": 253, "new_full_cpu_cycles": 1269981, "new_full_instructions": 394049, "old_remaining_cpu_cycles": 137980792, "old_remaining_instructions": 44268554, "rom_sha256": "adbb5c7e7657c228e53b52c75903abfdca423e71184ec5c755828cbe016e34e5"}
-Implementation status — design revision 0.9
+Measured linked build: {"arena_raw_bytes": 43008, "arena_spans": [[11264, 53248], [57344, 58368]], "bank_bytes": 8192, "bank_register": 56832, "banks": [{"bank": 0, "offset": 0, "reserved": false, "role": "boot, command editor, tokenizer, LIST and source transport", "spare_bytes": 663, "used_bytes": 7529, "window": [32768, 40960]}, {"bank": 1, "offset": 8192, "reserved": false, "role": "raw resident compiler image", "spare_bytes": 2335, "used_bytes": 5857, "window": [32768, 40960]}, {"bank": 2, "offset": 16384, "reserved": false, "role": "raw RAM execution runtime image", "spare_bytes": 1146, "used_bytes": 7046, "window": [32768, 40960]}, {"bank": 3, "offset": 24576, "reserved": true, "role": "reserved: improved editor and BASIC PRG conversion", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 4, "offset": 32768, "reserved": true, "role": "reserved: 16.16 fixed-point and PRINT formatting extensions", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 5, "offset": 40960, "reserved": true, "role": "reserved: sprite, VIC and SID commands", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 6, "offset": 49152, "reserved": true, "role": "reserved: numeric tables, fonts and optional resources", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}, {"bank": 7, "offset": 57344, "reserved": true, "role": "reserved: expansion and diagnostics", "spare_bytes": 8183, "used_bytes": 9, "window": [32768, 40960]}], "cartridge_format": "classic Magic Desk", "cartridge_type": 19, "compiler_budget_bytes": 6144, "compiler_image_encoding": "raw", "compiler_rom_bytes": 5848, "compiler_run_address": 5120, "compiler_used_bytes": 5848, "gateway_budget_bytes": 768, "gateway_used_bytes": 538, "rom_bytes": 65536, "rom_sha256": "b187b9ae7894ae3f9525c15098c6cc62f286b67240d4007a30086ac21ca1c489", "rom_spare_bytes": 45059, "rom_used_bytes": 20477, "runtime_abi": 6, "runtime_budget_bytes": 7162, "runtime_image_encoding": "raw", "runtime_rom_bytes": 7037, "runtime_run_address": 58368, "runtime_used_bytes": 7037, "segments": {"COMMAND": 6982, "COMPILER": 5848, "GATEWAY": 538, "HEADER": 9, "HEADER1": 9, "HEADER2": 9, "HEADER3": 9, "HEADER4": 9, "HEADER5": 9, "HEADER6": 9, "HEADER7": 9, "RUNTIME": 7037}, "workspace_bytes": 3072}
+Automated validation: 101 tests passed, 3419 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
+Source/container version 1 and runtime ABI 6 are distinct. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
+Instruction-level measurements and capacity scenario: {"capacity_scenario": {"accepted_lines": 690, "failure": "?OUT OF MEMORY\r\rREADY.\r", "first_rejected_line": 691, "note": "Cold NEW, one scalar; common-span anchor exhaustion and fragmentation can limit capacity before all raw bytes are used.", "remaining_free_physical_bytes": 46, "source_template": "<number> A=A+1"}, "cold_start_instructions": 176354, "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing", "rom_sha256": "b187b9ae7894ae3f9525c15098c6cc62f286b67240d4007a30086ac21ca1c489", "workloads": {"integer_loop": {"entry_instructions": 24631, "lines": [{"line": 10, "native_bytes": 203, "payload_physical_bytes": 229, "token_bytes": 23}], "output": " 5050 \r\rREADY.\r", "run_instructions": 147426}, "shadow_address": {"entry_instructions": 19568, "lines": [{"line": 10, "native_bytes": 140, "payload_physical_bytes": 168, "token_bytes": 25}], "output": "-12288  1 \r\rREADY.\r", "run_instructions": 94293}, "strings_arrays": {"entry_instructions": 45405, "lines": [{"line": 10, "native_bytes": 169, "payload_physical_bytes": 206, "token_bytes": 34}, {"line": 20, "native_bytes": 141, "payload_physical_bytes": 171, "token_bytes": 27}], "output": " 246 ROOT\r\rREADY.\r", "run_instructions": 98063}}}
+Captured Void Runner collection replay: {"captured_physical_blocks": 1636, "environment": "instruction-level py65; no IRQ/VIC timing", "final_free_blocks": 9, "final_free_bytes": 5651, "initial_free_blocks": 253, "new_full_cpu_cycles": 1269981, "new_full_instructions": 394049, "old_remaining_cpu_cycles": 137980792, "old_remaining_instructions": 44268554, "rom_sha256": "b187b9ae7894ae3f9525c15098c6cc62f286b67240d4007a30086ac21ca1c489"}
+Implementation status — design revision 0.10
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 Area — Implemented behavior — Remaining work
 Platform — 64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame — Broader VICE/stock-ROM acceptance, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts
@@ -841,12 +841,19 @@ Observed collection latency remains a performance backlog item: approximately 0.
 Future work should profile both workloads, reduce temporary-string allocation where semantics permit, and investigate reducing the worst collection pause while retaining roots, stationary native code and continuation safety. The maze allocates a fresh one-byte CHR$ string each iteration, making it a useful temporary-allocation stress case. Incremental collection would require an explicit mutation/root protocol before implementation. See [the collection investigation](VOIDRUNNER_FREEZE.md).
 Recorded architectural decisions
 Stable anchors/bindings allocate from the low end of free spans; payloads and runtime heap objects allocate from the high end, preserving common RAM for future anchor slabs. Common allocations are checked against the `$8000` boundary even for whole free blocks.
-Runtime ABI **5** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
+Runtime ABI **6** reserves `$E400–$FFF9` (7,162 bytes); `$FFFA–$FFFF` holds hardware vectors. The allocator spans `[$2C00,$D000)` and `[$E000,$E400)`, totaling 43,008 raw bytes. The resident compiler reserves `$1400–$2BFF` (6,144 bytes). The runtime base keeps the design's permitted lower-base adjustment.
 The fixed-address runtime and resident compiler occupy raw images in banks 2 and 1. Cold start copies both images through common RAM; RUN and CONT refresh the runtime image without moving user code. The link output proves its RAM addresses; no runtime relocation is assumed.
 String collection is **nonmoving mark-and-sweep**, followed by free-list coalescing, rather than the proposed compacting collector. Roots include line/slab/name/binding objects, arrays, functions, direct code, descriptors, expression temporaries and live helper string pointers. It marks roots once per 2 KiB window using a 256-byte bitmap over inactive lexer scratch, and sweeps the sorted free list with monotonic cursors. It avoids descriptor pointer rewriting but can leave fragmented free space.
 Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
 Language zero page is `$02–$78`; KERNAL service state uses `$90–$FF`. Common workspace is `$0800–$13FF`. A supported stock KERNAL audit remains a release requirement.
 Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+Revision 0.10 integer arithmetic — 13 October 2026
+Implements [the integer arithmetic specification](integer_arithmetic_design.md). Nonnegative constants are unsigned, negative literals are signed, and typed binary evaluation follows precedence/associativity independently of the destination. Representable naked literals adopt the local typed operand; computed constant subexpressions retain their types. Mixed arithmetic remains signed. Assignment copies the low 16 bits without range checking.
+`PRINT 20000+20000` prints 40000; assigning it to A stores -25536. `4-5` is unsigned 65535 and `(4-5)/2` is 32767. `U%=40000:B=2` gives unsigned 20000 for U%/2 and signed -12768 for U%/B; B=-2 changes the latter to 12768. PRINT/STR$, ordering and division consume the expression's type. VAL and declared function results retain their types.
+Power-of-two multiplication/division uses shifts in either signed or unsigned expressions. Signed division retains truncation toward zero; unsigned division uses zero fill, including operands above 32767. Literal $8000 means unsigned 32768; a mixed signed division reinterprets it as -32768. General constant folding remains unimplemented.
+Runtime ABI is 6; source version, two-byte cells/array elements, expression tags and RAM/arena boundaries remain unchanged. Compiler strength-reduction routines moved to command bank 0 to preserve RAM headroom. Hard-reset and reload/recompile source for changed native helper addresses and literal semantics.
+The specification's A# 16.16 fixed-point type remains planned. Integer arithmetic is the scope of this revision; fixed-point conversions and a remainder operator are not added.
+Historical revision notes below describe their original behavior; this section supersedes earlier literal-typing rules.
 Revision 0.9 file argument validation — 13 October 2026
 SAVE, LOAD and VERIFY accept `filename[,device[,secondary]]` with default device 8. The secondary expression is evaluated once, checked as a byte 0..255 and ignored for the source-only .AB format. The sequential transport remains channel 2 and does not select a PRG load address or native-code format.
 The previous parser consumed filename/device only, emitted the file operation and then appended a syntax trap for the remaining `,1`. SAVE completed before the trap ran; LOAD returned to READY after publishing its new graph and skipped the trap. The parser now consumes the optional third argument and checks the complete statement boundary before emitting the file call.
@@ -882,18 +889,18 @@ The later Void Runner freeze was a very long collection pause on a valid heap. C
 Error output and command allocator wrappers share the resident compiler image. Its RAM reservation remains unchanged in revision 0.6.
 Releasing version one
 Resolve the remaining behavior above, then execute the original section 14 acceptance corpus with genuine KERNAL ROMs, a cycle-accurate emulator, and PAL/NTSC machines. Include every bank-transition interrupt boundary, hardware stack maximum, allocation-failure site and source corruption boundary. Publish measured capacity, startup/copy latency and representative native speedups with normal VIC/IRQ activity. The current harness results cannot substitute for that evidence.
-Magic Desk cartridge architecture — revision 0.9
+Magic Desk cartridge architecture — revision 0.10
 The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF`. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the [VICE cartridge specification](https://vice-emu.sourceforge.io/vice_17.html); VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
 Bank — Current contents — Used / available bytes — Extension role
-0 — Autostart, command editor, tokenizer, LIST, source transport, gateway load image — 7,302 / 8,192 — Command dispatch and shared entry points
-1 — Raw resident compiler load image — 6,057 / 8,192 — Compiler and native emitter growth
-2 — Raw RAM execution runtime load image — 7,011 / 8,192 — Existing integer/string/array/control helpers
+0 — Autostart, command editor, tokenizer, LIST, source transport, gateway load image — 7,529 / 8,192 — Command dispatch and shared entry points
+1 — Raw resident compiler load image — 5,857 / 8,192 — Compiler and native emitter growth
+2 — Raw RAM execution runtime load image — 7,046 / 8,192 — Existing integer/string/array/control helpers
 3 — Recovery header; otherwise erased — 9 / 8,192 — Improved editor and stock BASIC PRG import/export
-4 — Recovery header; otherwise erased — 9 / 8,192 — 16.8 fixed-point helpers and improved PRINT
+4 — Recovery header; otherwise erased — 9 / 8,192 — 16.16 fixed-point helpers and improved PRINT
 5 — Recovery header; otherwise erased — 9 / 8,192 — Sprite, VIC and SID commands
 6 — Recovery header; otherwise erased — 9 / 8,192 — Numeric tables, fonts and optional resources
 7 — Recovery header; otherwise erased — 9 / 8,192 — Expansion and diagnostics
-The reserved roles guide future allocation; they do not add new language features in this revision. Total linked ROM use is 20,415 bytes, leaving 45,121 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 96 unused bytes and the runtime's has 160; additional ROM capacity does not enlarge those reservations.
+The reserved roles guide future allocation; they do not add new language features in this revision. Total linked ROM use is 20,477 bytes, leaving 45,059 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 296 unused bytes and the runtime's has 125; additional ROM capacity does not enlarge those reservations.
 Maps and bank ownership
 Command execution uses `$01` low bits 7: bank 0 at `$8000`, stock BASIC ROM at `$A000`, I/O and KERNAL visible. BASIC ROM is visible but the language does not call its routines. Generated native code uses low bits 5: cartridge/BASIC/KERNAL hidden, I/O visible. This retains writable shadow RAM and the existing program arena. Writes beneath visible ROM reach underlying RAM.
 The bank latch at `$DE00` is write-only. Firmware records its current bank at `$0BE3` (`CART_BANK`), outside user allocation. Every firmware bank selection updates both locations. Do not infer the latch from a read of `$DE00`. I/O must be visible when writing the latch. Native user code that selects a different bank must update the shadow too if it expects interrupted banked operations to resume that bank; SYS/USR normalize the bank to zero on return.
@@ -903,6 +910,135 @@ Firmware keeps the cartridge enabled and hides ROM through `$01`; it never write
 Future banked routines
 The current banking primitive copies images; it is not a general cross-bank function-call ABI. Before moving compiler or execution helpers to ROM, add explicit common-RAM call/return gates, argument/result conventions, nested bank restoration and interrupt tests. Keep the allocator, collection, active control state and native return addresses in stable RAM. A ROM-bank routine must never select another bank while executing instructions in `$8000–$9FFF`.
 Moving compiler work out of `$1400–$2BFF` could recover RAM, but requires auditing its calls into bank 0 and scratch ownership. Adding fixed-point values changes cell/array/expression layouts and arithmetic semantics; publish a new ABI and recompile all source then. Existing version-one `.AB` source files remain authoritative; stock PRG conversion is still planned. Editor/PRG routines can use bank 3, numeric/PRINT routines bank 4 and hardware command compilation tables bank 5, while execution helpers are placed deliberately in RAM or reached through defined bank gates.
-Runtime ABI is now **5** because numeric expression/array typing and runtime helper addresses changed. Source/container version remains **1**, and revision 0.7 adds unsigned `%` words and a typed, program-safe FRE() result to the existing language. Hard-reset with the new cartridge and reload/reenter source; old snapshots contain the previous ROM, gateway and compiled helper references.
+Runtime ABI is now **6** because literal typing and arithmetic helper addresses changed. Compiler strength-reduction helpers reside in command bank 0, alongside the existing file-argument compiler; they run only in the command map and do not require a cross-bank call. Source/container version remains **1**, and revision 0.10 refines the signed/unsigned integer semantics while preserving the program-safe FRE() result. Hard-reset with the new cartridge and reload/reenter source; old snapshots contain the previous ROM, gateway and compiled helper references.
 Validation
 Automated tests cover eight-bank CRT parsing, latch mirrors and PLA visibility, exact startup copies, bank/port/flag restoration, IRQ and NMI frames during banked work, KERNAL calls, SYS/USR map changes and auxiliary-bank warm recovery. The complete existing language suite also runs, including Void Runner gameplay and collection replay. The py65 harness uses deterministic KERNAL stubs; cartconv validation checks the file format. The user reports successful disk loading and gameplay of Void Runner in VICE after this conversion. Visible collection pauses remain a performance backlog item. Broader genuine-ROM/cycle-accurate acceptance and physical-machine execution remain release work. See [the validation record](IMPLEMENTATION_STATUS.md).
+**Proposed specification: 16-bit integer signedness and arithmetic**
+1. Numeric types
+Variable syntax — Type — Range
+--- — --- — ---:
+`A` — Signed 16-bit integer — −32768 to 32767
+`A%` — Unsigned 16-bit integer — 0 to 65535
+`A#` — 16.16 fixed point — Separate arithmetic and conversion rules
+Both integer types use a 16-bit word. Signed values use two’s-complement interpretation.
+For a word \(w\):
+Unsigned value: \(w\).
+Signed value: \(w\) when \(w < 32768\), otherwise \(w - 65536\).
+Changing integer signedness preserves the word. It does not perform range checking.
+2. Evaluation and destination conversion are separate
+Evaluate an expression according to its operands and operators. The destination must not influence earlier arithmetic.
+After evaluation, the destination consumes or converts the result:
+Consumer — Treatment of integer result
+--- — ---
+Signed integer variable — Preserve the word; interpret as signed
+Unsigned integer variable — Preserve the word; interpret as unsigned
+`PRINT` — Print according to the expression’s result type
+`POKE` address argument — Consume the word as an unsigned address
+Thus:
+```basic
+PRINT 20000 + 20000   : REM Prints 40000
+A = 20000 + 20000     : REM A becomes -25536
+A% = 20000 + 20000    : REM A% becomes 40000
+PRINT -5 + 4          : REM Prints -1
+A% = -5 + 4           : REM A% becomes 65535
+```
+The arithmetic result is identical regardless of destination. Only its final interpretation changes.
+3. Integer literals
+**Constant-only arithmetic**
+In expressions containing only integer constants:
+Nonnegative constants, including zero, are unsigned.
+Negative constants are signed.
+Operators follow the normal mixed arithmetic rules.
+Result signedness follows operand types, not the mathematical sign of the answer.
+Examples:
+```basic
+PRINT 4 - 5          : REM Unsigned 65535
+PRINT -5 + 4         : REM Signed -1
+PRINT 20000 + 20000  : REM Unsigned 40000
+```
+**Contextual naked literals**
+When directly combined with a typed variable expression, a naked literal adopts that expression’s type if its value is representable in that type.
+Literal value — Permitted interpretation
+--- — ---
+0 through 32767 — Signed or unsigned, according to context
+32768 through 65535 — Unsigned
+−32768 through −1 — Signed
+Examples:
+```basic
+N% + 2      : REM 2 adopts unsigned
+N + 2       : REM 2 adopts signed
+N + 40000   : REM 40000 remains unsigned; mixed arithmetic applies
+N% + -2     : REM -2 remains signed; mixed arithmetic applies
+```
+The signed negative constant `-32768` must be recognized before independently typing its magnitude `32768`.
+4. Context is local to each operation
+Resolve literal context according to the expression tree, respecting precedence and associativity. Later operands must not retroactively change an earlier operation.
+```basic
+A% / 2 + B
+```
+Evaluate as:
+1. `2` adopts unsigned from `A%`.
+2. Perform unsigned division.
+3. Combine that unsigned result with signed `B`.
+4. The addition has a signed result.
+For:
+```basic
+A% + B + 2
+```
+evaluate as:
+1. `A% + B` produces a signed result.
+2. `2` adopts signed from that result.
+3. Perform signed addition.
+An evaluated constant subexpression has its own type and is no longer an adaptable naked literal:
+```basic
+N% + (4 - 5)
+```
+Here, `4 - 5` independently produces unsigned `65535`.
+Parentheses around a literal alone need not prevent contextual typing: `N% + (2)` may behave like `N% + 2`.
+5. Mixed integer arithmetic
+Use the following type rule for binary integer arithmetic:
+Left operand — Right operand — Operation and result type
+--- — --- — ---
+Signed — Signed — Signed
+Unsigned — Unsigned — Unsigned
+Signed — Unsigned — Signed
+Unsigned — Signed — Signed
+For mixed operations, reinterpret the unsigned operand’s existing word as signed before performing sign-sensitive arithmetic. No wider intermediate or range check is implied.
+Consequences:
+```basic
+A% = 40000
+B = 2
+PRINT A% / 2    : REM Unsigned division: 20000
+PRINT A% / B    : REM Signed division: -12768
+B = -2
+PRINT A% / B    : REM Signed division: 12768
+```
+The last expression does not produce mathematical `-20000`: signed interpretation changes unsigned `40000` into signed `-25536`.
+6. Arithmetic width and overflow
+Integer addition, subtraction, and multiplication retain the low 16 bits of the result. Overflow wraps for both signed and unsigned arithmetic.
+The result’s type determines how those bits are subsequently interpreted.
+Implementation may share routines for:
+Signed and unsigned addition.
+Signed and unsigned subtraction.
+Multiplication that returns only the low 16 bits.
+Signedness remains significant for division, remainder, ordering comparisons, printing, and conversion to fixed point.
+Division must select its signed or unsigned implementation after operand types have been resolved.
+7. Constant folding
+Constant folding, if and where implemented, must reproduce the specified typed, 16-bit evaluation at every operation.
+A folder may use wider host arithmetic internally, but it must:
+1. Apply the language’s operand interpretations.
+2. Perform the operation.
+3. Retain the specified 16-bit result.
+4. Preserve the operation’s result type.
+It must not infer signedness from the final mathematical value or postpone all wrapping until the end.
+For example:
+```basic
+PRINT (4 - 5) / 2
+```
+must evaluate as unsigned `65535 / 2`, producing `32767`. Folding it through mathematical `-1 / 2` would change its behavior.
+8. Implementation record — revision 0.10
+The signed/unsigned integer rules above are implemented by the 64 KiB Magic Desk cartridge, runtime ABI 6, retaining source format version 1. Numeric cells and array elements remain two bytes; expression tags remain signed 0, string 1 and unsigned $80.
+Representable naked literals beside signed operands can retain their default unsigned tag internally: the mixed signed rule gives exactly the same operand interpretation and result type as adopting signed. This requires no extra runtime provenance and does not allow context to change an already evaluated operation. Positive constants never inherit the assignment destination's type.
+Negative literal prefixes, including `-32768` and `-(2)`, produce signed words. Unary minus on computed expressions and declared values preserves their type: `-(2+2)` is unsigned 65532, whereas `-4` is signed -4. Power retains its existing precedence; `-2^2` is signed -4, while `-(2^2)` negates the already evaluated unsigned subexpression and produces unsigned 65532. `NOT` preserves numeric type; comparisons produce signed -1 or 0. Numeric functions keep their established declared result types (for example, VAL and RND are signed; FRE is unsigned; INT and ABS preserve the argument type).
+Literal power-of-two multiplication uses wrapping left shifts. Signed division uses biased arithmetic right shifts to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal `$8000` is unsigned 32768, interpreted as signed -32768 only in mixed signed division. General constant folding is not implemented; the same per-operation rules constrain the existing strength reductions.
+The table's `A#` 16.16 fixed-point type remains a future extension; its conversion rules are outside this integer implementation. The design mentions remainder but defines no remainder operator syntax, so this revision adds none. Explicit `>>` retains the language's arithmetic sign-fill behavior for both integer types.

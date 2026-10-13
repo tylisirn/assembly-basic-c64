@@ -23,12 +23,12 @@ class UnsignedTests(unittest.TestCase):
     def test_unsigned_arithmetic_and_signed_mixing(self):
         m=self.m;m.command('U%=65535:V%=2')
         expected={'U%+V%':' 1 ','U%-V%':' 65533 ','U%*V%':' 65534 ',
-                  'U%/V%':' 32767 ','U%+2':' 1 ','U%-2':'-3 ','U%/2':' 0 ',
-                  'U%>V%':'-1 ','U%>2':' 0 ','U%=65535':'-1 ',
+                  'U%/V%':' 32767 ','U%+2':' 1 ','U%-2':' 65533 ','U%/2':' 32767 ',
+                  'U%>V%':'-1 ','U%>2':'-1 ','U%=65535':'-1 ',
                   'U% AND V%':' 2 ','NOT U%':' 0 ','-V%':' 65534 ',
                   'ABS(U%)':' 65535 ','INT(U%)':' 65535 ','SGN(U%)':' 1 ',
-                  'STR$(U%)':' 65535','STR$(U%+0)':'-1',
-                  'U%>>1':'-1 ','U%<<1':'-2 '}
+                  'STR$(U%)':' 65535','STR$(U%+0)':' 65535',
+                  'U%>>1':' 65535 ','U%<<1':' 65534 '}
         for expression,result in expected.items():
             self.assertEqual(self.result('PRINT '+expression),result,expression)
         m.command('U%=0:V%=1')
