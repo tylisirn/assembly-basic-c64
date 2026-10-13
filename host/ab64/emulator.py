@@ -24,6 +24,9 @@ class Memory:
         # Stock NMI entry shape: SEI; JMP ($0318), before register saves.
         self.kernal[0x1e43:0x1e47]=bytes.fromhex('786c1803')
         self.kernal[0x1ffa:0x1ffc]=bytes.fromhex('43fe')
+        # Stock IRQ entry saves A/X/Y before dispatching through $0314.
+        self.kernal[0x1f48:0x1f50]=bytes.fromhex('488a4898486c1403')
+        self.kernal[0x1ffe:0x2000]=bytes.fromhex('48ff')
     def __getitem__(self, i):
         if isinstance(i,slice):
             return [self[j] for j in range(i.start or 0,i.stop or 65536,i.step or 1)]
@@ -81,7 +84,7 @@ class Machine:
         if c.pc == 0xea31 and m[1]&2:
             c.y=c.stPop();c.x=c.stPop();c.a=c.stPop()
             c.inst_0x40() # stock IRQ completion shape: restore regs and RTI
-        elif (c.pc >= 0xff00 or c.pc == 0xfd15) and m[1]&2:
+        elif (c.pc >= 0xff00 and not 0xff48 <= c.pc < 0xff50 or c.pc == 0xfd15) and m[1]&2:
             self.services.append((c.pc,m[1]&7,c.a,c.x,c.y))
             if c.pc == 0xffbd:
                 p=c.x | c.y<<8
@@ -150,6 +153,8 @@ class Machine:
             self.rts()
         elif c.pc in (0xfda3,0xfd50) and m[1]&2:
             self.services.append((c.pc,m[1]&7,c.a,c.x,c.y))
+            if c.pc == 0xfd50:
+                m[0x200:0x400] = bytes(512) # RAMTAS clears system/user buffers.
             self.rts()
         else:
             c.step()

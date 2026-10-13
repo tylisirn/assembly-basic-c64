@@ -1,6 +1,7 @@
 .setcpu "6502"
 .include "memory.inc"
 .import __GATEWAY_LOAD__, __GATEWAY_RUN__, __GATEWAY_SIZE__
+.import __SERVICE_GATEWAY_LOAD__, __SERVICE_GATEWAY_RUN__, __SERVICE_GATEWAY_SIZE__
 .import __COMPILER_LOAD__, __COMPILER_RUN__, __COMPILER_SIZE__
 .import __RUNTIME_LOAD__, __RUNTIME_RUN__, __RUNTIME_SIZE__
 .segment "HEADER"
@@ -34,6 +35,19 @@ cold_start:
  lda #<__GATEWAY_SIZE__
  sta COUNT
  lda #>__GATEWAY_SIZE__
+ sta COUNT+1
+ jsr copy_image
+ lda #<__SERVICE_GATEWAY_LOAD__
+ sta SOURCE
+ lda #>__SERVICE_GATEWAY_LOAD__
+ sta SOURCE+1
+ lda #<__SERVICE_GATEWAY_RUN__
+ sta DEST
+ lda #>__SERVICE_GATEWAY_RUN__
+ sta DEST+1
+ lda #<__SERVICE_GATEWAY_SIZE__
+ sta COUNT
+ lda #>__SERVICE_GATEWAY_SIZE__
  sta COUNT+1
  jsr copy_image
  jsr select_command_bank
@@ -429,6 +443,8 @@ command_free:
 
 .include "reserve.s"
 .include "runtime.s"
+.include "services.s"
+.include "service_gateway.s"
 
 ; Every auxiliary bank has a recovery header pointing into common RAM. This
 ; lets KERNAL cartridge NMI dispatch recover even during a banked image copy.

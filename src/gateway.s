@@ -1,59 +1,124 @@
 .segment "GATEWAY"
 ; All instructions that alter $01 and all mapped service return PCs live here.
 ; Runtime may select a KERNAL vector by patching service_call+1/+2.
-kernal_gate:
+bank_call:
+ ; The caller's descriptor is read in its original map, before any bank write.
+ ; Only setup/return use shared scratch; each live call owns its stack frame.
+ php
+ sei
+ cld ; Descriptor/return-address arithmetic is binary even for SYS callers.
  sta IO_A
  stx IO_X
  sty IO_Y
- php
  pla
  sta IO_STATUS
- sta GATE_FLAGS
- sei
- lda CART_BANK
+ pla
+ sta bank_descriptor+1
+ pla
+ sta bank_descriptor+2
+ clc
+ lda bank_descriptor+1
+ adc #4
+ sta IO_MAP
+ lda bank_descriptor+2
+ adc #0
+ pha
+ lda IO_MAP
+ pha
+ lda IO_STATUS
  pha
  lda PORT
- and #7
+ pha
+ lda CART_BANK
+ pha
+ ldy #2
+ jsr bank_descriptor
+ sta GATE_FLAGS
+ ldy #3
+ jsr bank_descriptor
+ sec
+ sbc #1
+ sta IO_MAP
+ iny
+ jsr bank_descriptor
+ sbc #0
+ sta bank_target+1
+ lda IO_MAP
+ sta bank_target
+ ldy #1
+ jsr bank_descriptor
  sta IO_MAP
  lda PORT
  ora #7
  sta PORT
- jsr select_command_bank
- lda IO_STATUS
+ lda IO_MAP
+ cmp #$ff
+ beq @bank_ready
+ sta CART_BANK
+ sta CART_REGISTER
+@bank_ready:
+ lda PORT
+ and #$f8
+ ora GATE_FLAGS
+ sta PORT
+ ; Stack an RTS target, avoiding a mutable dispatch operand after IRQ enable.
+ lda #>(bank_return-1)
  pha
- plp
+ lda #<(bank_return-1)
+ pha
+ lda bank_target+1
+ pha
+ lda bank_target
+ pha
+ lda IO_STATUS
+ and #$f7
+ pha
  lda IO_A
  ldx IO_X
  ldy IO_Y
-service_call:
- jsr $ffd2
+ plp
+ rts
+bank_descriptor:
+ lda $ffff,y
+ rts
+bank_target:
+ .word 0 ; Target minus one, staged only while IRQs are masked.
+bank_return:
+ php
+ sei
  sta IO_A
  stx IO_X
  sty IO_Y
- php
  pla
  sta IO_STATUS
- sei
+ lda PORT
+ ora #7
+ sta PORT
  pla
  sta CART_BANK
  sta CART_REGISTER
- lda PORT
- and #$f8
- ora IO_MAP
+ pla
  sta PORT
+ pla
+ and #4
+ sta GATE_FLAGS
  lda IO_STATUS
  and #$f3
- sta IO_STATUS
- lda GATE_FLAGS
- and #4
- ora IO_STATUS
+ ora GATE_FLAGS
  pha
  lda IO_A
  ldx IO_X
  ldy IO_Y
  plp
- cld
  rts
+
+kernal_gate:
+ jsr bank_call
+ .byte BANK_COMMAND,7
+ .word service_call
+ rts
+service_call:
+ jmp $ffd2
 ; Read a byte from shadow RAM without returning into hidden cartridge code.
 read_ram:
  php
@@ -73,38 +138,19 @@ read_ram:
  and #$f8
  ora IO_MAP
  sta PORT
- lda STATE+151
  plp
+ lda STATE+151
  rts
 ; Call a RAM helper from command ROM; callee address is gateway_call operand.
 call_ram:
- php
- sei
- lda PORT
- and #7
- pha
- lda PORT
- and #$f8
- ora #5
- sta PORT
  lda IO_A
  ldx IO_X
- cli
-gateway_call:
- jsr alloc
+ RAM_CALL gateway_call
  sta IO_A
  stx IO_X
- sei
- pla
- sta IO_MAP
- lda PORT
- and #$f8
- ora IO_MAP
- sta PORT
- plp
- lda IO_A
- ldx IO_X
  rts
+gateway_call:
+ jmp alloc
 run_entry:
  sei
  lda PORT
@@ -212,21 +258,9 @@ sys_return:
  cli
  rts
 file_entry:
- sei
- lda PORT
- ora #7
- sta PORT
- jsr select_command_bank
- cld
- cli
- jsr file_command
- sei
- lda PORT
- and #$f8
- ora #5
- sta PORT
- cld
- cli
+ jsr bank_call
+ .byte BANK_COMMAND,7
+ .word file_command
  rts
 
 sys_gateway:
@@ -291,20 +325,17 @@ recovery_map:
 ; A = source bank; SOURCE/DEST/COUNT describe its raw fixed-address image.
 ; Preserve bank, full $01 and interrupt flags before returning to the caller.
 copy_bank_image:
+ ; Reuse the call ABI for map/bank ownership; the copy itself masks IRQs.
  php
  sei
- pha
- lda PORT
- pha
- lda CART_BANK
- pha
- lda PORT
- ora #7
- sta PORT
- tsx
- lda $0103,x
- sta CART_BANK
- sta CART_REGISTER
+ sta copy_bank_descriptor
+ jsr bank_call
+copy_bank_descriptor:
+ .byte 0,7
+ .word copy_image_ram
+ plp
+ rts
+copy_image_ram:
  ldy #0
 @loop:
  lda COUNT
@@ -327,11 +358,4 @@ copy_bank_image:
  dec COUNT
  jmp @loop
 @done:
- pla
- sta CART_BANK
- sta CART_REGISTER
- pla
- sta PORT
- pla
- plp
  rts

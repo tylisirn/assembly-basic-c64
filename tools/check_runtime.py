@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the runtime's static instructions and hidden-ROM dependency closure."""
+"""Check resident/runtime and banked-service dependency closures."""
 import re
 from pathlib import Path
 import sys
@@ -37,7 +37,48 @@ def check():
                 raise AssertionError(f'helper references hidden cartridge at ${p:04X}: {text}')
         p+=n;count+=1
     assert p==end
-    print(f'Runtime closure: {count} documented instructions; all static calls remain in RAM or declared gateways.')
+    # Bank-2 services execute with ROM visible. RAM helper calls must carry an
+    # explicit bank_call descriptor; ordinary calls stay in this bank or gates.
+    rom=(ROOT/'build/assembly-basic.bin').read_bytes()
+    service_base=labels['__SERVICES_LOAD__'];service_end=service_base+labels['__SERVICES_SIZE__']
+    memory[service_base:service_end]=rom[2*8192+service_base-0x8000:2*8192+service_end-0x8000]
+    service_gates={labels[k] for k in ('bank_call','read_ram','kernal_gate','file_entry')}
+    p=service_base;service_count=0
+    while p<service_end:
+        n,text=dis.instruction_at(p)
+        if text.startswith('???'):raise AssertionError(f'undocumented service opcode at ${p:04X}')
+        op=memory[p]
+        if n==3 and op in (0x20,0x4c):
+            target=memory[p+1]|memory[p+2]<<8
+            if not (service_base<=target<service_end or target in service_gates):
+                raise AssertionError(f'ROM service calls outside its bank/gateways at ${p:04X}: {text}')
+            if target==labels['bank_call']:
+                assert op==0x20 and p+7<=service_end, 'Truncated service call descriptor'
+                bank,mode=memory[p+3:p+5]
+                callback=memory[p+5]|memory[p+6]<<8
+                assert bank==0xff and mode==5 and base<=callback<end, 'Invalid RAM callback descriptor'
+                n+=4
+        if op in (0xa1,0xb1):
+            raise AssertionError(f'ROM service reads an unstaged indirect RAM pointer at ${p:04X}')
+        p+=n;service_count+=1
+    assert p==service_end
+    stub_base=labels['__SERVICE_GATEWAY_RUN__'];stub_end=stub_base+labels['__SERVICE_GATEWAY_SIZE__']
+    stub_load=labels['__SERVICE_GATEWAY_LOAD__']-0x8000
+    memory[stub_base:stub_end]=rom[stub_load:stub_load+stub_end-stub_base]
+    p=stub_base;stub_count=0
+    while p<stub_end:
+        n,text=dis.instruction_at(p)
+        if text.startswith('???'):raise AssertionError(f'undocumented service stub opcode at ${p:04X}')
+        if memory[p]==0x20:
+            target=memory[p+1]|memory[p+2]<<8
+            assert target==labels['bank_call'] and p+7<=stub_end, 'Invalid service stub call'
+            bank,mode=memory[p+3:p+5]
+            service=memory[p+5]|memory[p+6]<<8
+            assert bank==2 and mode==7 and service_base<=service<service_end, 'Invalid ROM service descriptor'
+            n+=4
+        p+=n;stub_count+=1
+    assert p==stub_end
+    print(f'Runtime closure: {count} documented instructions; ROM services: {service_count}; entry stubs: {stub_count}; all static calls use their declared maps/gateways.')
     return count
 
 if __name__=='__main__':check()

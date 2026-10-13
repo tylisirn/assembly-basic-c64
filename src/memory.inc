@@ -1,4 +1,4 @@
-; Assembly BASIC ABI 6: fixed RAM entry points, documented NMOS instructions.
+; Assembly BASIC ABI 7: fixed RAM entry points, documented NMOS instructions.
 PORT = $01
 PTR = $02
 PTR2 = $04
@@ -13,6 +13,11 @@ SIZE = $14
 PREV = $16
 WALK = $18
 CPTR = $1a
+
+; Banked-service entry stubs; copied after KERNAL RAMTAS clears page 3.
+FUTURE_RAM_START = $0334
+FUTURE_RAM_END = $0400 ; exclusive
+FUTURE_RAM_BYTES = FUTURE_RAM_END-FUTURE_RAM_START ; 204 bytes
 
 STATE = $0b00
 FREE_HEAD = STATE
@@ -210,6 +215,16 @@ CART_BANK = STATE+227 ; Software shadow of the write-only bank register.
 BANK_COMMAND = 0
 BANK_COMPILER = 1
 BANK_RUNTIME = 2
+BANK_SERVICES = 2
+
+; Inline descriptor: JSR bank_call; bank byte, map byte, target word.
+; $ff retains the current bank. Calls return A/X/Y and result flags, with the
+; caller's complete port, bank and interrupt mask restored; decimal is cleared.
+.macro RAM_CALL target
+ jsr bank_call
+ .byte $ff,5
+ .word target
+.endmacro
 
 ; Expression tags: signed=0, string=1, unsigned=$80.
 NUM_TYPE = STATE+228

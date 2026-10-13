@@ -2,7 +2,7 @@
 
 A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.10, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.11, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -26,9 +26,11 @@ The user has successfully loaded Void Runner from disk and played it in VICE wit
 
 ## Bank layout
 
-Bank 0 contains the current command/editor code, bank 1 the raw compiler image and bank 2 the raw runtime image. Banks 3–7 reserve space for the improved editor/PRG conversion, 16.16 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
+Bank 0 contains command/editor code and gateway load images, bank 1 the raw compiler image, and bank 2 the raw runtime image plus ROM execution services for DATA/READ/RESTORE, DEF FN activation and device/input operations. Banks 3–7 reserve space for the improved editor/PRG conversion, 16.16 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
 
-Firmware revision 0.10 uses runtime ABI 6; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
+Common RAM at `$0334–$03FF` holds 116 bytes of service entry stubs; its remaining 88 bytes stay reserved for future firmware uses. Additional gateways are prospective; other code, data or workspace uses remain open. The high runtime uses 5,922 of 7,162 bytes, leaving 1,240 bytes for implementation. See [the banked-service ABI and initialization requirements](docs/MAGIC_DESK_BANKS.md#banked-service-call-abi).
+
+Firmware revision 0.11 uses runtime ABI 7; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
@@ -58,7 +60,7 @@ For an older `.AB` file that already stored TAB/SPC as array-name tokens, re-enc
 
 `FRE()` collects unreachable objects, coalesces adjacent free blocks and returns an unsigned free-byte count. `FRE(argument)` remains supported; its numeric argument is ignored. It is safe inside programs and preserves variables, arrays, source/code, reservations and CONT. It reports the sum of free physical arena bytes, including free-block headers, rather than the largest possible allocation. For example, `FREE%=FRE():PRINT FREE%`. Direct CLEAN still rebuilds source and clears values.
 
-`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The Magic Desk cartridge uses runtime ABI 6, reserves 6 KiB at `$1400–$2BFF` for a compiler image copied at startup, and has a 42 KiB raw program arena.
+`CLEAN` is a stopped, direct command. It removes unreferenced anchor slots and symbols, fills new slabs densely, remaps name IDs and recompiles every line and native reference. It clears variable values and invalidates CONT. Rebuilding needs temporary space for a source snapshot and a second graph; allocation failure retains the old source. The Magic Desk cartridge uses runtime ABI 7, reserves 6 KiB at `$1400–$2BFF` for a compiler image copied at startup, and has a 42 KiB raw program arena.
 
 `RESERVE address,bytes` declares RAM for graphics or machine code before the
 compiler allocates it. Both arguments must be unsigned numeric literals aligned
