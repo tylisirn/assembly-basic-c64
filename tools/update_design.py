@@ -11,6 +11,8 @@ import json
 import io
 import xml.etree.ElementTree as ET
 import zipfile
+from design_formatting import (WordContent, build_tables, measurement_tables,
+                               collection_tables, export_text)
 ROOT=Path(__file__).resolve().parents[1]
 DOC=ROOT/'Assembly_BASIC_C64_Design.docx'
 W='http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -52,6 +54,19 @@ def synchronize():
     declared=namespaces(original)
     root=ET.fromstring(original)
     body=root.find('w:body',NS)
+    parts={info.filename:data for info,data in entries}
+    relationships=ET.fromstring(parts['word/_rels/document.xml.rels'])
+    # These relationships belong to the replaced appendix; other links survive.
+    for relationship in list(relationships):
+        if relationship.get('Id','').startswith('designLink'):
+            relationships.remove(relationship)
+    numbering=ET.fromstring(parts['word/numbering.xml'])
+    section=body.find('w:sectPr',NS)
+    page=section.find('w:pgSz',NS)
+    margins=section.find('w:pgMar',NS)
+    width=int(page.get(f'{{{W}}}w'))-sum(int(margins.get(f'{{{W}}}{side}'))
+                                       for side in ('left','right','gutter'))
+    word=WordContent(relationships,numbering,width)
     for child in list(body):
         value=''.join(child.itertext())
         if value.startswith('Appendix B — implementation status'):
@@ -380,8 +395,10 @@ def synchronize():
         'This appendix records the development implementation on 14 October 2026. '
         'The full version-one contract is not yet complete. Original release '
         'requirements above remain the target unless an architectural choice is '
-        'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.'),
-        paragraph('Measured linked build: '+json.dumps(report,sort_keys=True)),
+        'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.')]
+    additions.extend(build_tables(word,report))
+    additions.extend([
+        word.heading('Validation and implementation context'),
         paragraph(f"Automated validation: {tests['tests_run']} tests passed, "
                   f"{tests['runtime_instructions_checked']} documented runtime instructions checked. "
                   'Environment: instruction-level py65 with deterministic KERNAL stubs; '
@@ -389,22 +406,19 @@ def synchronize():
         paragraph('Source/container version 1 and runtime ABI 7 are distinct. '
                   'Language zero page is $02-$78; common workspace is $0800-$13FF. '
                   'Function activations currently use a guarded hardware stack with depth eight. '
-                  'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')]
+                  'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')])
     measurements=json.loads((ROOT/'docs/measurements.json').read_text())
     assert measurements['rom_sha256']==report['rom_sha256'], 'Measurements refer to a different cartridge'
-    additions.append(paragraph('Instruction-level measurements and capacity scenario: '+
-                               json.dumps(measurements,sort_keys=True)))
+    additions.extend(measurement_tables(word,measurements))
     collection=json.loads((ROOT/'docs/voidrunner-collection.json').read_text())
     assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
-    additions.append(paragraph('Captured Void Runner collection replay: '+json.dumps(collection,sort_keys=True)))
-    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()+'\n'+(ROOT/'docs/SCREEN_EDITOR.md').read_text()+'\n'+(ROOT/'docs/integer_arithmetic_design.md').read_text(encoding='utf-8-sig')
-    for line in status.splitlines():
-        if not line or line.startswith('| ---'):continue
-        if line.startswith('#'):additions.append(paragraph(line.lstrip('# '),True))
-        elif line.startswith('|'):
-            fields=[f.strip() for f in line.strip('|').split('|')]
-            additions.append(paragraph(' — '.join(fields)))
-        else:additions.append(paragraph(line.lstrip('- ')))
+    additions.extend(collection_tables(word,collection))
+    sources=[(name,(ROOT/'docs'/name).read_text(encoding='utf-8-sig')) for name in
+             ('IMPLEMENTATION_STATUS.md','MAGIC_DESK_BANKS.md','SCREEN_EDITOR.md',
+              'integer_arithmetic_design.md')]
+    word.prepare_sources(sources)
+    for name,text in sources:
+        additions.extend(word.markdown(text,name))
     section=body.find('w:sectPr',NS)
     position=list(body).index(section) if section is not None else len(body)
     for p in additions:body.insert(position,p);position+=1
@@ -413,6 +427,10 @@ def synchronize():
     with zipfile.ZipFile(temporary,'w') as z:
         for info,data in entries:
             if info.filename=='word/document.xml':data=xml
+            elif info.filename=='word/_rels/document.xml.rels':
+                data=serialize(relationships,namespaces(data))
+            elif info.filename=='word/numbering.xml':
+                data=serialize(numbering,namespaces(data))
             elif info.filename=='docProps/core.xml':
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
@@ -427,8 +445,7 @@ def synchronize():
             if name.endswith('.xml'):ET.fromstring(z.read(name))
     assert hashlib.sha256(DOC.read_bytes()).hexdigest()==design_before, 'Design document changed during synchronization; preserve the user edit and rerun'
     temporary.replace(DOC)
-    text='\n'.join(''.join(n.text or '' for n in p.iter(f'{{{W}}}t'))
-                   for p in root.iter(f'{{{W}}}p'))+'\n'
+    text=export_text(root)
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
         'design_revision':'0.13','runtime_abi':report['runtime_abi'],

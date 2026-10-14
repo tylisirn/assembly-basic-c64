@@ -1,7 +1,7 @@
 {
   "design_revision": "0.13",
   "runtime_abi": 7,
-  "design_sha256": "58a269f47090c1ce3480c593742b261f118eae9fee37ac4fa82bbc0d6a257d6e",
+  "design_sha256": "43604843b44ef442815c63b38b3fcca55bad677f514c8a332eb6ef240747670e",
   "rom_sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03",
   "runtime_run_address": 58368,
   "arena_raw_bytes": 43008,
