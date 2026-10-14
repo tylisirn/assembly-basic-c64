@@ -1,4 +1,4 @@
-10 VIDEO=$D000
-20 POKE VIDEO+$21,1
-30 PRINT VIDEO;PEEK(VIDEO+33)
-40 END
+10 video=$d000
+20 poke video+$21,1
+30 print video;peek(video+33)
+40 end

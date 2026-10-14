@@ -1,4 +1,4 @@
-10 PRINT "ASSEMBLY BASIC"
-20 FOR I=1 TO 5:PRINT I;:NEXT I
-30 PRINT
-40 END
+10 print "assembly basic"
+20 for i=1 to 5:print i;:next i
+30 print
+40 end

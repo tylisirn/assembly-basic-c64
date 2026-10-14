@@ -1,8 +1,8 @@
-10 DIM A(2,3),WORDS$(2)
-20 DATA 001,$D000,"ASSEMBLY BASIC"
-30 READ A$,VIDEO,TEXT$
-40 WORDS$(1)=TEXT$:A(1,2)=123
-50 DEF FN DOUBLED(X)=X*2
-60 PRINT A$;WORDS$(1);FN DOUBLED(A(1,2))
-70 PRINT LEFT$(WORDS$(1),8)
-80 END
+10 dim a(2,3),words$(2)
+20 data 001,$d000,"assembly basic"
+30 read a$,video,text$
+40 words$(1)=text$:a(1,2)=123
+50 def fn doubled(x)=x*2
+60 print a$;words$(1);fn doubled(a(1,2))
+70 print left$(words$(1),8)
+80 end
