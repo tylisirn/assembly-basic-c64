@@ -18,7 +18,7 @@ BANK_ROLES = (
     'boot, command editor, tokenizer, LIST and source transport',
     'raw resident compiler image',
     'raw RAM execution runtime image and banked ROM services',
-    'reserved: improved editor and BASIC PRG conversion',
+    'split screen editor; remaining space reserved for BASIC PRG conversion',
     'reserved: 16.16 fixed-point and PRINT formatting extensions',
     'reserved: sprite, VIC and SID commands',
     'reserved: numeric tables, fonts and optional resources',
@@ -78,11 +78,11 @@ def build(toolchain=None):
             segments[match[1]] = int(match[2], 16)
     banks = []
     for bank, role in enumerate(BANK_ROLES):
-        names = ('HEADER', 'COMMAND', 'GATEWAY', 'SERVICE_GATEWAY') if bank == 0 else (f'HEADER{bank}',) + (('COMPILER',) if bank == 1 else ('RUNTIME', 'SERVICES') if bank == 2 else ())
+        names = ('HEADER', 'COMMAND', 'GATEWAY', 'SERVICE_GATEWAY') if bank == 0 else (f'HEADER{bank}',) + (('COMPILER',) if bank == 1 else ('RUNTIME', 'SERVICES') if bank == 2 else ('SCREEN_EDITOR',) if bank == 3 else ())
         used = sum(segments[name] for name in names)
         banks.append({'bank': bank, 'offset': bank*8192, 'window': [0x8000, 0xa000],
                       'role': role, 'used_bytes': used, 'spare_bytes': 8192-used,
-                      'reserved': bank >= 3})
+                      'reserved': bank >= 4})
     used = sum(bank['used_bytes'] for bank in banks)
     report = {'rom_bytes': len(rom), 'rom_sha256': hashlib.sha256(rom).hexdigest(),
               'cartridge_type': 19, 'cartridge_format': 'classic Magic Desk', 'bank_bytes': 8192,
@@ -90,8 +90,13 @@ def build(toolchain=None):
               'runtime_run_address': 0xe400, 'runtime_used_bytes': runtime,
               'runtime_rom_bytes': runtime, 'runtime_image_encoding': 'raw', 'runtime_budget_bytes': 7162,
               'gateway_used_bytes': gateway, 'gateway_budget_bytes': 768, 'workspace_bytes': 3072,
+              'gateway_code_budget_bytes': 608,
               'service_gateway_run_address': 0x334, 'service_gateway_used_bytes': service_gateway,
               'service_gateway_budget_bytes': 204,
+              'service_gateway_code_budget_bytes': 152,
+              'editor_bank': 3, 'editor_rom_bytes': labels['__SCREEN_EDITOR_SIZE__'],
+              'editor_text_workspace': [0x0a60, 0x0b00],
+              'editor_state_workspace': [0x03cc, 0x0400],
               'services_bank': 2, 'services_rom_address': labels['__SERVICES_LOAD__'],
               'services_rom_bytes': services,
               'arena_spans': [[0x2c00, 0xd000], [0xe000, 0xe400]], 'arena_raw_bytes': 43008,

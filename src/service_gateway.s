@@ -72,3 +72,31 @@ input_field:
  .byte BANK_SERVICES,7
  .word rom_input_field
  rts
+
+; CHROUT's RAM vector must enter common RAM before changing cartridge banks.
+; Device output continues through the original KERNAL vector.
+editor_output_gate:
+ pha
+ lda $9a
+ cmp #3
+ beq @screen
+ pla
+ jmp (ED_OLD_OUT)
+@screen:
+ pla
+ php
+ pha
+ txa
+ pha
+ tya
+ pha
+ tsx
+ lda $0103,x
+ EDITOR_CALL editor_output
+ pla
+ tay
+ pla
+ tax
+ pla
+ plp
+ rts

@@ -79,6 +79,9 @@ class Machine:
         self.cpu.pc = (self.cpu.stPopWord()+1)&65535
     def step(self):
         c, m = self.cpu, self.memory.ram
+        if (c.pc in (self.labels.get('editor_wait'), self.labels.get('editor_input_wait')) and self.memory.bank == 3
+                and m[0x3cc] and not self.input and not m[0x77]):
+            return False
         if c.pc == self.labels['report_error']:
             self.errors.append(c.a)
         if c.pc == 0xea31 and m[1]&2:
@@ -120,6 +123,11 @@ class Machine:
                     self.steps+=1
                     return True
                 self.output.append(c.a)
+                vector=m[0x326] | m[0x327]<<8
+                if vector == self.labels.get('editor_output_gate'):
+                    c.pc=vector
+                    self.steps+=1
+                    return True
                 if c.a == 13:
                     m[0xd3] = 0
                     m[0xd6] = min(m[0xd6]+1,24)
@@ -129,6 +137,11 @@ class Machine:
                 c.a=self.input.pop(0) if self.input else 0
                 c.p=(c.p & ~2) | (2 if c.a==0 else 0)
             elif c.pc == 0xffcf:
+                vector=m[0x324] | m[0x325]<<8
+                if not self.input_channel and vector == self.labels.get('editor_input_gate'):
+                    c.pc=vector
+                    self.steps+=1
+                    return True
                 if self.input_channel:
                     data=self.files.get(self.channel,b'')
                     if self.file_cursor >= len(data):
@@ -150,6 +163,9 @@ class Machine:
                 self.jiffy=c.a | c.x<<8 | c.y<<16
             elif c.pc == 0xfd15:
                 m[0x314],m[0x315] = 0x31,0xea
+                m[0x326],m[0x327] = 0xca,0xf1
+                m[0x324],m[0x325] = 0x57,0xf1
+                m[0x9a]=3
             self.rts()
         elif c.pc in (0xfda3,0xfd50) and m[1]&2:
             self.services.append((c.pc,m[1]&7,c.a,c.x,c.y))

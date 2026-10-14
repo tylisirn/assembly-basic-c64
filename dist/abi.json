@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "6b283d74ffc328b57958e86db8b32ae18420b58c9d31c0e5fcb98639c07c9f12",
+  "rom_sha256": "77171be48e320e56319097fefe274ae86b2a296554f79dd63540edc703a6f593",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 7712,
-      "spare_bytes": 480,
+      "used_bytes": 7927,
+      "spare_bytes": 265,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5857,
-      "spare_bytes": 2335,
+      "used_bytes": 5952,
+      "spare_bytes": 2240,
       "reserved": false
     },
     {
@@ -49,10 +49,10 @@
         32768,
         40960
       ],
-      "role": "reserved: improved editor and BASIC PRG conversion",
-      "used_bytes": 9,
-      "spare_bytes": 8183,
-      "reserved": true
+      "role": "split screen editor; remaining space reserved for BASIC PRG conversion",
+      "used_bytes": 3901,
+      "spare_bytes": 4291,
+      "reserved": false
     },
     {
       "bank": 4,
@@ -123,6 +123,31 @@
     820,
     1024
   ],
+  "screen_editor": {
+    "bank": 3,
+    "rom_bytes": 3892,
+    "text_workspace": [
+      2656,
+      2816
+    ],
+    "state_workspace": [
+      972,
+      1024
+    ],
+    "screen_rows": {
+      "listing": [
+        0,
+        20
+      ],
+      "status": 20,
+      "edit": [
+        21,
+        25
+      ]
+    },
+    "input_gate": 2626,
+    "output_gate": 936
+  },
   "banked_call_abi": {
     "version": 1,
     "entry": 2048,
@@ -203,23 +228,23 @@
   "image_loads": {
     "gateway": {
       "bank": 0,
-      "rom_address": 39786,
+      "rom_address": 39950,
       "run_address": 2048,
-      "bytes": 578,
+      "bytes": 593,
       "encoding": "raw"
     },
     "service_gateway": {
       "bank": 0,
-      "rom_address": 40364,
+      "rom_address": 40543,
       "run_address": 820,
-      "bytes": 116,
+      "bytes": 152,
       "encoding": "raw"
     },
     "compiler": {
       "bank": 1,
       "rom_address": 32777,
       "run_address": 5120,
-      "bytes": 5848,
+      "bytes": 5943,
       "encoding": "raw"
     },
     "runtime": {

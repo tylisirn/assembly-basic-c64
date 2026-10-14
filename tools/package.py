@@ -22,6 +22,11 @@ def package():
     destination=ROOT/'dist';destination.mkdir(exist_ok=True)
     for name in ('assembly-basic.bin','assembly-basic.crt','size-report.json','test-report.json'):
         shutil.copyfile(ROOT/'build'/name,destination/name)
+    editor_validation = ROOT/'build/editor-rom-report.json'
+    if editor_validation.exists():
+        result = json.loads(editor_validation.read_text())
+        if result.get('passed') and result.get('rom_sha256') == report['rom_sha256']:
+            shutil.copyfile(editor_validation, destination/editor_validation.name)
     labels={}
     for line in (ROOT/'build/assembly-basic.lbl').read_text().splitlines():
         match=re.match(r'al ([0-9A-Fa-f]+) \.(.+)',line)
@@ -33,6 +38,12 @@ def package():
          'language_zero_page':[2,121],'workspace':[0x800,0x1400],
          'resident_compiler':[0x1400,0x2c00],
          'service_gateway':[0x334,0x400],
+         'screen_editor':{'bank':report['editor_bank'], 'rom_bytes':report['editor_rom_bytes'],
+                          'text_workspace':report['editor_text_workspace'],
+                          'state_workspace':report['editor_state_workspace'],
+                          'screen_rows':{'listing':[0,20],'status':20,'edit':[21,25]},
+                          'input_gate':labels['editor_input_gate'],
+                          'output_gate':labels['editor_output_gate']},
          'banked_call_abi':{'version':1, 'entry':labels['bank_call'],
                             'descriptor':['bank byte ($ff = current)','port low bits byte','target little-endian word'],
                             'valid_banks':list(range(8))+[255], 'valid_port_bits':[5,7],

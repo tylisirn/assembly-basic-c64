@@ -1,0 +1,74 @@
+# Cartridge screen editor
+
+Enter `BASIC` in direct mode to open the editor. The upper 20 rows show the
+program, row 20 shows the writing mode and shortcuts, and the bottom four rows
+hold the current draft and direct-command output. `QUIT`, F7, and `RUN` clear
+the screen and close the editor; RUN then executes the program. The selected
+BASIC line number and first displayed line number survive closing and reopening.
+
+| Key | Listing focus | Edit focus |
+| --- | --- | --- |
+| Cursor up/left | Previous BASIC line | Move text cursor |
+| Cursor down/right | Next BASIC line | Move text cursor within the pane |
+| Return | Copy selected source into the pane, cursor at its end | Submit current draft |
+| Left-arrow key, left of 1 | Focus the edit pane | Discard the draft and focus the listing |
+| Shift-DEL (INS) | — | Cycle INSERT, OVERWRITE, LITERAL |
+| DEL | — | Delete the preceding character |
+| HOME | — | Move to the start of the draft |
+| F1 | Show help; any key returns | Show help; any key returns |
+| F7 | Clear screen and quit | Clear screen and quit |
+
+Wrapped source continues after the line-number column. Moving the selection
+past the listing frame advances or backs up the viewport by five BASIC lines,
+clamped at the program's ends. Source changes refresh the listing. Numeric
+bookmarks are resolved against the current program, including after NEW, LOAD,
+and CLEAN, so the editor never retains a pointer into freed source.
+
+Numbered drafts add, replace, or delete program lines through the existing
+on-machine tokenizer/compiler. Successful numbered submissions clear the edit
+pane. A line number alone deletes that line. Failed submissions retain the draft,
+show the error in the status row, and position the text cursor at the top right
+of the edit pane. Recoverable compilation errors still retain malformed source
+in the program, matching ordinary direct entry. Correct the retained draft and
+submit it again.
+
+Commands such as `PRINT 123`, LIST, SAVE, LOAD, and INPUT use the edit pane.
+Output, wrapping, screen-clear controls, and scrolling stay within its four rows;
+there is no READY prompt there. Keyboard INPUT uses the bounded pane editor;
+file/device input and output continue through their original KERNAL vectors.
+Moving the cursor down from the last pane row does not scroll.
+
+INSERT pushes subsequent characters right and uses the normal reverse cursor.
+OVERWRITE replaces the character at the cursor and displays it in reverse black.
+LITERAL inserts PETSCII control bytes as visible quoted-style glyphs and shows a
+cyan reverse L cursor. In LITERAL, cursor and HOME control codes become literal
+characters. Return, DEL, INS, F1, F7, and the left-arrow focus key retain their
+editor functions. Other PETSCII control bytes are ignored while typing in INSERT
+or OVERWRITE, including inside quotes.
+
+The visible draft can hold 160 PETSCII bytes, including its line number. A stored
+line whose canonical spelling exceeds that capacity remains listable and is
+rejected for copying with an explicit message, rather than being truncated and
+accidentally replacing the original source. Output above a draft is scrolled
+away as needed when typing wraps; moving the cursor alone never scrolls.
+
+The UI lives in Magic Desk bank 3 and shares bank 0's canonical LIST formatter.
+The common-RAM CHROUT hook preserves registers, flags and user zero-page
+pointers. Hooks are restored on exit. Editor text occupies `$0A60–$0AFF`, and
+persistent state occupies `$03CC–$03FF`, outside the program arena and compiler,
+collector, and runtime scratch. `$FB–$FE` are borrowed as screen pointers while
+editing. Help temporarily borrows inactive lexer/expression scratch and restores
+the pane before resuming.
+
+Build and run the full suite with `python3 tools/build.py` and
+`python3 tools/test.py`. Optional validation with a user-supplied stock KERNAL
+and character ROM also produces a rendered preview:
+
+```sh
+python3 tools/check_editor_rom.py --rom-dir /path/to/VICE/C64 \
+    --preview build/editor-preview.png
+```
+
+This runs actual 901227-03 RESTOR/CINT/GETIN/CHRIN/CHROUT instructions in py65,
+with injected keyboard bytes and synthetic raster registers. It is a software
+integration check, not cycle-accurate VIC/IEC or physical-machine acceptance.

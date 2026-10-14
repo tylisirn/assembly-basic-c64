@@ -1,5 +1,11 @@
 # Assembly BASIC implementation summary
 
+## Revision 0.12 — split screen cartridge editor
+
+BASIC opens the bank-3 screen editor with a 20-row listing, mode/help status row and four-row command pane. It retains selected-line and viewport bookmarks, aligns wrapped source after line numbers, scrolls by five BASIC lines, and copies the selected source on Return. Left-arrow switches focus and discards a draft on return to the listing. INS cycles INSERT, OVERWRITE and LITERAL, with the requested cursor styles. F1 shows help; F7/QUIT clear and close; RUN closes before execution.
+
+Numbered submissions reuse the existing tokenizer/compiler and refresh the listing. Success clears the pane; errors retain the draft, display a status diagnostic and position the cursor at the top right. Direct PRINT, INPUT and other commands stay within the lower four rows without READY. Common-RAM CHRIN/CHROUT hooks preserve bank routing and restore KERNAL vectors on exit. Text and state occupy existing reserved RAM; the arena and ABI 7 execution runtime are unchanged. Tests include error/allocation/load recovery, HELP/INPUT, modes, source wrapping, cursor bounds, capacity, output confinement and persistent bookmarks. Optional stock-KERNAL validation and a character-ROM preview are available in `tools/check_editor_rom.py`; see [editor documentation](docs/SCREEN_EDITOR.md).
+
 The original design document was committed first as `9480026`. The project now contains a working native-code development cartridge, a reproducible build, source-file tools, automated tests, examples and synchronized design documentation. The full version-one release contract is **not yet complete**; the outstanding requirements are listed in [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) and design Appendix B.
 
 ## Firmware

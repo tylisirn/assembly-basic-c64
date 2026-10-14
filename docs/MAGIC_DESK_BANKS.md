@@ -1,19 +1,19 @@
-# Magic Desk cartridge architecture — revision 0.11
+# Magic Desk cartridge architecture — revision 0.12
 
 The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF`. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the [VICE cartridge specification](https://vice-emu.sourceforge.io/vice_17.html); VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
 
 | Bank | Current contents | Used / available bytes | Extension role |
 | --- | --- | --- | --- |
-| 0 | Autostart, command editor, tokenizer, LIST, source transport, gateway load image | 7,712 / 8,192 | Command dispatch and shared entry points |
-| 1 | Raw resident compiler load image | 5,857 / 8,192 | Compiler and native emitter growth |
+| 0 | Autostart, command editor, tokenizer, LIST, source transport, gateway load image | 7,927 / 8,192 | Command dispatch and shared entry points |
+| 1 | Raw resident compiler load image | 5,952 / 8,192 | Compiler and native emitter growth |
 | 2 | Raw runtime load image and banked execution services | 7,213 / 8,192 | RAM helpers plus DATA, DEF FN activation and device/input services |
-| 3 | Recovery header; otherwise erased | 9 / 8,192 | Improved editor and stock BASIC PRG import/export |
+| 3 | Split screen editor and recovery header | 3,901 / 8,192 | Screen UI; remaining space for stock BASIC PRG import/export |
 | 4 | Recovery header; otherwise erased | 9 / 8,192 | 16.16 fixed-point helpers and improved PRINT |
 | 5 | Recovery header; otherwise erased | 9 / 8,192 | Sprite, VIC and SID commands |
 | 6 | Recovery header; otherwise erased | 9 / 8,192 | Numeric tables, fonts and optional resources |
 | 7 | Recovery header; otherwise erased | 9 / 8,192 | Expansion and diagnostics |
 
-The reserved roles guide future allocation; they do not add new language features in this revision. Total linked ROM use is 20,827 bytes, leaving 44,709 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 296 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
+The editor is implemented in bank 3. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 25,029 bytes, leaving 40,507 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 201 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
 
 ## Maps and bank ownership
 
@@ -21,7 +21,7 @@ Command execution uses `$01` low bits 7: bank 0 at `$8000`, stock BASIC ROM at `
 
 The bank latch at `$DE00` is write-only. Firmware records its current bank at `$0BE3` (`CART_BANK`), outside user allocation. Every firmware bank selection updates both locations. Do not infer the latch from a read of `$DE00`. I/O must be visible when writing the latch. Native user code that selects a different bank must update the shadow too if it expects interrupted banked operations to resume that bank; SYS/USR normalize the bank to zero on return.
 
-Command/editor ROM routines stay in bank 0; cold execution services run in bank 2. All instructions that select another bank and their return paths execute from the common-RAM gateway at `$0800`. `copy_bank_image` uses the shared `bank_call` ABI with IRQs masked for the copy, restores the original bank, complete `$01` and flags, and consumes SOURCE/DEST/COUNT. Cold start copies the gateway and service entry stubs after KERNAL initialization, then bank 2's runtime to `$E400–$FFF9` and bank 1's compiler to `$1400–$2BFF`. RUN and CONT refresh only the RAM runtime image; bank-2 services execute directly from ROM. There is no decompressor or instruction relocation.
+Command dispatch, source formatting and transport run in bank 0, the split screen UI runs in bank 3, and cold execution services run in bank 2. The editor calls existing command/compiler routines through bank_call and hooks KERNAL input/output through common RAM. All instructions that select another bank and their return paths execute from the common-RAM gateway at `$0800`. `copy_bank_image` uses the shared `bank_call` ABI with IRQs masked for the copy, restores the original bank, complete `$01` and flags, and consumes SOURCE/DEST/COUNT. Cold start copies the gateway and service entry stubs after KERNAL initialization, then bank 2's runtime to `$E400–$FFF9` and bank 1's compiler to `$1400–$2BFF`. RUN and CONT refresh only the RAM runtime image; bank-2 services execute directly from ROM. There is no decompressor or instruction relocation.
 
 KERNAL and IRQ gateways preserve the interrupted bank, temporarily select bank 0 for ROM service/recovery paths and restore it before returning. NMI handling stays in common RAM and preserves the selected bank. READY, source transport and SYS/USR returns establish bank 0 after exposing I/O. The first nine bytes of every bank contain the CBM80 signature and cold/warm vectors; auxiliary-bank vectors reach common-RAM recovery helpers installed at boot. Hardware reset starts in bank 0.
 
@@ -29,7 +29,7 @@ Firmware keeps the cartridge enabled and hides ROM through `$01`; it never write
 
 ## Common service entry stubs and remaining reservation
 
-`$0334–$03FF` is a 204-byte firmware-owned common-RAM region, outside the user arena and BASIC `RESERVE` ranges. It now holds **116 bytes** of `SERVICE_GATEWAY` entry stubs, leaving **88 bytes** reserved for future firmware code, data or workspace. Additional bank gateways remain a prospective use of that spare space; other uses remain open. The linker names the region `FUTURE`; `src/memory.inc` declares `FUTURE_RAM_START` and exclusive `FUTURE_RAM_END`.
+`$0334–$03FF` is a 204-byte firmware-owned common-RAM region, outside the user arena and BASIC `RESERVE` ranges. It now holds **152 bytes** of `SERVICE_GATEWAY` entry stubs, including the screen-output hook, followed by **52 bytes** of editor state at `$03CC–$03FF`. The main gateway holds **593 code bytes**, including the keyboard-input hook, and reserves `$0A60–$0AFF` for the **160-byte** editor draft. The linker restricts code to its own spans so it cannot overlap these buffers. The linker names the stub region `FUTURE`; `src/memory.inc` declares `FUTURE_RAM_START` and exclusive `FUTURE_RAM_END`.
 
 | Range | Stock C64 use | Reclaimed bytes |
 | --- | --- | --- |
@@ -65,11 +65,11 @@ Nonreturning errors enter the existing RAM error/READY path, establish bank 0 an
 | Component | Used / reserved bytes |
 | --- | --- |
 | High RAM runtime at `$E400` | 5,922 / 7,162 |
-| Common gateway at `$0800` | 578 / 768 |
-| Service entry stubs at `$0334` | 116 / 204 |
+| Common gateway at `$0800` | 593 code + 160 text / 768 |
+| Service entry stubs at `$0334` | 152 code + 52 state / 204 |
 | Bank-2 ROM services | 1,282 / bank's remaining ROM |
 
-The high runtime shrank by **1,115 bytes**, increasing its headroom from 125 to **1,240 bytes**. The main gateway grew by 40 bytes and the stubs occupy 116 newly reclaimed bytes, so total resident firmware code in RAM fell by **959 bytes**. Existing RAM reservations and the 43,008-byte arena retain their bounds; this change creates implementation headroom rather than adding user-arena bytes.
+The ABI 7 service migration shrank the high runtime by **1,115 bytes**, increasing its headroom from 125 to **1,240 bytes**. Relative to the earlier runtime, the gateway and stubs now occupy 55 and 152 additional bytes respectively, so resident firmware code in RAM remains **908 bytes** smaller. The editor also uses 212 bytes of buffers in existing firmware reservations. Existing RAM reservations and the 43,008-byte arena retain their bounds; this change creates implementation headroom rather than adding user-arena bytes.
 
 Bank 2 has 979 ROM bytes free with both images present. Filling all 1,240 bytes of runtime RAM headroom would require shifting some ROM services to another bank; the descriptor ABI already supports that placement change.
 
@@ -77,10 +77,10 @@ Bank 2 has 979 ROM bytes free with both images present. Filling all 1,240 bytes 
 
 The call ABI now supports moving additional cold helpers to ROM. Each migration must declare arguments, results, shadow reads, RAM callbacks, error behavior and stack use. Keep the allocator, collection, active control state and native return addresses in stable RAM. ROM helpers must enter common RAM before selecting a different bank.
 
-Moving compiler work out of `$1400–$2BFF` could recover RAM, but requires auditing its calls into bank 0 and scratch ownership. Adding fixed-point values changes cell/array/expression layouts and arithmetic semantics; publish a new ABI and recompile all source then. Existing version-one `.AB` source files remain authoritative; stock PRG conversion is still planned. Editor/PRG routines can use bank 3, numeric/PRINT routines bank 4 and hardware command compilation tables bank 5, while execution helpers are placed deliberately in RAM or reached through defined bank gates.
+Moving compiler work out of `$1400–$2BFF` could recover RAM, but requires auditing its calls into bank 0 and scratch ownership. Adding fixed-point values changes cell/array/expression layouts and arithmetic semantics; publish a new ABI and recompile all source then. Existing version-one `.AB` source files remain authoritative; stock PRG conversion is still planned. The editor uses bank 3; remaining PRG routines can share its spare space, numeric/PRINT routines bank 4 and hardware command compilation tables bank 5, while execution helpers are placed deliberately in RAM or reached through defined bank gates.
 
 Runtime ABI is now **7** because helper entry addresses and the banked-service contract changed. Source/container version remains **1**. Hard-reset with the new cartridge and reload/reenter source; old snapshots contain the earlier ROM, gateways and compiled helper references.
 
 ## Validation
 
-Automated tests cover nested ROM/RAM/KERNAL service calls, IRQ/NMI injection at nested transition boundaries, blocking input, shadow DATA/DEF FN operands, page-3 stub installation, eight-bank CRT parsing, latch mirrors and PLA visibility, exact startup copies, bank/port/flag restoration, IRQ and NMI frames during banked work, KERNAL calls, SYS/USR map changes and auxiliary-bank warm recovery. The complete existing language suite also runs, including Void Runner gameplay and collection replay. The py65 harness uses deterministic KERNAL stubs; independent cartridge tests validate the current eight-bank CRT format. Earlier cartconv and user-reported VICE disk-load/gameplay validation applied to the revision 0.6 Magic Desk conversion. The ABI 7 migration has instruction-level validation and still requires a fresh VICE/genuine-ROM retest. Visible collection pauses remain a performance backlog item. Broader genuine-ROM/cycle-accurate acceptance and physical-machine execution remain release work. See [the validation record](IMPLEMENTATION_STATUS.md).
+Automated tests cover nested ROM/RAM/KERNAL service calls, IRQ/NMI injection at nested transition boundaries, blocking input, shadow DATA/DEF FN operands, page-3 stub installation, eight-bank CRT parsing, latch mirrors and PLA visibility, exact startup copies, bank/port/flag restoration, IRQ and NMI frames during banked work, KERNAL calls, SYS/USR map changes and auxiliary-bank warm recovery. The complete existing language suite also runs, including Void Runner gameplay and collection replay. The py65 harness uses deterministic KERNAL stubs; independent cartridge tests validate the current eight-bank CRT format. Earlier cartconv and user-reported VICE disk-load/gameplay validation applied to the revision 0.6 Magic Desk conversion. The editor has additional software integration checks with actual 901227-03 KERNAL initialization, keyboard, input and output instructions. Keyboard bytes and raster status are injected in py65; this adds no VIC/IEC timing evidence. Fresh VICE/genuine-ROM gameplay remains open. Visible collection pauses remain a performance backlog item. Broader genuine-ROM/cycle-accurate acceptance and physical-machine execution remain release work. See [the validation record](IMPLEMENTATION_STATUS.md).

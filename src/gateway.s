@@ -359,3 +359,13 @@ copy_image_ram:
  jmp @loop
 @done:
  rts
+
+; Keyboard CHRIN uses the bounded editor during a direct INPUT statement.
+; Files and redirected devices retain the original KERNAL input vector.
+editor_input_gate:
+ lda $99
+ beq @keyboard
+ jmp (ED_OLD_IN)
+@keyboard:
+ EDITOR_CALL editor_chrin
+ rts

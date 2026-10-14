@@ -88,6 +88,24 @@ list_line:
 @skip:
  jmp list_advance
 @print:
+ jsr print_source_line
+ lda #13
+ jsr $ffd2
+ jmp list_advance
+; Shared canonical detokenizer. The bank-3 editor captures CHROUT through its
+; common-RAM vector. This returns one line without a terminating CR, so raw
+; carriage returns inside strings/comments can be displayed as literal glyphs.
+print_source_line:
+ lda LIST_ANCHOR
+ sta WALK
+ lda LIST_ANCHOR+1
+ sta WALK+1
+ ldy #3
+ lda (WALK),y
+ sta IO_A
+ iny
+ lda (WALK),y
+ sta IO_X
  jsr print_source_number
  lda #' '
  jsr $ffd2
@@ -312,8 +330,7 @@ list_line:
 @space:
  jmp @token
 @next:
- lda #13
- jsr $ffd2
+ rts
 list_advance:
  lda LIST_ANCHOR
  sta WALK
@@ -484,3 +501,53 @@ list_bound:
 list_syntax:
  lda #ERR_SYNTAX
  jmp command_error
+
+; Editor navigation uses numeric positions, so NEW/LOAD/CLEAN cannot leave
+; persistent viewport state pointing at freed anchors.
+editor_find:
+ jsr find_position
+ lda SUCCESSOR
+ ldx SUCCESSOR+1
+ rts
+editor_next:
+ lda ED_ANCHOR
+ sta WALK
+ lda ED_ANCHOR+1
+ sta WALK+1
+ jsr next_line
+ lda WALK
+ ldx WALK+1
+ rts
+editor_previous:
+ lda PROGRAM_HEAD
+ sta WALK
+ lda PROGRAM_HEAD+1
+ sta WALK+1
+ lda #0
+ sta ED_NEXT
+ sta ED_NEXT+1
+@scan:
+ lda WALK
+ cmp ED_ANCHOR
+ bne @advance
+ lda WALK+1
+ cmp ED_ANCHOR+1
+ beq @done
+@advance:
+ lda WALK
+ cmp #<run_end
+ bne @save
+ lda WALK+1
+ cmp #>run_end
+ beq @done
+@save:
+ lda WALK
+ sta ED_NEXT
+ lda WALK+1
+ sta ED_NEXT+1
+ jsr next_line
+ jmp @scan
+@done:
+ lda ED_NEXT
+ ldx ED_NEXT+1
+ rts

@@ -74,7 +74,10 @@ def check():
             assert target==labels['bank_call'] and p+7<=stub_end, 'Invalid service stub call'
             bank,mode=memory[p+3:p+5]
             service=memory[p+5]|memory[p+6]<<8
-            assert bank==2 and mode==7 and service_base<=service<service_end, 'Invalid ROM service descriptor'
+            if p >= labels['editor_output_gate']:
+                assert bank==3 and mode==7 and service==labels['editor_output'], 'Invalid editor output descriptor'
+            else:
+                assert bank==2 and mode==7 and service_base<=service<service_end, 'Invalid ROM service descriptor'
             n+=4
         p+=n;stub_count+=1
     assert p==stub_end

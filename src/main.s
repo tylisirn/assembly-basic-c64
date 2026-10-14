@@ -144,10 +144,25 @@ ready:
  txs
  cld
  jsr $ffcc
+ lda ED_ACTIVE
+ bne @prompt
  lda ERROR_CODE
  beq @prompt
  jsr report_error
 @prompt:
+ lda ED_ACTIVE
+ beq @stock
+ lda ERROR_CODE
+ EDITOR_CALL editor_finish
+ lda ERROR_CODE
+ beq @editor_input
+ jsr report_error
+@editor_input:
+ lda #0
+ sta ERROR_CODE
+ sta PENDING
+ jmp input_loop
+@stock:
  lda #0
  sta ERROR_CODE
  sta PENDING
@@ -155,6 +170,11 @@ ready:
  ldx #>ready_text
  jsr rom_puts
 input_loop:
+ lda ED_ACTIVE
+ beq @stock_read
+ EDITOR_CALL editor_read
+ jmp submit_input
+@stock_read:
  lda #0
  sta INPUT_LEN
 @read:
@@ -170,6 +190,9 @@ input_loop:
 @line:
  ; CHRIN returns the editor CR; send it to CHROUT before parsing/output.
  jsr $ffd2
+submit_input:
+ lda #0
+ sta ERROR_CODE
  ldx INPUT_LEN
  lda #0
  sta INPUT_BUFFER,x
@@ -197,16 +220,35 @@ input_loop:
  jsr edit_line
  lda COMPILE_ERROR
  beq @submitted
+ sta ERROR_CODE
+ lda ED_ACTIVE
+ bne @submitted
+ lda ERROR_CODE
  jsr report_error
 @submitted:
+ lda ED_ACTIVE
+ beq @again
+ lda ERROR_CODE
+ EDITOR_CALL editor_finish
+ lda ERROR_CODE
+ beq @again
+ jsr report_error
+ lda #0
+ sta ERROR_CODE
+@again:
  jmp input_loop
 @delete:
  jsr delete_line
- jmp input_loop
+ jmp @submitted
 command_quantity:
  lda #ERR_QUANTITY
  jmp command_error
 direct_command:
+ EDITOR_CALL editor_check_command
+ cmp #1
+ JEQ command_basic
+ cmp #2
+ JEQ command_quit
  jsr tokenize_input
  ; Command-only statements are dispatched while stopped in ROM.
  lda TOKENS
@@ -245,6 +287,7 @@ direct_command:
  sta ENTRY+1
  jmp run_entry
 command_run:
+ EDITOR_CALL editor_close
  jsr load_runtime
  jsr clear_values
  lda #0
@@ -274,6 +317,12 @@ command_run:
  lda #1
  sta RUNNING
  jmp run_entry
+command_basic:
+ EDITOR_CALL editor_open
+ jmp input_loop
+command_quit:
+ EDITOR_CALL editor_close
+ jmp ready
 command_cont:
  lda CONT_PC
  ora CONT_PC+1
@@ -312,7 +361,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.10",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.12",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
@@ -445,6 +494,7 @@ command_free:
 .include "runtime.s"
 .include "services.s"
 .include "service_gateway.s"
+.include "screen_editor.s"
 
 ; Every auxiliary bank has a recovery header pointing into common RAM. This
 ; lets KERNAL cartridge NMI dispatch recover even during a banked image copy.

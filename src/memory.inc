@@ -232,3 +232,61 @@ NAME_KIND = STATE+229
 
 ; LIST formatting state, inactive during lexing and native execution.
 LIST_CURRENT = STATE+230
+
+; Split editor workspace stays outside the arena and all compiler/runtime scratch.
+BANK_EDITOR = 3
+ED_TEXT = $0a60 ; 160 PETSCII bytes, reserved at the end of the common gateway.
+ED_STATE = $03cc ; 52 bytes after the service/output stubs, cleared by RAMTAS.
+ED_ACTIVE = ED_STATE
+ED_FOCUS = ED_STATE+1 ; 0 listing, 1 edit pane
+ED_MODE = ED_STATE+2 ; 0 insert, 1 overwrite, 2 literal
+ED_SELECTED = ED_STATE+3 ; persistent BASIC line number
+ED_TOP = ED_STATE+5 ; persistent first displayed BASIC line number
+ED_LAST = ED_STATE+7
+ED_ANCHOR = ED_STATE+9
+ED_NEXT = ED_STATE+11
+ED_OLD_OUT = ED_STATE+13
+ED_LEN = ED_STATE+15
+ED_CURSOR = ED_STATE+16 ; index in ED_TEXT
+ED_START = ED_STATE+17 ; physical offset of draft in the four-row pane
+ED_OUT = ED_STATE+18 ; physical output offset, 0..159
+ED_ROUTE = ED_STATE+19 ; 0 output, 1 listing, 2 copy, 3 help, 4 diagnostic
+ED_ROW = ED_STATE+20
+ED_COL = ED_STATE+21
+ED_INDENT = ED_STATE+22
+ED_HIGHLIGHT = ED_STATE+23
+ED_SEEN = ED_STATE+24
+ED_SUBMITTED = ED_STATE+25 ; 1 numbered, 2 direct
+ED_CHAR = ED_STATE+26
+ED_CODE = ED_STATE+27
+ED_COLOR = ED_STATE+28
+ED_HELP = ED_STATE+29
+ED_COPY_FULL = ED_STATE+30
+ED_BLINK = ED_STATE+31
+ED_CURSOR_ON = ED_STATE+32
+ED_UNDER = ED_STATE+33
+ED_UNDER_COLOR = ED_STATE+34
+ED_TEMP = ED_STATE+35
+ED_SAVE = ED_STATE+36 ; two-byte temporary line number
+ED_STEPS = ED_STATE+38
+ED_OLD_IN = ED_STATE+39
+ED_INPUT_LEN = ED_STATE+41
+ED_INPUT_POS = ED_STATE+42
+ED_INPUT_READY = ED_STATE+43
+ED_SAVE_LEN = ED_STATE+44
+ED_SAVE_CURSOR = ED_STATE+45
+ED_SAVE_START = ED_STATE+46
+ED_PTR = $fb ; KERNAL's free user zero-page pointers; no language scratch borrowed
+ED_CPTR = $fd
+ED_HELP_SCREEN = LEX_BUFFER ; borrowed only while help is open, before submission
+ED_HELP_COLORS = ED_HELP_SCREEN+160
+.macro EDITOR_CALL target
+ jsr bank_call
+ .byte BANK_EDITOR,7
+ .word target
+.endmacro
+.macro COMMAND_CALL target
+ jsr bank_call
+ .byte BANK_COMMAND,7
+ .word target
+.endmacro

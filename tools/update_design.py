@@ -60,26 +60,28 @@ def synchronize():
                 if old.tag!=f'{{{W}}}sectPr':body.remove(old)
             break
     replacements={
+        'Design specification  |  Version 0.11  |  13 October 2026':
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'Design specification  |  Version 0.9  |  13 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'ABI 5':'ABI 7',
         'ABI 6':'ABI 7',
-        'Version 0.10':'Version 0.11',
+        'Version 0.10':'Version 0.12',
         '16.8 fixed-point':'16.16 fixed-point',
         'Design specification  |  Version 0.8  |  12 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'Design specification  |  Version 0.7  |  12 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'Design specification  |  Version 0.6  |  10 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'ABI 4':'ABI 7',
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         'Design specification  |  Version 0.5  |  9 October 2026':
-        'Design specification  |  Version 0.11  |  13 October 2026',
+        'Design specification  |  Version 0.12  |  14 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.11', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
+        'Version 0.4':'Version 0.12', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
         'runtime ABI 3':'runtime ABI 7', 'ABI 3':'ABI 7',
         'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
         'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
@@ -144,6 +146,7 @@ def synchronize():
         'declarations. Identical bounds are idempotent; occupied/overlapping bounds fail safely. '
         'Removing source or a failed import may leave a reservation until NEW. $C000 is not implicit '
         'scratch RAM, and stock BASIC memory-top POKEs at 55/56 do not configure this allocator.')
+    rewrites['READY runs the editor/compiler in the command map'] += (' Direct BASIC opens the bank-3 split editor: 20 listing rows, one status row and four edit/output rows. F1 shows help; F7/QUIT close and clear, and RUN closes before execution. Bookmarks retain selected and top BASIC line numbers. Return copies the selection or submits a draft; left-arrow changes focus and discards the draft on return to the list. INS cycles insert, overwrite and literal control-glyph modes. Errors preserve drafts and place the cursor at the pane top right, with diagnostics in the status bar. Keyboard INPUT, output and screen-clear controls stay within the pane, with no READY prompt. The visible draft is limited to 160 bytes; overlong source copying is rejected without truncation. KERNAL input/output vectors are restored on exit.')
     # Revision 0.6 changes the hardware/load contract while preserving source semantics.
     image=('Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident '
            'compiler for $1400-$2BFF (runtime ABI 7). Store raw load images in Magic Desk banks '
@@ -281,7 +284,7 @@ def synchronize():
         'RAM helpers call SETNAM':
         'Resident and banked helpers call SETNAM, SETLFS, OPEN, CLOSE, CHKIN, CHKOUT, CLRCHN, CHRIN, CHROUT, GETIN, READST, RDTIM and SETTIM through the common kernal_gate/bank_call ABI. Restore caller mapping/bank and documented results. Stage arguments originally under ROM into common buffers. Blocking input permits IRQs and resumes its nested bank frames. Nonreturning errors establish bank 0 through RAM error/READY recovery and reset the hardware stack. DEF FN activation consumes its original native return address in a RAM stub and reads the four inline operands through read_ram; hot FN calls remain in RAM.',
         'Serial source files are streamed as bounded chunks through common RAM.':
-        'Serial source files are streamed as bounded chunks through common RAM. Do not call unrestricted KERNAL LOAD into the arena: it could overwrite source/code, gateways or resident helpers. The ROM file wrapper enters bank-0 source transport through bank_call. KERNAL-owned state stays excluded from the arena. $0334-$03FF holds the service entry stubs; its spare bytes remain reserved for future firmware code/data/workspace, with additional gateways prospective. Install contents after KERNAL initialization because RAMTAS clears page 3; preserve vectors through $0333 and keep tape transport unsupported.',
+        'Serial source files are streamed as bounded chunks through common RAM. Do not call unrestricted KERNAL LOAD into the arena: it could overwrite source/code, gateways or resident helpers. The ROM file wrapper enters bank-0 source transport through bank_call. KERNAL-owned state stays excluded from the arena. $0334-$03FF holds 152 bytes of service/output stubs and 52 bytes of editor state; $0A60-$0AFF holds the 160-byte editor draft. The keyboard-input stub shares the main gateway code span. Install contents after KERNAL initialization because RAMTAS clears page 3; preserve vectors through $0333 and keep tape transport unsupported.',
         'KERNAL gateways save low mapping bits':
         'KERNAL gateways use bank_call to save the complete $01, interrupt state and bank shadow on each call frame. Expose I/O before selecting bank 0, preserve service arguments/results and carry, and restore the bank before the original complete map. Image copies reuse the ABI with IRQs masked throughout the copy and restore original flags. Every bank-selection instruction and its return path executes in common RAM. NMI stays in common RAM and leaves the bank and dispatch scratch unchanged.',
         'The seven-byte anchor and binary vocabulary are defined designs':
@@ -367,12 +370,12 @@ def synchronize():
         elif address=='$1400-$2BFF':
             set_cell(cells[-1],'Resident compiler, copied from bank 1 at cold start; excluded from user allocation.')
         elif address=='$0334-$03FF':
-            set_cell(cells[-1],f"Firmware-owned common RAM: {report['service_gateway_used_bytes']} bytes of banked-service entry stubs, copied after KERNAL initialization (RAMTAS clears page 3); {204-report['service_gateway_used_bytes']} bytes remain reserved for future code, data or workspace. Further gateway uses are prospective; other uses remain open. Tape transport stays unsupported.")
+            set_cell(cells[-1],f"Firmware-owned common RAM: {report['service_gateway_used_bytes']} bytes of banked-service/output entry stubs, copied after KERNAL initialization (RAMTAS clears page 3); {204-report['service_gateway_used_bytes']} bytes hold editor state at $03CC-$03FF. Tape transport stays unsupported.")
         elif address=='$8000-$BFFF':
             set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
-    marker='Appendix B — implementation status, revision 0.11'
+    marker='Appendix B — implementation status, revision 0.12'
     additions=[paragraph(marker,True),paragraph(
-        'This appendix records the development implementation on 13 October 2026. '
+        'This appendix records the development implementation on 14 October 2026. '
         'The full version-one contract is not yet complete. Original release '
         'requirements above remain the target unless an architectural choice is '
         'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.'),
@@ -392,7 +395,7 @@ def synchronize():
     collection=json.loads((ROOT/'docs/voidrunner-collection.json').read_text())
     assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
     additions.append(paragraph('Captured Void Runner collection replay: '+json.dumps(collection,sort_keys=True)))
-    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()+'\n'+(ROOT/'docs/integer_arithmetic_design.md').read_text(encoding='utf-8-sig')
+    status=(ROOT/'docs/IMPLEMENTATION_STATUS.md').read_text()+'\n'+(ROOT/'docs/MAGIC_DESK_BANKS.md').read_text()+'\n'+(ROOT/'docs/SCREEN_EDITOR.md').read_text()+'\n'+(ROOT/'docs/integer_arithmetic_design.md').read_text(encoding='utf-8-sig')
     for line in status.splitlines():
         if not line or line.startswith('| ---'):continue
         if line.startswith('#'):additions.append(paragraph(line.lstrip('# '),True))
@@ -412,8 +415,8 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='11'
-                    if n.tag.endswith('}modified'):n.text='2026-10-13T00:00:00Z'
+                    if n.tag.endswith('}revision'):n.text='12'
+                    if n.tag.endswith('}modified'):n.text='2026-10-14T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
     with zipfile.ZipFile(temporary) as z:
@@ -426,12 +429,12 @@ def synchronize():
                    for p in root.iter(f'{{{W}}}p'))+'\n'
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.11','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.12','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.11 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.12 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()
