@@ -86,6 +86,12 @@ editor_open:
  sta ED_SUBMITTED
  sta ED_CURSOR_ON
  sta ED_INPUT_READY
+ lda ED_VIEW_VALID
+ bne @screen_ready
+ lda #$ff
+ sta ED_SELECTED_ROW
+ jsr editor_listing_colors
+@screen_ready:
  jsr editor_clear_pane
  jsr editor_listing
  jmp editor_status
@@ -118,6 +124,7 @@ editor_close:
  sta ED_HELP
  sta ED_SUBMITTED
  sta ED_INPUT_READY
+ sta ED_VIEW_VALID
  sta $cf
  lda #1
  sta $cc ; stock CHRIN enables blinking when it begins keyboard input
@@ -213,7 +220,7 @@ editor_wait:
  jsr editor_help_on
  jmp editor_wait
 @focus:
- cmp #$5f ; C64 left-arrow key
+ cmp #95 ; ← focus key (PETSCII 95)
  bne @pane
  lda ED_FOCUS
  eor #1
@@ -221,7 +228,7 @@ editor_wait:
  bne @focused
  jsr editor_clear_pane
 @focused:
- jsr editor_listing
+ jsr editor_line_cursor
  jsr editor_status
  jmp editor_read
 @pane:
@@ -687,6 +694,8 @@ editor_output_impl:
  JEQ editor_listing_char
  cmp #3
  JEQ editor_listing_char
+ cmp #5
+ JEQ editor_listing_char
  cmp #4
  JEQ editor_error_char
  lda ED_CODE
@@ -869,32 +878,50 @@ editor_listing_char:
  bne @literal
  lda ED_CODE
  cmp #13
- beq @newline
+ JEQ @newline
 @literal:
+ lda ED_ROUTE
+ cmp #5
+ beq @advance ; count physical rows without touching screen or row metadata
  lda ED_ROW
- cmp #20
+ cmp ED_SKIP
+ bcc @advance
+ cmp ED_LIMIT
  bcs @advance
  tax
  lda editor_rows_lo,x
  sta ED_PTR
  lda editor_rows_hi,x
  sta ED_PTR+1
- lda ED_PTR
- sta ED_CPTR
- lda ED_PTR+1
- clc
- adc #$d4
- sta ED_CPTR+1
+ lda ED_ROUTE
+ cmp #1
+ bne @glyph
+ ; Continuation indentation must replace any old line-number cells.
+ lda ED_COL
+ cmp ED_INDENT
+ bne @glyph
+ lda ED_ROWS_LO,x
+ ora ED_ROWS_HI,x
+ bne @glyph
+ ldy #0
+@indent:
+ cpy ED_INDENT
+ beq @glyph
+ lda (ED_PTR),y
+ cmp #' '
+ beq :+
+ lda #' '
+ sta (ED_PTR),y
+:
+ iny
+ bne @indent
+@glyph:
  lda ED_CODE
  jsr editor_screen_code
- ldx ED_HIGHLIGHT
- beq :+
- ora #$80
-:
  ldy ED_COL
+ cmp (ED_PTR),y
+ beq @advance
  sta (ED_PTR),y
- lda #14
- sta (ED_CPTR),y
 @advance:
  inc ED_COL
  lda ED_INDENT
@@ -914,6 +941,18 @@ editor_listing_char:
  cmp #$ff
  beq @done
  inc ED_ROW
+ lda ED_ROUTE
+ cmp #1
+ bne @done
+ lda ED_ROW
+ cmp ED_SKIP
+ bcc @done
+ cmp ED_LIMIT
+ bcs @done
+ tax
+ lda #0
+ sta ED_ROWS_LO,x
+ sta ED_ROWS_HI,x
 @done:
  rts
 @newline:
@@ -969,8 +1008,26 @@ editor_find_selected:
  sta ED_ANCHOR
  stx ED_ANCHOR+1
  rts
+editor_cached_selected:
+ lda ED_SELECTED_ANCHOR
+ sta ED_ANCHOR
+ lda ED_SELECTED_ANCHOR+1
+ sta ED_ANCHOR+1
+ rts
 editor_listing:
- ; Normalize numeric bookmarks against the current graph after every mutation.
+ ; Source commands that leave the program alone must not redraw the viewport.
+ lda ED_VIEW_VALID
+ beq @changed
+ lda GENERATION
+ cmp ED_VIEW_GEN
+ bne @changed
+ lda GENERATION+1
+ cmp ED_VIEW_GEN+1
+ bne @changed
+ jmp editor_line_cursor
+@changed:
+ jsr editor_cursor_off
+ ; Resolve numeric bookmarks only when the source graph may have changed.
  jsr editor_find_selected
  jsr editor_is_end
  bne @selected
@@ -979,6 +1036,10 @@ editor_listing:
  lda PROGRAM_HEAD+1
  sta ED_ANCHOR+1
 @selected:
+ lda ED_ANCHOR
+ sta ED_SELECTED_ANCHOR
+ lda ED_ANCHOR+1
+ sta ED_SELECTED_ANCHOR+1
  jsr editor_is_end
  beq @top
  jsr editor_anchor_number
@@ -993,7 +1054,8 @@ editor_listing:
  sta ED_TOP+1
 @paint:
  jsr editor_paint_listing
- lda ED_SEEN
+ lda ED_SELECTED_ROW
+ cmp #$ff
  bne @done
  jsr editor_find_selected
  jsr editor_is_end
@@ -1004,71 +1066,211 @@ editor_listing:
  sta ED_TOP+1
  jsr editor_paint_listing
 @done:
- lda #0
- sta ED_ROUTE
- sta ED_HIGHLIGHT
- lda #14
- sta ED_COLOR
- rts
+ lda GENERATION
+ sta ED_VIEW_GEN
+ lda GENERATION+1
+ sta ED_VIEW_GEN+1
+ lda #1
+ sta ED_VIEW_VALID
+ jmp editor_line_cursor
+
 editor_paint_listing:
  lda #0
+ sta ED_ROUTE
+ sta ED_SKIP
  sta ED_ROW
- sta ED_COL
- sta ED_SEEN
- jsr editor_clear_listing
+ ldx #19
+@map:
+ sta ED_ROWS_LO,x
+ sta ED_ROWS_HI,x
+ dex
+ bpl @map
+ lda #20
+ sta ED_LIMIT
  jsr editor_find_top
+ jsr editor_render_rows
+ jmp editor_reindex
+
+; Render into [ED_SKIP,ED_LIMIT), keeping all other screen cells intact. Rows
+; copied by scrolling are retained even when their last logical line is clipped.
+editor_render_rows:
 @line:
  jsr editor_is_end
- beq @done
+ beq @clear
  lda ED_ROW
- cmp #20
+ cmp ED_LIMIT
  bcs @done
- jsr editor_anchor_number
- stx ED_LAST
- sta ED_LAST+1
- lda #0
- sta ED_HIGHLIGHT
- sta ED_INDENT
- lda ED_LAST
- cmp ED_SELECTED
- bne @print
- lda ED_LAST+1
- cmp ED_SELECTED+1
- bne @print
- lda #1
- sta ED_SEEN
- lda ED_FOCUS
- bne @print
- lda #1
- sta ED_HIGHLIGHT
-@print:
+ tax
  lda ED_ANCHOR
+ sta ED_ROWS_LO,x
  sta LIST_ANCHOR
  lda ED_ANCHOR+1
+ sta ED_ROWS_HI,x
  sta LIST_ANCHOR+1
- lda #1
- sta ED_ROUTE
- COMMAND_CALL print_source_line
- lda ED_COL
- beq @advanced
- inc ED_ROW
- lda #0
- sta ED_COL
-@advanced:
+ jsr editor_render_line
  COMMAND_CALL editor_next
  sta ED_ANCHOR
  stx ED_ANCHOR+1
  jmp @line
+@clear:
+ lda ED_ROW
+ cmp ED_LIMIT
+ bcs @done
+ tax
+ lda #0
+ sta ED_ROWS_LO,x
+ sta ED_ROWS_HI,x
+ sta ED_COL
+ jsr editor_blank_row
+ inc ED_ROW
+ jmp @clear
+@done:
+ lda #0
+ sta ED_ROUTE
+ rts
+
+editor_render_line:
+ lda ED_ROW
+ sta ED_LINE_START
+ lda #0
+ sta ED_INDENT
+ sta ED_COL
+ lda ED_ROUTE
+ cmp #5
+ beq @format
+ lda #1
+ sta ED_ROUTE
+@format:
+ COMMAND_CALL print_source_line
+ ; An exact right-edge ending already advanced to the next physical row.
+ lda ED_ROW
+ cmp ED_LINE_START
+ beq @finish
+ lda ED_COL
+ cmp ED_INDENT
+ bne @finish
+ lda #0
+ sta ED_COL
+ rts
+@finish:
+ lda ED_ROUTE
+ cmp #5
+ beq @advance
+ jsr editor_blank_row
+@advance:
+ lda ED_ROW
+ cmp #$ff
+ beq @done
+ inc ED_ROW
 @done:
  rts
-editor_clear_listing:
- ldx #0
-@pages:
+
+; Pad only cells whose displayed characters actually differ. Color RAM is
+; initialized once on entry and is never rewritten or moved by listing updates.
+editor_blank_row:
+ lda ED_ROW
+ cmp ED_SKIP
+ bcc @done
+ cmp ED_LIMIT
+ bcs @done
+ tax
+ lda editor_rows_lo,x
+ sta ED_PTR
+ lda editor_rows_hi,x
+ sta ED_PTR+1
+ ldy ED_COL
+@blank:
+ cpy #40
+ bcs @done
+ lda (ED_PTR),y
+ cmp #' '
+ beq :+
  lda #' '
- sta $0400,x
- sta $0500,x
- sta $0600,x
+ sta (ED_PTR),y
+:
+ iny
+ bne @blank
+@done:
+ rts
+
+editor_reindex:
+ lda #$ff
+ sta ED_SELECTED_ROW
+ lda #0
+ sta ED_LAST
+ sta ED_LAST+1
+ ldx #0
+@row:
+ stx ED_SCAN_ROW
+ lda ED_ROWS_LO,x
+ sta ED_PTR
+ lda ED_ROWS_HI,x
+ sta ED_PTR+1
+ ora ED_PTR
+ beq @next
+ lda ED_PTR
+ cmp ED_SELECTED_ANCHOR
+ bne @number
+ lda ED_PTR+1
+ cmp ED_SELECTED_ANCHOR+1
+ bne @number
+ stx ED_SELECTED_ROW
+@number:
+ ldy #3
+ lda (ED_PTR),y
+ sta ED_LAST
+ iny
+ lda (ED_PTR),y
+ sta ED_LAST+1
+@next:
+ ldx ED_SCAN_ROW
+ inx
+ cpx #20
+ bne @row
+ rts
+
+editor_cursor_off:
+ lda #0
+ beq editor_cursor_mask
+editor_line_cursor:
+ lda ED_FOCUS
+ beq @on
+ lda #0
+ beq editor_cursor_mask
+@on:
+ lda #$80
+editor_cursor_mask:
+ sta ED_HIGHLIGHT_MASK
+ ldx ED_SELECTED_ROW
+ cpx #20
+ bcs @done
+ lda editor_rows_lo,x
+ sta ED_PTR
+ lda editor_rows_hi,x
+ sta ED_PTR+1
+ ldy #0
+@digit:
+ lda (ED_PTR),y
+ and #$7f
+ cmp #'0'
+ bcc @done
+ cmp #'9'+1
+ bcs @done
+ ora ED_HIGHLIGHT_MASK
+ cmp (ED_PTR),y
+ beq :+
+ sta (ED_PTR),y
+:
+ iny
+ cpy #5
+ bcc @digit
+@done:
+ rts
+
+editor_listing_colors:
+ ldx #0
  lda #14
+@pages:
  sta $d800,x
  sta $d900,x
  sta $da00,x
@@ -1076,77 +1278,109 @@ editor_clear_listing:
  bne @pages
  ldx #31
 @tail:
- lda #' '
- sta $0700,x
- lda #14
  sta $db00,x
  dex
  bpl @tail
  rts
 
+editor_clear_listing:
+ lda #0
+ sta ED_ROW
+ sta ED_COL
+ sta ED_SKIP
+ lda #20
+ sta ED_LIMIT
+@row:
+ jsr editor_blank_row
+ inc ED_ROW
+ lda ED_ROW
+ cmp #20
+ bcc @row
+ rts
+
 editor_select_next:
- jsr editor_find_selected
+ jsr editor_cached_selected
  jsr editor_is_end
  beq @done
+ ldx ED_SELECTED_ROW
+@visible:
+ inx
+ cpx #20
+ bcs @linked
+ lda ED_ROWS_LO,x
+ ora ED_ROWS_HI,x
+ beq @visible
+ lda ED_ROWS_LO,x
+ sta ED_ANCHOR
+ lda ED_ROWS_HI,x
+ sta ED_ANCHOR+1
+ jmp @selected
+@linked:
  COMMAND_CALL editor_next
  sta ED_ANCHOR
  stx ED_ANCHOR+1
  jsr editor_is_end
  beq @done
- jsr editor_anchor_number
- stx ED_SELECTED
- sta ED_SELECTED+1
- cmp ED_LAST+1
- bcc @paint
- bne @scroll
- cpx ED_LAST
- bcc @paint
- beq @paint
-@scroll:
+@selected:
+ jsr editor_move_selection
+ jsr editor_locate_selection
+ cmp #$ff
+ bne @cursor
+ ; Advance at most five BASIC lines, without passing the new selection.
  jsr editor_find_top
  lda #5
  sta ED_STEPS
 @five:
- COMMAND_CALL editor_next
- sta ED_NEXT
- stx ED_NEXT+1
- cmp #<run_end
- bne @accept
- cpx #>run_end
+ lda ED_ANCHOR
+ cmp ED_SELECTED_ANCHOR
+ bne @next
+ lda ED_ANCHOR+1
+ cmp ED_SELECTED_ANCHOR+1
  beq @scrolled
-@accept:
- lda ED_NEXT
+@next:
+ COMMAND_CALL editor_next
  sta ED_ANCHOR
- lda ED_NEXT+1
- sta ED_ANCHOR+1
+ stx ED_ANCHOR+1
  dec ED_STEPS
  bne @five
 @scrolled:
- jsr editor_anchor_number
- stx ED_TOP
- sta ED_TOP+1
-@paint:
- jsr editor_listing
+ jsr editor_scroll_up
+@cursor:
+ jsr editor_line_cursor
 @done:
  rts
+
 editor_select_previous:
- jsr editor_find_selected
+ jsr editor_cached_selected
  jsr editor_is_end
  beq @done
+ ldx ED_SELECTED_ROW
+@visible:
+ dex
+ bmi @linked
+ lda ED_ROWS_LO,x
+ ora ED_ROWS_HI,x
+ beq @visible
+ lda ED_ROWS_LO,x
+ sta ED_ANCHOR
+ lda ED_ROWS_HI,x
+ sta ED_ANCHOR+1
+ jmp @selected
+@linked:
  COMMAND_CALL editor_previous
  sta ED_ANCHOR
  stx ED_ANCHOR+1
  ora ED_ANCHOR+1
  beq @done
- jsr editor_anchor_number
- stx ED_SELECTED
- sta ED_SELECTED+1
- cmp ED_TOP+1
- bcc @scroll
- bne @paint
- cpx ED_TOP
- bcs @paint
-@scroll:
+@selected:
+ jsr editor_move_selection
+ jsr editor_locate_selection
+ cmp #$ff
+ bne @cursor
+ lda ED_ROWS_LO
+ sta ED_OLD_TOP
+ lda ED_ROWS_HI
+ sta ED_OLD_TOP+1
  jsr editor_find_top
  lda #5
  sta ED_STEPS
@@ -1163,16 +1397,224 @@ editor_select_previous:
  dec ED_STEPS
  bne @five
 @scrolled:
- jsr editor_anchor_number
- stx ED_TOP
- sta ED_TOP+1
-@paint:
- jsr editor_listing
+ jsr editor_scroll_down
+@cursor:
+ jsr editor_line_cursor
 @done:
  rts
 
+editor_move_selection:
+ ; Remove only the old number's reverse bits before changing numeric bookmarks.
+ lda ED_ANCHOR
+ pha
+ lda ED_ANCHOR+1
+ pha
+ jsr editor_cursor_off
+ pla
+ sta ED_ANCHOR+1
+ pla
+ sta ED_ANCHOR
+ lda ED_ANCHOR
+ sta ED_SELECTED_ANCHOR
+ lda ED_ANCHOR+1
+ sta ED_SELECTED_ANCHOR+1
+ jsr editor_anchor_number
+ stx ED_SELECTED
+ sta ED_SELECTED+1
+ rts
+
+editor_locate_selection:
+ ldx #0
+@row:
+ lda ED_ROWS_LO,x
+ cmp ED_SELECTED_ANCHOR
+ bne @next
+ lda ED_ROWS_HI,x
+ cmp ED_SELECTED_ANCHOR+1
+ beq @found
+@next:
+ inx
+ cpx #20
+ bne @row
+ ldx #$ff
+@found:
+ stx ED_SELECTED_ROW
+ txa
+ rts
+
+editor_scroll_up:
+ jsr editor_anchor_number
+ stx ED_TOP
+ sta ED_TOP+1
+ ldx #0
+@offset:
+ lda ED_ROWS_LO,x
+ cmp ED_ANCHOR
+ bne @next
+ lda ED_ROWS_HI,x
+ cmp ED_ANCHOR+1
+ beq @overlap
+@next:
+ inx
+ cpx #20
+ bne @offset
+ ; No retained rows when a preceding long line fills the whole frame.
+ jmp editor_paint_listing
+@overlap:
+ stx ED_DELTA
+ stx ED_MOVE_ROW
+ lda #20
+ sec
+ sbc ED_DELTA
+ sta ED_RETAIN
+@move:
+ ldx ED_MOVE_ROW
+ lda editor_rows_lo,x
+ sta ED_PTR
+ lda editor_rows_hi,x
+ sta ED_PTR+1
+ txa
+ sec
+ sbc ED_DELTA
+ tax
+ lda editor_rows_lo,x
+ sta ED_CPTR
+ lda editor_rows_hi,x
+ sta ED_CPTR+1
+ ldy #0
+@chars:
+ lda (ED_PTR),y
+ sta (ED_CPTR),y
+ iny
+ cpy #40
+ bne @chars
+ ldy ED_MOVE_ROW
+ lda ED_ROWS_LO,y
+ sta ED_ROWS_LO,x
+ lda ED_ROWS_HI,y
+ sta ED_ROWS_HI,x
+ inc ED_MOVE_ROW
+ lda ED_MOVE_ROW
+ cmp #20
+ bcc @move
+ ldx ED_RETAIN
+ lda #0
+@map:
+ sta ED_ROWS_LO,x
+ sta ED_ROWS_HI,x
+ inx
+ cpx #20
+ bcc @map
+ ; Resume the last retained logical line, skipping its already displayed rows.
+ ldx ED_RETAIN
+@last:
+ dex
+ lda ED_ROWS_LO,x
+ ora ED_ROWS_HI,x
+ beq @last
+ lda ED_ROWS_LO,x
+ sta ED_ANCHOR
+ lda ED_ROWS_HI,x
+ sta ED_ANCHOR+1
+ stx ED_ROW
+ lda ED_RETAIN
+ sta ED_SKIP
+ lda #20
+ sta ED_LIMIT
+ lda #0
+ sta ED_ROUTE
+ jsr editor_render_rows
+ jmp editor_reindex
+
+editor_scroll_down:
+ jsr editor_anchor_number
+ stx ED_TOP
+ sta ED_TOP+1
+ ; Measure only the new prefix, so wrapped BASIC lines shift the correct rows.
+ lda #0
+ sta ED_ROW
+@measure:
+ lda ED_ANCHOR
+ cmp ED_OLD_TOP
+ bne @line
+ lda ED_ANCHOR+1
+ cmp ED_OLD_TOP+1
+ beq @measured
+@line:
+ lda ED_ANCHOR
+ sta LIST_ANCHOR
+ lda ED_ANCHOR+1
+ sta LIST_ANCHOR+1
+ lda #5
+ sta ED_ROUTE
+ jsr editor_render_line
+ lda ED_ROW
+ cmp #20
+ bcs @replace
+ COMMAND_CALL editor_next
+ sta ED_ANCHOR
+ stx ED_ANCHOR+1
+ jmp @measure
+@replace:
+ lda #0
+ sta ED_ROUTE
+ jmp editor_paint_listing
+@measured:
+ lda ED_ROW
+ sta ED_DELTA
+ lda #19
+ sec
+ sbc ED_DELTA
+ sta ED_MOVE_ROW
+@move:
+ ldx ED_MOVE_ROW
+ lda editor_rows_lo,x
+ sta ED_PTR
+ lda editor_rows_hi,x
+ sta ED_PTR+1
+ txa
+ clc
+ adc ED_DELTA
+ tax
+ lda editor_rows_lo,x
+ sta ED_CPTR
+ lda editor_rows_hi,x
+ sta ED_CPTR+1
+ ldy #39
+@chars:
+ lda (ED_PTR),y
+ sta (ED_CPTR),y
+ dey
+ bpl @chars
+ ldy ED_MOVE_ROW
+ lda ED_ROWS_LO,y
+ sta ED_ROWS_LO,x
+ lda ED_ROWS_HI,y
+ sta ED_ROWS_HI,x
+ dec ED_MOVE_ROW
+ bpl @move
+ ldx #0
+ lda #0
+@map:
+ sta ED_ROWS_LO,x
+ sta ED_ROWS_HI,x
+ inx
+ cpx ED_DELTA
+ bcc @map
+ lda ED_DELTA
+ sta ED_LIMIT
+ lda #0
+ sta ED_SKIP
+ sta ED_ROW
+ sta ED_ROUTE
+ jsr editor_find_top
+ jsr editor_render_rows
+ lda #20
+ sta ED_LIMIT
+ jmp editor_reindex
+
 editor_copy_line:
- jsr editor_find_selected
+ jsr editor_cached_selected
  jsr editor_is_end
  beq @done
  jsr editor_clear_pane
@@ -1208,7 +1650,7 @@ editor_copy_line:
  sta ED_CURSOR
  jsr editor_draw_text
 @refresh:
- jsr editor_listing
+ jsr editor_line_cursor
  jsr editor_status
 @done:
  rts
@@ -1262,8 +1704,10 @@ editor_pane_message:
 @char:
  lda (ED_PTR),y
  beq @done
+ sta ED_CHAR
  tya
  pha
+ lda ED_CHAR
  jsr editor_output
  pla
  tay
@@ -1272,17 +1716,29 @@ editor_pane_message:
 @done:
  rts
 editor_help_on:
+ ; Preserve the listing as characters, so returning from help never detokenizes
+ ; source or disturbs a suspended INPUT. These buffers are inactive while GETIN
+ ; waits: TOKENS, LEX_BUFFER, BRIDGE (before the first INPUT field byte), and the
+ ; unused expression-stack tail. INPUT_BUFFER's saved command stays intact.
  ldx #0
 @save:
- lda $0748,x
- sta ED_HELP_SCREEN,x
- lda $db48,x
- sta ED_HELP_COLORS,x
+ lda $0400,x
+ sta TOKENS,x
+ lda $0500,x
+ sta LEX_BUFFER,x
+ lda $0600,x
+ sta BRIDGE,x
  inx
- cpx #160
  bne @save
+ ldx #31
+@tail:
+ lda $0700,x
+ sta ED_HELP_TAIL,x
+ dex
+ bpl @tail
  lda #1
  sta ED_HELP
+ jsr editor_clear_listing
  lda #3
  sta ED_ROUTE
  lda #0
@@ -1290,31 +1746,21 @@ editor_help_on:
  sta ED_COL
  sta ED_INDENT
  sta ED_HIGHLIGHT
- jsr editor_clear_listing
  lda #<editor_help_text
  sta ED_PTR
  lda #>editor_help_text
  sta ED_PTR+1
- ; Save the text pointer on the hardware stack around the screen writer.
  ldy #0
 @char:
  lda (ED_PTR),y
  beq @done
  sta ED_CHAR
- lda ED_PTR
- pha
- lda ED_PTR+1
- pha
  tya
  pha
  lda ED_CHAR
  jsr editor_output
  pla
  tay
- pla
- sta ED_PTR+1
- pla
- sta ED_PTR
  iny
  bne @char
  inc ED_PTR+1
@@ -1326,23 +1772,41 @@ editor_help_on:
 editor_help_off:
  lda #0
  sta ED_HELP
- jsr editor_listing
- jsr editor_status
  ldx #0
 @restore:
- lda ED_HELP_SCREEN,x
- sta $0748,x
- lda ED_HELP_COLORS,x
- sta $db48,x
+ lda TOKENS,x
+ cmp $0400,x
+ beq :+
+ sta $0400,x
+:
+ lda LEX_BUFFER,x
+ cmp $0500,x
+ beq :+
+ sta $0500,x
+:
+ lda BRIDGE,x
+ cmp $0600,x
+ beq :+
+ sta $0600,x
+:
  inx
- cpx #160
  bne @restore
- rts
+ ldx #31
+@tail:
+ lda ED_HELP_TAIL,x
+ cmp $0700,x
+ beq :+
+ sta $0700,x
+:
+ dex
+ bpl @tail
+ jmp editor_status
+
 editor_help_text:
  .byte "ASSEMBLY BASIC SCREEN EDITOR",13,13
  .byte "CURSOR KEYS  SELECT / MOVE TEXT",13
  .byte "RETURN       COPY LINE / SUBMIT",13
- .byte "LEFT ARROW   SWITCH LIST / EDIT",13
+ .byte 95,"            SWITCH LIST / EDIT",13
  .byte "SHIFT-DEL    INSERT/OVERWRITE/LITERAL",13
  .byte "DEL          DELETE PREVIOUS CHARACTER",13
  .byte "HOME         START OF EDIT LINE",13
@@ -1352,7 +1816,7 @@ editor_help_text:
  .byte "ENTER A NUMBERED LINE TO ADD OR CHANGE.",13
  .byte "A LINE NUMBER ALONE DELETES THAT LINE.",13
  .byte "DIRECT COMMANDS PRINT IN THE LOWER PANE.",13
- .byte "LEFT ARROW TO LIST DISCARDS THE DRAFT.",13
+ .byte 95," TO LIST DISCARDS THE DRAFT.",13
  .byte "LITERAL TYPES CONTROL CODES AS GLYPHS.",13
  .byte "BASIC REOPENS AT YOUR LAST POSITION.",13,13
  .byte "PRESS ANY KEY TO RETURN",0

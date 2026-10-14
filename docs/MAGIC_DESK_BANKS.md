@@ -1,4 +1,4 @@
-# Magic Desk cartridge architecture — revision 0.12
+# Magic Desk cartridge architecture — revision 0.13
 
 The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF`. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the [VICE cartridge specification](https://vice-emu.sourceforge.io/vice_17.html); VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
 
@@ -7,13 +7,13 @@ The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF
 | 0 | Autostart, command editor, tokenizer, LIST, source transport, gateway load image | 7,927 / 8,192 | Command dispatch and shared entry points |
 | 1 | Raw resident compiler load image | 5,952 / 8,192 | Compiler and native emitter growth |
 | 2 | Raw runtime load image and banked execution services | 7,213 / 8,192 | RAM helpers plus DATA, DEF FN activation and device/input services |
-| 3 | Split screen editor and recovery header | 3,901 / 8,192 | Screen UI; remaining space for stock BASIC PRG import/export |
+| 3 | Split screen editor and recovery header | 4,828 / 8,192 | Screen UI; remaining space for stock BASIC PRG import/export |
 | 4 | Recovery header; otherwise erased | 9 / 8,192 | 16.16 fixed-point helpers and improved PRINT |
 | 5 | Recovery header; otherwise erased | 9 / 8,192 | Sprite, VIC and SID commands |
 | 6 | Recovery header; otherwise erased | 9 / 8,192 | Numeric tables, fonts and optional resources |
 | 7 | Recovery header; otherwise erased | 9 / 8,192 | Expansion and diagnostics |
 
-The editor is implemented in bank 3. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 25,029 bytes, leaving 40,507 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 201 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
+The editor is implemented in bank 3. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 25,956 bytes, leaving 39,580 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 201 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
 
 ## Maps and bank ownership
 
@@ -29,7 +29,7 @@ Firmware keeps the cartridge enabled and hides ROM through `$01`; it never write
 
 ## Common service entry stubs and remaining reservation
 
-`$0334–$03FF` is a 204-byte firmware-owned common-RAM region, outside the user arena and BASIC `RESERVE` ranges. It now holds **152 bytes** of `SERVICE_GATEWAY` entry stubs, including the screen-output hook, followed by **52 bytes** of editor state at `$03CC–$03FF`. The main gateway holds **593 code bytes**, including the keyboard-input hook, and reserves `$0A60–$0AFF` for the **160-byte** editor draft. The linker restricts code to its own spans so it cannot overlap these buffers. The linker names the stub region `FUTURE`; `src/memory.inc` declares `FUTURE_RAM_START` and exclusive `FUTURE_RAM_END`.
+`$0334–$03FF` is a 204-byte firmware-owned common-RAM region, outside the user arena and BASIC `RESERVE` ranges. It now holds **152 bytes** of `SERVICE_GATEWAY` entry stubs, including the screen-output hook, followed by **52 bytes** of editor state at `$03CC–$03FF`. The main gateway holds **593 code bytes**, including the keyboard-input hook, and reserves `$0A60–$0AFF` for the **160-byte** editor draft. The cached row map uses `$0F80–$0FDF`, and the help snapshot tail uses `$0FE0–$0FFF`, above the existing 32 four-byte expression-stack entries. No user-arena bytes are added or removed. The linker restricts code to its own spans so it cannot overlap these buffers. The linker names the stub region `FUTURE`; `src/memory.inc` declares `FUTURE_RAM_START` and exclusive `FUTURE_RAM_END`.
 
 | Range | Stock C64 use | Reclaimed bytes |
 | --- | --- | --- |

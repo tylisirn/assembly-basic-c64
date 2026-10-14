@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "77171be48e320e56319097fefe274ae86b2a296554f79dd63540edc703a6f593",
+  "rom_sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -50,8 +50,8 @@
         40960
       ],
       "role": "split screen editor; remaining space reserved for BASIC PRG conversion",
-      "used_bytes": 3901,
-      "spare_bytes": 4291,
+      "used_bytes": 4828,
+      "spare_bytes": 3364,
       "reserved": false
     },
     {
@@ -118,7 +118,7 @@
   "service_gateway_budget_bytes": 204,
   "service_gateway_code_budget_bytes": 152,
   "editor_bank": 3,
-  "editor_rom_bytes": 3892,
+  "editor_rom_bytes": 4819,
   "editor_text_workspace": [
     2656,
     2816
@@ -126,6 +126,14 @@
   "editor_state_workspace": [
     972,
     1024
+  ],
+  "editor_view_workspace": [
+    3968,
+    4064
+  ],
+  "editor_help_tail_workspace": [
+    4064,
+    4096
   ],
   "services_bank": 2,
   "services_rom_address": 38699,
@@ -154,7 +162,7 @@
     "RUNTIME": 5922,
     "SERVICES": 1282,
     "SERVICE_GATEWAY": 152,
-    "SCREEN_EDITOR": 3892,
+    "SCREEN_EDITOR": 4819,
     "HEADER1": 9,
     "HEADER2": 9,
     "HEADER3": 9,
@@ -163,6 +171,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 25029,
-  "rom_spare_bytes": 40507
+  "rom_used_bytes": 25956,
+  "rom_spare_bytes": 39580
 }

@@ -1,26 +1,26 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.12",
+  "design_revision": "0.13",
   "runtime_abi": 7,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 124,
+  "validated_tests": 133,
   "artifacts": {
     "abi.json": {
-      "bytes": 8906,
-      "sha256": "eb7287088a13db69e53422a2911242976aefa44d7e5056254fdff9c365172162"
+      "bytes": 9019,
+      "sha256": "605d944513293c0f3d6e03f64501a0ea06bdb5730ed7d547a68075ba855aa518"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "77171be48e320e56319097fefe274ae86b2a296554f79dd63540edc703a6f593"
+      "sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "a49e6648ae84853b90b324c169ce75361efa31919873c7a59361fa44d25113c5"
+      "sha256": "87fc52cf5e4d9f00644a628094b05a7119242a4dc0e5a2a0686e00b9b1af16eb"
     },
     "editor-rom-report.json": {
       "bytes": 346,
-      "sha256": "d8278ba1e86a7a9ead3bdcacf095c62af151de66d4469ea905c4c6f4ce4bc4d7"
+      "sha256": "941278312c85b4f4a0cdd71b555ef09dd0588aba064175043d626ba074d5db09"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -51,12 +51,12 @@
       "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
     "size-report.json": {
-      "bytes": 3613,
-      "sha256": "d2dfacdfadf9ea3b0f255fbf1596df81f295d421035807c32ba65f366e0b0d31"
+      "bytes": 3724,
+      "sha256": "d235f7f7f328f8e1f7138cd14543af5d5bda7c3d24dba5c9ddb8fb79a91bc0b2"
     },
     "test-report.json": {
       "bytes": 266,
-      "sha256": "9a1b13266ecb1261e9ddbbd13b520956be473b841a33da2965d8786b8419af7e"
+      "sha256": "e328cd4d48306efde63da799b2ec2e7f8630eacd3605ea45f1856a3e587e8061"
     }
   }
 }

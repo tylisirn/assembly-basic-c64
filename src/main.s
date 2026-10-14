@@ -361,7 +361,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.12",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.13",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data

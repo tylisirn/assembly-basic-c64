@@ -41,6 +41,8 @@ def package():
          'screen_editor':{'bank':report['editor_bank'], 'rom_bytes':report['editor_rom_bytes'],
                           'text_workspace':report['editor_text_workspace'],
                           'state_workspace':report['editor_state_workspace'],
+                          'view_workspace':report['editor_view_workspace'],
+                          'help_tail_workspace':report['editor_help_tail_workspace'],
                           'screen_rows':{'listing':[0,20],'status':20,'edit':[21,25]},
                           'input_gate':labels['editor_input_gate'],
                           'output_gate':labels['editor_output_gate']},

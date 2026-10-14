@@ -97,6 +97,8 @@ def build(toolchain=None):
               'editor_bank': 3, 'editor_rom_bytes': labels['__SCREEN_EDITOR_SIZE__'],
               'editor_text_workspace': [0x0a60, 0x0b00],
               'editor_state_workspace': [0x03cc, 0x0400],
+              'editor_view_workspace': [0x0f80, 0x0fe0],
+              'editor_help_tail_workspace': [0x0fe0, 0x1000],
               'services_bank': 2, 'services_rom_address': labels['__SERVICES_LOAD__'],
               'services_rom_bytes': services,
               'arena_spans': [[0x2c00, 0xd000], [0xe000, 0xe400]], 'arena_raw_bytes': 43008,

@@ -2,7 +2,7 @@
 
 A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.12, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.13, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -30,11 +30,11 @@ Bank 0 contains command/editor code and gateway load images, bank 1 the raw comp
 
 Common RAM at `$0334–$03FF` holds 152 bytes of service/output entry stubs and 52 bytes of editor state. The gateway contains 593 code bytes and reserves `$0A60–$0AFF` for the 160-byte editor draft. The high runtime uses 5,922 of 7,162 bytes, leaving 1,240 bytes for implementation. See [the banked-service ABI and initialization requirements](docs/MAGIC_DESK_BANKS.md#banked-service-call-abi).
 
-Firmware revision 0.12 uses runtime ABI 7; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
+Firmware revision 0.13 uses runtime ABI 7; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
-Enter `BASIC` to open the [split screen editor](docs/SCREEN_EDITOR.md): a scrolling listing above a four-row edit pane. Return copies the selected line; the left-arrow key switches focus; INS cycles INSERT, OVERWRITE and LITERAL; F1 shows help. F7 or `QUIT` closes and clears the screen. `RUN` closes the editor before execution. The editor remembers its selected line and viewport.
+Enter `BASIC` to open the [split screen editor](docs/SCREEN_EDITOR.md): a scrolling listing above a four-row edit pane. Return copies the selected line; the `←` (PETSCII 95) key switches focus; INS cycles INSERT, OVERWRITE and LITERAL; F1 shows help. F7 or `QUIT` closes and clears the screen. `RUN` closes the editor before execution. Only the selected line number is highlighted. Cursor movement leaves listing text intact, and scrolling shifts existing characters without moving color RAM. The editor remembers its selected line and viewport.
 
 At `READY.`, enter decimal numbered lines, then use RUN, LIST, CLEAN, NEW and the usual direct commands. Enter advances the screen cursor before processing each command or numbered line. Numbered entry and deletion resume input without another READY prompt. A tokenization or compilation failure prints an error while retaining the new line as repairable source. Enter a line number alone to delete it. Identifiers use their full spelling; write `PRINT A`, since `PRINTA` is a variable name. Integers wrap to 16 bits. Unsuffixed variables are signed; `%` variables are unsigned. Nonnegative literals are unsigned; negative literals are signed. Hexadecimal constants preserve their radix in LIST.
 

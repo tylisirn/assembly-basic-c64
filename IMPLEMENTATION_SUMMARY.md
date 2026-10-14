@@ -1,8 +1,14 @@
 # Assembly BASIC implementation summary
 
+## Revision 0.13 — number cursor and incremental listing updates
+
+The listing cursor highlights only line-number digits. A cached row map makes visible cursor moves and focus switches update just the number cells. Scrolling shifts existing character rows, accounts for wrapped BASIC lines, and renders newly exposed rows while preserving a clipped line's continuation. Listing color RAM is left in place. Source refreshes write only differing characters; unchanged commands, identical edits and changes outside the viewport leave listing text alone.
+
+Help restores a saved character screen instead of reformatting BASIC, and uses the actual PETSCII 95 glyph (←) for its focus key. The row cache and help tail use the previously unused upper half of the expression-stack page. Runtime ABI 7, its native image and the user arena remain unchanged. Tests monitor screen/color writes and compare repeated scrolling with fresh viewports; stock-KERNAL validation also exercises navigation and the help glyph.
+
 ## Revision 0.12 — split screen cartridge editor
 
-BASIC opens the bank-3 screen editor with a 20-row listing, mode/help status row and four-row command pane. It retains selected-line and viewport bookmarks, aligns wrapped source after line numbers, scrolls by five BASIC lines, and copies the selected source on Return. Left-arrow switches focus and discards a draft on return to the listing. INS cycles INSERT, OVERWRITE and LITERAL, with the requested cursor styles. F1 shows help; F7/QUIT clear and close; RUN closes before execution.
+BASIC opens the bank-3 screen editor with a 20-row listing, mode/help status row and four-row command pane. It retains selected-line and viewport bookmarks, aligns wrapped source after line numbers, scrolls by five BASIC lines, and copies the selected source on Return. ← (PETSCII 95) switches focus and discards a draft on return to the listing. INS cycles INSERT, OVERWRITE and LITERAL, with the requested cursor styles. F1 shows help; F7/QUIT clear and close; RUN closes before execution.
 
 Numbered submissions reuse the existing tokenizer/compiler and refresh the listing. Success clears the pane; errors retain the draft, display a status diagnostic and position the cursor at the top right. Direct PRINT, INPUT and other commands stay within the lower four rows without READY. Common-RAM CHRIN/CHROUT hooks preserve bank routing and restore KERNAL vectors on exit. Text and state occupy existing reserved RAM; the arena and ABI 7 execution runtime are unchanged. Tests include error/allocation/load recovery, HELP/INPUT, modes, source wrapping, cursor bounds, capacity, output confinement and persistent bookmarks. Optional stock-KERNAL validation and a character-ROM preview are available in `tools/check_editor_rom.py`; see [editor documentation](docs/SCREEN_EDITOR.md).
 

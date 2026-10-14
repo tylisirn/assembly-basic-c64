@@ -1,0 +1,40 @@
+{
+  "baseline_commit": "bac143f",
+  "environment": "py65 with deterministic KERNAL stubs; no hardware/VIC timing",
+  "workload": "30 one-row PRINT lines; one visible cursor move and five-line scrolling in both directions",
+  "before": {
+    "cursor_move": {
+      "instructions": 87133,
+      "listing_character_writes": 1042,
+      "listing_color_writes": 1042
+    },
+    "scroll_down": {
+      "instructions": 99211,
+      "listing_character_writes": 1052,
+      "listing_color_writes": 1052
+    },
+    "scroll_up": {
+      "instructions": 93307,
+      "listing_character_writes": 1042,
+      "listing_color_writes": 1042
+    }
+  },
+  "after": {
+    "cursor_move": {
+      "instructions": 202,
+      "listing_character_writes": 4,
+      "listing_color_writes": 0
+    },
+    "scroll_down": {
+      "instructions": 32911,
+      "listing_character_writes": 624,
+      "listing_color_writes": 0
+    },
+    "scroll_up": {
+      "instructions": 47449,
+      "listing_character_writes": 624,
+      "listing_color_writes": 0
+    }
+  },
+  "rom_sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03"
+}

@@ -318,3 +318,210 @@ class SplitEditorTests(unittest.TestCase):
         self.assertEqual(m.memory.ram[ED+30], 1)
         self.keys('\x88')
         self.assertIn('Z'*180, m.command('LIST'))
+
+    def record_video_writes(self):
+        from machine import Memory
+
+        class RecordingMemory(Memory):
+            def __setitem__(self, address, value):
+                if 0x400 <= address < 0x7e8 or 0xd800 <= address < 0xdbe8:
+                    self.video_writes.append((address, value))
+                super().__setitem__(address, value)
+
+        memory = self.m.memory
+        memory.__class__ = RecordingMemory
+        memory.video_writes = []
+        return memory.video_writes
+
+    def test_selection_highlights_only_digits_and_never_reformats_source(self):
+        m = self.m
+        m.command('10 REM '+ 'A'*65)
+        m.command('20 PRINT 2')
+        m.command('BASIC')
+        self.assertEqual(self.screen(0x400, 2), b'\xb1\xb0')
+        self.assertEqual(self.screen(0x402, 1), b' ')
+        self.assertEqual(self.screen(0x403, 4), bytes((18, 5, 13, 32)))
+        self.assertEqual(self.screen(0x428, 3), b' '*3)
+        self.assertEqual(self.screen(0x42b, 1), b'\x01')
+        writes = self.record_video_writes()
+        before_services = len(m.services)
+        self.keys('\x11')
+        listing_writes = [(p, b) for p, b in writes if 0x400 <= p < 0x720]
+        self.assertEqual(listing_writes, [(0x400, 49), (0x401, 48),
+                                         (0x450, 178), (0x451, 176)])
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        self.assertFalse(any(pc == 0xffd2 for pc, *_ in m.services[before_services:]))
+        writes.clear()
+        self.keys('\x11')  # last program line, so no redraw or cursor repaint
+        self.assertEqual(writes, [])
+        self.keys('\x91')
+        self.assertEqual(self.screen(0x400, 2), b'\xb1\xb0')
+
+    def test_focus_copy_and_source_preserving_commands_do_not_redraw_listing(self):
+        m = self.m
+        m.command('10 PRINT 7')
+        m.command('20 PRINT 8')
+        m.command('BASIC')
+        writes = self.record_video_writes()
+        self.keys('\r')
+        self.assertEqual(self.draft(), b'10 PRINT 7')
+        self.assertEqual([p for p, _ in writes if p < 0x720], [0x400, 0x401])
+        writes.clear()
+        self.keys('_')
+        self.assertEqual([p for p, _ in writes if p < 0x720], [0x400, 0x401])
+        self.keys('_')
+        for command in ('PRINT 123', 'PRINT 1/0', 'CLR', 'CLEAN'):
+            with self.subTest(command=command):
+                # Discard an error draft before the next direct command.
+                self.keys('__')
+                writes.clear()
+                self.keys(command+'\r')
+                self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
+                self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+
+    def test_identical_edits_and_offscreen_changes_do_not_write_listing(self):
+        m = self.m
+        for number in range(10, 261, 10):
+            m.command(f'{number} PRINT {number}')
+        m.command('BASIC')
+        self.keys('_')
+        writes = self.record_video_writes()
+        for command in ('10 PRINT 10', '260 PRINT 999', '260', '999'):
+            with self.subTest(command=command):
+                writes.clear()
+                self.keys(command+'\r')
+                self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
+                self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        writes.clear()
+        self.keys('10 PRINT 11\r')
+        self.assertEqual([(p, v) for p, v in writes if p < 0x720], [(0x40a, 49)])
+
+    def test_bidirectional_scroll_moves_rows_without_touching_color_ram(self):
+        m = self.m
+        for number in range(10, 311, 10):
+            m.command(f'{number} PRINT {number}')
+        m.command('BASIC')
+        self.keys('\x11'*19)
+        before = bytes(b & 127 for b in self.screen(0x400, 800))
+        colors = self.screen(0xd800, 800)
+        writes = self.record_video_writes()
+        self.keys('\x11')
+        after = bytes(b & 127 for b in self.screen(0x400, 800))
+        self.assertEqual(after[:600], before[200:])
+        self.assertEqual(self.screen(0xd800, 800), colors)
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        retained_writes = [p for p, _ in writes if 0x400 <= p < 0x658]
+        self.assertEqual(len(retained_writes), 600)  # each retained character copied once
+        self.assertIn(b'21', after[600:640])
+        self.keys('\x91'*15)
+        before = bytes(b & 127 for b in self.screen(0x400, 800))
+        writes.clear()
+        self.keys('\x91')
+        after = bytes(b & 127 for b in self.screen(0x400, 800))
+        self.assertEqual(after[200:], before[:600])
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        retained_writes = [p for p, _ in writes if 0x4c8 <= p < 0x720]
+        self.assertEqual(len(retained_writes), 600)
+
+    def test_wrapped_scroll_restores_partial_lines_and_matches_a_fresh_view(self):
+        m = self.m
+        for number in range(10, 311, 10):
+            # First five BASIC lines occupy ten physical rows. Later lines mix
+            # widths, including a clipped line at the bottom of the viewport.
+            count = 50 if number <= 50 or number % 30 == 0 else 5
+            m.command(f'{number} REM '+ 'X'*count)
+        m.command('BASIC')
+        while m.word(ED+3) < m.word(ED+7):
+            self.keys('\x11')
+        before = bytes(b & 127 for b in self.screen(0x400, 800))
+        writes = self.record_video_writes()
+        self.keys('\x11')
+        after = bytes(b & 127 for b in self.screen(0x400, 800))
+        self.assertEqual(m.word(ED+5), 60)
+        self.assertEqual(after[:400], before[400:])
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        optimized = self.screen(0x400, 800)
+        self.keys('\x88')
+        m.command('BASIC')
+        self.assertEqual(self.screen(0x400, 800), optimized)
+        while m.word(ED+3) > 60:
+            self.keys('\x91')
+        writes.clear()
+        self.keys('\x91')
+        self.assertEqual(m.word(ED+5), 10)
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        optimized = self.screen(0x400, 800)
+        self.keys('\x88')
+        m.command('BASIC')
+        self.assertEqual(self.screen(0x400, 800), optimized)
+
+    def test_help_uses_petscii_95_and_restores_saved_listing_without_formatting(self):
+        m = self.m
+        m.command('10 PRINT 7')
+        m.command('BASIC')
+        listing = self.screen(0x400, 800)
+        writes = self.record_video_writes()
+        before_services = len(m.services)
+        self.keys('\x85')
+        self.assertEqual(self.screen(0x400+4*40, 1), b'\x1f')
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        self.keys(' ')
+        self.assertEqual(self.screen(0x400, 800), listing)
+        self.assertFalse(any(pc == 0xffd2 for pc, *_ in m.services[before_services:]))
+        self.keys('_INPUT A$,B:PRINT A$;B\r')
+        self.keys('AB\x85 \x85 ,12\r')
+        self.assertIn(b'AB 12 ', m.output)
+
+    def test_lines_taller_than_the_frame_scroll_without_overlap_or_color_writes(self):
+        from ab64.cli import text_program
+        from ab64.container import dumps
+        m = self.m
+        name = 'V'*200
+        source = f'10 {name}={name}+{name}+{name}+{name}\n20 PRINT 2\n30 PRINT 3'
+        m.files['TALL'] = bytearray(dumps(*text_program(source)))
+        m.command('LOAD "TALL",8')
+        m.command('BASIC')
+        before = self.screen(0x400, 800)
+        writes = self.record_video_writes()
+        self.keys('\x11')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (20, 20))
+        self.assertEqual(self.screen(0x400, 2), b'\xb2\xb0')
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        writes.clear()
+        self.keys('\x91')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (10, 10))
+        self.assertEqual(self.screen(0x400, 800), before)
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+
+    def test_many_scrolls_and_source_changes_match_fresh_viewports(self):
+        import random
+        m = self.m
+        for number in range(10, 411, 10):
+            m.command(f'{number} REM '+chr(65+number//10 % 26)*(number % 75))
+        m.command('BASIC')
+        randomizer = random.Random(95)
+        for _ in range(4):
+            self.keys(''.join(randomizer.choice(('\x91', '\x11', '\x11')) for _ in range(35)))
+            optimized = self.screen(0x400, 800)
+            selected, top = m.word(ED+3), m.word(ED+5)
+            self.keys('\x88')
+            m.command('BASIC')
+            self.assertEqual((m.word(ED+3), m.word(ED+5)), (selected, top))
+            self.assertEqual(self.screen(0x400, 800), optimized)
+        self.keys('_'+f'{m.word(ED+5)} REM '+ 'Z'*100+'\r')
+        self.keys('_')
+        optimized = self.screen(0x400, 800)
+        self.keys('\x88')
+        m.command('BASIC')
+        self.assertEqual(self.screen(0x400, 800), optimized)
+
+    def test_help_preserves_a_suspended_gosub_for_cont(self):
+        m = self.m
+        for source in ('10 GOSUB 100', '20 END', '100 STOP', '110 PRINT 7:RETURN'):
+            m.command(source)
+        m.command('RUN')
+        frames = self.screen(0x1000, 512)
+        m.command('BASIC')
+        self.keys('\x85 \x88')
+        self.assertEqual(self.screen(0x1000, 512), frames)
+        self.assertIn(' 7 ', m.command('CONT'))

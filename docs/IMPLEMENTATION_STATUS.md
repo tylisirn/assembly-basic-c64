@@ -1,4 +1,4 @@
-# Implementation status — design revision 0.12
+# Implementation status — design revision 0.13
 
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 
@@ -35,10 +35,19 @@ Future work should profile both workloads, reduce temporary-string allocation wh
 - `$0334–$03FF` (204 bytes) is firmware-owned common RAM: 152 bytes hold service/output entry stubs and 52 bytes hold editor state. The main gateway holds 593 code bytes and a keyboard-input stub; `$0A60–$0AFF` holds the 160-byte editor draft. Cold start copies the stubs after KERNAL initialization because `RAMTAS` clears page 3. Tape transport remains unsupported. See [the banked-service ABI](MAGIC_DESK_BANKS.md#banked-service-call-abi).
 - Runtime ABI and source-container version are separate. Source files remain version **1**, magic `AB64SRC\0`, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
 
+## Revision 0.13 listing redraw and scroll optimization — 14 October 2026
+
+- The listing cursor reverses only the line-number digits. Visible navigation uses a cached row map and updates just the old/new number cells; focus changes and copying a line do not redraw program text.
+- Five-BASIC-line scrolling copies overlapping character rows up or down, measures wrapped prefix heights, and formats only newly exposed rows. The hidden tail of a partially visible line resumes at the bottom. Listing color RAM is initialized on entry and never shifted or rewritten during list updates.
+- Source generation invalidates cached anchors after edits, NEW, LOAD or CLEAN. Refreshes compare screen codes and write only differences, so identical edits and changes outside the viewport leave listing characters alone. Commands without source changes skip the refresh.
+- Help saves/restores the listing characters instead of calling LIST again, including while keyboard INPUT waits. Its key labels use the actual PETSCII 95 glyph, shown as ← in documentation. The cache/snapshot tail occupies the previously unused upper half of the 32-entry expression-stack page; arena bounds and ABI 7 native runtime remain unchanged.
+- [Measured visible navigation](editor-scroll-measurements.json) reduces listing writes from 1,042 characters plus 1,042 colors to four characters and zero colors on a 30-line PRINT workload (py65, no hardware timing).
+- Regressions record actual character/color RAM writes, cover wrapped and tall lines, exercise repeated scrolling against fresh viewports, and preserve INPUT and STOP/GOSUB/CONT through help. Optional stock-KERNAL checks exercise the number cursor, PETSCII 95 glyph and bidirectional scrolling.
+
 ## Revision 0.12 screen editor — 14 October 2026
 
 - Direct BASIC opens a 20-row listing and four-row edit pane, with a mode/help status row between them. QUIT/F7 clear and close it; RUN closes before execution. Numeric line/viewport bookmarks survive invocation and are normalized after program mutations.
-- Listing navigation scrolls by five BASIC lines at a frame edge. Continuations align after the number; Return copies canonical source and focuses its end. Left-arrow switches focus and discards a draft when returning to the listing.
+- Listing navigation scrolls by five BASIC lines at a frame edge. Continuations align after the number; Return copies canonical source and focuses its end. ← (PETSCII 95) switches focus and discards a draft when returning to the listing.
 - INSERT, OVERWRITE and LITERAL share bounded editing. Cursor colors/glyphs identify the mode; control bytes are literal only in LITERAL. Numbered success clears the pane; errors retain the complete draft and show a status-row diagnostic with the cursor at the pane's top right. Direct output/INPUT scroll and clear only the pane, without READY.
 - Bank 3 contains the UI, using the existing bank-0 detokenizer and compiler. CHRIN/CHROUT RAM vectors dispatch through common RAM and are restored on exit; device/file channels retain KERNAL routing. Draft/state reservations fit existing firmware RAM and leave the 43,008-byte arena unchanged. Runtime ABI remains 7; the execution runtime is byte-identical to revision 0.11.
 - Editor tests cover navigation, focus, modes/literal controls, clipping/capacity, edits/deletion, error/allocation/load recovery, INPUT, help, output confinement, bookmarks and vector restoration. A user-supplied 901227-03 KERNAL software check exercises actual RESTOR/CINT/GETIN/CHRIN/CHROUT instructions with injected keyboard input. Genuine-ROM/cycle-accurate VICE gameplay, VIC/IEC timing and physical-machine acceptance remain open. See [editor usage and validation](SCREEN_EDITOR.md).

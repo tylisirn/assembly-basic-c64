@@ -250,7 +250,7 @@ ED_LEN = ED_STATE+15
 ED_CURSOR = ED_STATE+16 ; index in ED_TEXT
 ED_START = ED_STATE+17 ; physical offset of draft in the four-row pane
 ED_OUT = ED_STATE+18 ; physical output offset, 0..159
-ED_ROUTE = ED_STATE+19 ; 0 output, 1 listing, 2 copy, 3 help, 4 diagnostic
+ED_ROUTE = ED_STATE+19 ; 0 output, 1 listing, 2 copy, 3 help, 4 error, 5 measure
 ED_ROW = ED_STATE+20
 ED_COL = ED_STATE+21
 ED_INDENT = ED_STATE+22
@@ -276,10 +276,29 @@ ED_INPUT_READY = ED_STATE+43
 ED_SAVE_LEN = ED_STATE+44
 ED_SAVE_CURSOR = ED_STATE+45
 ED_SAVE_START = ED_STATE+46
+ED_VIEW_VALID = ED_STATE+47
+ED_VIEW_GEN = ED_STATE+48 ; cached source generation
+ED_SELECTED_ROW = ED_STATE+50 ; $ff when the selection is outside the viewport
+ED_SKIP = ED_STATE+51 ; first row written by an incremental render
+; The expression stack has 32 four-byte entries, leaving its upper 128 bytes
+; unused by native execution and GC. The row map and scroll work use 96 bytes.
+ED_ROWS_LO = EXPR_STACK+128 ; 20 logical-line start anchors; continuations = 0
+ED_ROWS_HI = ED_ROWS_LO+20
+ED_SELECTED_ANCHOR = ED_ROWS_HI+20
+ED_OLD_TOP = ED_SELECTED_ANCHOR+2
+ED_LIMIT = ED_OLD_TOP+2 ; exclusive last row written by an incremental render
+ED_DELTA = ED_LIMIT+1
+ED_RETAIN = ED_DELTA+1
+ED_MOVE_ROW = ED_RETAIN+1
+ED_LINE_START = ED_MOVE_ROW+1
+ED_SCAN_ROW = ED_LINE_START+1
+ED_HIGHLIGHT_MASK = ED_SCAN_ROW+1
+ED_HELP_TAIL = EXPR_STACK+224 ; final 32 bytes of an 800-byte listing snapshot
+.assert ED_HIGHLIGHT_MASK < ED_HELP_TAIL, error, "Editor row workspace overflow"
+.assert ED_HELP_TAIL+32 = CONTROL_STACK, error, "Editor overlaps control stack"
 ED_PTR = $fb ; KERNAL's free user zero-page pointers; no language scratch borrowed
 ED_CPTR = $fd
-ED_HELP_SCREEN = LEX_BUFFER ; borrowed only while help is open, before submission
-ED_HELP_COLORS = ED_HELP_SCREEN+160
+ED_HELP_SCREEN = LEX_BUFFER ; INPUT staging borrows this only before allocation
 .macro EDITOR_CALL target
  jsr bank_call
  .byte BANK_EDITOR,7

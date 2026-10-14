@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "77171be48e320e56319097fefe274ae86b2a296554f79dd63540edc703a6f593",
+  "rom_sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -50,8 +50,8 @@
         40960
       ],
       "role": "split screen editor; remaining space reserved for BASIC PRG conversion",
-      "used_bytes": 3901,
-      "spare_bytes": 4291,
+      "used_bytes": 4828,
+      "spare_bytes": 3364,
       "reserved": false
     },
     {
@@ -125,7 +125,7 @@
   ],
   "screen_editor": {
     "bank": 3,
-    "rom_bytes": 3892,
+    "rom_bytes": 4819,
     "text_workspace": [
       2656,
       2816
@@ -133,6 +133,14 @@
     "state_workspace": [
       972,
       1024
+    ],
+    "view_workspace": [
+      3968,
+      4064
+    ],
+    "help_tail_workspace": [
+      4064,
+      4096
     ],
     "screen_rows": {
       "listing": [

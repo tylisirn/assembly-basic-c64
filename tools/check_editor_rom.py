@@ -75,9 +75,13 @@ def verify(rom_dir):
         m.command(source)
     assert m.memory.ram[0x3cc] == 1
     assert m.word(0x326) == m.labels['editor_output_gate']
+    assert m.memory.ram[0x400:0x402] == bytes((177, 176))
+    assert m.memory.ram[0x403] == 16  # PRINT remains in normal video
     m.keys(b'\r')
     assert bytes(m.memory.ram[0xa60:0xa6b]) == b'10 PRINT 77'
-    m.keys(b'\x85 \x14' + b'9\r')
+    m.keys(b'\x85')
+    assert m.memory.ram[0x400+4*40] == 31  # PETSCII 95's screen glyph
+    m.keys(b' \x14' + b'9\r')
     m.keys(b'PRINT 123\r')
     assert b' 123 ' in m.output
     m.keys(b'INPUT A$:PRINT A$\r')
@@ -94,8 +98,24 @@ def verify(rom_dir):
     assert m.word(0x324) == 0xf157
     assert b' 79 ' in m.output
     assert m.memory.bank == 0
+    # Scroll mixed-width source in both directions with the real keyboard API,
+    # then compare the retained screen with a newly opened viewport.
+    m.command('NEW')
+    for number in range(10, 311, 10):
+        width = 50 if number % 30 == 0 else 5
+        m.command(f'{number} REM '+ 'X'*width)
+    m.command('BASIC')
+    colors = bytes(m.memory.ram[0xd800:0xdb20])
+    m.keys(b'\x11'*19+b'\x91'*15)
+    screen = bytes(m.memory.ram[0x400:0x720])
+    assert bytes(m.memory.ram[0xd800:0xdb20]) == colors
+    m.keys(b'\x88')
+    m.command('BASIC')
+    assert bytes(m.memory.ram[0x400:0x720]) == screen
+    m.keys(b'\x88')
     print('Stock 901227-03 KERNAL: RESTOR/CINT, GETIN, CHRIN, CHROUT, '
-          'F1, editing, PRINT, INPUT, error retention and RUN/exit passed.')
+          'F1/95 glyph, number cursor, scrolling, editing, PRINT, INPUT, '
+          'error retention and RUN/exit passed.')
     return {'kernal': '901227-03', 'passed': True,
             'rom_sha256': hashlib.sha256(m.memory.rom).hexdigest(),
             'kernal_sha256': hashlib.sha256(m.memory.kernal).hexdigest(),

@@ -1,7 +1,7 @@
 {
   "kernal": "901227-03",
   "passed": true,
-  "rom_sha256": "77171be48e320e56319097fefe274ae86b2a296554f79dd63540edc703a6f593",
+  "rom_sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03",
   "kernal_sha256": "83c60d47047d7beab8e5b7bf6f67f80daa088b7a6a27de0d7e016f6484042721",
   "environment": "py65; actual KERNAL editor/I/O instructions; injected keyboard bytes and synthetic raster; no VIC/IEC timing"
 }

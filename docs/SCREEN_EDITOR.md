@@ -11,7 +11,7 @@ BASIC line number and first displayed line number survive closing and reopening.
 | Cursor up/left | Previous BASIC line | Move text cursor |
 | Cursor down/right | Next BASIC line | Move text cursor within the pane |
 | Return | Copy selected source into the pane, cursor at its end | Submit current draft |
-| Left-arrow key, left of 1 | Focus the edit pane | Discard the draft and focus the listing |
+| `←` (PETSCII 95), left of 1 | Focus the edit pane | Discard the draft and focus the listing |
 | Shift-DEL (INS) | — | Cycle INSERT, OVERWRITE, LITERAL |
 | DEL | — | Delete the preceding character |
 | HOME | — | Move to the start of the draft |
@@ -20,7 +20,18 @@ BASIC line number and first displayed line number survive closing and reopening.
 
 Wrapped source continues after the line-number column. Moving the selection
 past the listing frame advances or backs up the viewport by five BASIC lines,
-clamped at the program's ends. Source changes refresh the listing. Numeric
+clamped at the program's ends. Only the selected line number is highlighted;
+source text and continuation rows remain in normal video. Moving the cursor or
+switching focus updates just the number cells, without detokenizing the listing.
+
+Scrolling shifts the overlapping character rows in place and renders only the
+newly exposed rows. A clipped line at the bottom resumes in those new rows;
+wrapped lines determine the physical row count of each five-BASIC-line shift.
+Listing color RAM is initialized on entry and is never shifted or rewritten
+during navigation or source updates. When no rows overlap, the new viewport is
+rendered normally. Commands that leave source alone skip the listing refresh.
+Source changes compare displayed characters and write only cells that differ,
+including after identical edits or changes outside the viewport. Numeric
 bookmarks are resolved against the current program, including after NEW, LOAD,
 and CLEAN, so the editor never retains a pointer into freed source.
 
@@ -42,7 +53,7 @@ INSERT pushes subsequent characters right and uses the normal reverse cursor.
 OVERWRITE replaces the character at the cursor and displays it in reverse black.
 LITERAL inserts PETSCII control bytes as visible quoted-style glyphs and shows a
 cyan reverse L cursor. In LITERAL, cursor and HOME control codes become literal
-characters. Return, DEL, INS, F1, F7, and the left-arrow focus key retain their
+characters. Return, DEL, INS, F1, F7, and the `←` (PETSCII 95) focus key retain their
 editor functions. Other PETSCII control bytes are ignored while typing in INSERT
 or OVERWRITE, including inside quotes.
 
@@ -57,8 +68,11 @@ The common-RAM CHROUT hook preserves registers, flags and user zero-page
 pointers. Hooks are restored on exit. Editor text occupies `$0A60–$0AFF`, and
 persistent state occupies `$03CC–$03FF`, outside the program arena and compiler,
 collector, and runtime scratch. `$FB–$FE` are borrowed as screen pointers while
-editing. Help temporarily borrows inactive lexer/expression scratch and restores
-the pane before resuming.
+editing. The row map and scroll work occupy `$0F80–$0FDF`, the unused upper
+half of the existing 32-entry expression-stack page. Help saves the 800 listing
+characters in inactive TOKENS, LEX_BUFFER and BRIDGE buffers plus `$0FE0–$0FFF`;
+it restores those characters without reformatting the program or touching color
+RAM. The draft, INPUT command backup and frozen control stack remain intact.
 
 Build and run the full suite with `python3 tools/build.py` and
 `python3 tools/test.py`. Optional validation with a user-supplied stock KERNAL
@@ -72,3 +86,10 @@ python3 tools/check_editor_rom.py --rom-dir /path/to/VICE/C64 \
 This runs actual 901227-03 RESTOR/CINT/GETIN/CHRIN/CHROUT instructions in py65,
 with injected keyboard bytes and synthetic raster registers. It is a software
 integration check, not cycle-accurate VIC/IEC or physical-machine acceptance.
+
+On a deterministic 30-line workload, moving between visible lines now uses four
+character writes and no color writes, compared with 1,042 of each previously.
+Five-line scrolling retains 600 characters in place and writes only the exposed
+text. [Recorded instruction/write measurements](editor-scroll-measurements.json)
+compare against commit `bac143f`; these are software measurements, not hardware
+timing claims.
