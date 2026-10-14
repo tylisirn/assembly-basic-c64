@@ -1,0 +1,1 @@
+﻿10 print chr$(205 + (abs(rnd(1)) >> 14));:goto 10
