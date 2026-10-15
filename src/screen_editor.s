@@ -82,6 +82,7 @@ editor_open:
  sta $cf
  sta ED_FOCUS
  sta ED_MODE
+ sta ED_LITERAL
  sta ED_HELP
  sta ED_SUBMITTED
  sta ED_CURSOR_ON
@@ -141,13 +142,16 @@ editor_finish:
  lda #0
  sta ED_INPUT_READY
  jsr editor_hide_cursor
+ jsr editor_select_submitted
  jsr editor_listing
  lda ED_TEMP
  beq @success
- lda #0
+ lda ED_DRAFT_START
  sta ED_START
+ lda #0
+ sta ED_PAINT_LEN
  jsr editor_draw_text
- lda #39
+ lda #0
  sta ED_CURSOR
  lda #1
  sta ED_FOCUS
@@ -160,6 +164,7 @@ editor_finish:
  bne @done
  lda #0
  sta ED_LEN
+ sta ED_PAINT_LEN
  sta ED_CURSOR
  lda ED_OUT
  sta ED_START
@@ -259,13 +264,17 @@ editor_wait:
  lda ED_CHAR
  cmp #13
  JEQ editor_submit
- cmp #$94 ; shift-DEL cycles the three writing modes
+ cmp #5 ; CTRL+2 toggles literal independently of insertion policy
+ bne @insert
+ lda ED_LITERAL
+ eor #1
+ sta ED_LITERAL
+ jmp @mode
+@insert:
+ cmp #$94
  bne @motion
- inc ED_MODE
  lda ED_MODE
- cmp #3
- bcc @mode
- lda #0
+ eor #1
  sta ED_MODE
 @mode:
  jsr editor_status
@@ -273,9 +282,8 @@ editor_wait:
 @motion:
  cmp #$14
  JEQ editor_delete
- ldx ED_MODE
- cpx #2
- beq @type
+ ldx ED_LITERAL
+ bne @type
  cmp #$9d
  JEQ editor_left
  cmp #$1d
@@ -290,9 +298,8 @@ editor_wait:
  sta ED_CURSOR
  jmp editor_read
 @printable:
- lda ED_MODE
- cmp #2
- beq @type
+ lda ED_LITERAL
+ bne @type
  lda ED_CHAR
  cmp #32
  bcc @ignore
@@ -319,6 +326,10 @@ editor_wait:
  rts
 
 editor_submit:
+ lda ED_START
+ sta ED_DRAFT_START
+ lda #$ff
+ sta ED_AFFECTED+1
  lda ED_LEN
  sta INPUT_LEN
  ldx #0
@@ -373,41 +384,173 @@ editor_submit:
  rts
 
 editor_left:
- lda ED_CURSOR
+ jsr editor_absolute
  beq @done
- dec ED_CURSOR
+ sec
+ sbc #1
+ jsr editor_seek
 @done:
  jmp editor_read
 editor_right:
- lda ED_CURSOR
- clc
- adc ED_START
+ jsr editor_absolute
  cmp #159
  bcs @done
- inc ED_CURSOR
+ clc
+ adc #1
+ jsr editor_seek
 @done:
  jmp editor_read
 editor_up:
- lda ED_CURSOR
+ jsr editor_absolute
  cmp #40
  bcc @done
  sec
  sbc #40
- sta ED_CURSOR
+ jsr editor_seek
 @done:
  jmp editor_read
 editor_down:
+ jsr editor_absolute
+ cmp #120
+ bcs @done
+ clc
+ adc #40
+ jsr editor_seek
+@done:
+ jmp editor_read
+
+editor_absolute:
  lda ED_CURSOR
  clc
  adc ED_START
- cmp #120
- bcs @done
- lda ED_CURSOR
- clc
- adc #40
- sta ED_CURSOR
+ rts
+editor_row_index:
+ ldx #0
+@row:
+ cmp #40
+ bcc @done
+ sec
+ sbc #40
+ inx
+ bne @row
 @done:
- jmp editor_read
+ rts
+
+; Select the visible logical screen line containing absolute pane cell A.
+; Continuation rows belong to their first row; hard newlines remain separate.
+editor_seek:
+ sta ED_TARGET
+ cmp ED_START
+ bcc @history
+ sec
+ sbc ED_START
+ cmp ED_LEN
+ bcc @current
+ jsr editor_row_index
+ stx ED_END
+ lda ED_LEN
+ beq :+
+ sec
+ sbc #1
+:
+ jsr editor_row_index
+ cpx ED_END
+ bcc @history
+@current:
+ lda ED_TARGET
+ sec
+ sbc ED_START
+ sta ED_CURSOR
+ rts
+@history:
+ lda ED_TARGET
+ jsr editor_row_index
+@first:
+ lda ED_LINKS,x
+ beq @found
+ dex
+ bpl @first
+@found:
+ lda editor_pane_rows,x
+ sta ED_FIRST
+ inx
+@last:
+ cpx #4
+ beq @end
+ lda ED_LINKS,x
+ beq @end
+ inx
+ bne @last
+@end:
+ lda editor_pane_rows,x
+ sta ED_END
+ ldx ED_FIRST
+ ldy #0
+@copy:
+ lda $0748,x
+ ; Invert the quoted-style control glyphs as well as normal screen codes.
+ cmp #$80
+ bcc @normal
+ cmp #$a0
+ bcc @control
+ cmp #$c0
+ bcc @reverse
+ cmp #$e0
+ bcc @high_control
+@normal:
+ cmp #$20
+ bcc @letter
+ cmp #$40
+ bcc @store
+ cmp #$60
+ bcc @graphic
+ and #$7f
+ ora #$80
+ bne @store
+@letter:
+ ora #$40
+ bne @store
+@graphic:
+ cmp #$5e
+ bne :+
+ lda #$ff
+ bne @store
+:
+ ora #$80
+ bne @store
+@control:
+ and #$1f
+ jmp @store
+@reverse:
+ and #$7f
+ bne @store
+@high_control:
+ and #$1f
+ ora #$80
+@store:
+ sta ED_TEXT,y
+ iny
+ inx
+ cpx ED_END
+ bcc @copy
+@trim:
+ cpy #0
+ beq @empty
+ dey
+ lda ED_TEXT,y
+ cmp #' '
+ beq @trim
+ iny
+ bne @length
+@empty:
+ ldy #0
+@length:
+ sty ED_LEN
+ sty ED_PAINT_LEN
+ lda ED_FIRST
+ sta ED_START
+ jmp @current
+editor_pane_rows: .byte 0,40,80,120,160
 
 editor_delete:
  lda ED_CURSOR
@@ -503,7 +646,14 @@ editor_clear_pane:
  sta ED_CURSOR
  sta ED_START
  sta ED_OUT
+ sta ED_PAINT_LEN
 editor_erase_pane:
+ lda #0
+ ldx #3
+@links:
+ sta ED_LINKS,x
+ dex
+ bpl @links
  lda #<$0748
  sta ED_PTR
  lda #>$0748
@@ -524,16 +674,57 @@ editor_erase_pane:
  rts
 
 editor_draw_text:
- ; Retain earlier direct output above ED_START, repaint the current draft below.
+ ; Clear only this draft's old extent, retaining other visible screen lines.
+ ldy ED_PAINT_LEN
+ lda ED_LEN
+ cmp ED_PAINT_LEN
+ bcc :+
+ tay
+:
+ sty ED_END
+ lda ED_START
+ jsr editor_row_index
+ lda #0
+ sta ED_LINKS,x
+ lda ED_END
+ beq @extent
+ sec
+ sbc #1
+ clc
+ adc ED_START
+ jsr editor_row_index
+ stx ED_FIRST
+ lda ED_START
+ jsr editor_row_index
+ lda #0
+@unlink:
+ sta ED_LINKS,x
+ cpx ED_FIRST
+ beq @extent
+ inx
+ bne @unlink
+@extent:
+ ldy ED_END
  ldx ED_START
 @clear:
+ cpy #0
+ beq @paint
+ cpx #160
+ bcs @paint
  lda #' '
  sta $0748,x
  lda #14
  sta $db48,x
  inx
- cpx #160
- bcc @clear
+ dey
+ jmp @clear
+@paint:
+ lda ED_LEN
+ sta ED_PAINT_LEN
+ lda ED_START
+ jsr editor_row_index
+ lda #0
+ sta ED_LINKS,x
  ldx #0
 @char:
  cpx ED_LEN
@@ -548,6 +739,17 @@ editor_draw_text:
  sta $0748,y
  lda #14
  sta $db48,y
+ tya
+ cmp ED_START
+ beq :+
+ jsr editor_row_index
+ cpx #0
+ beq :+
+ cmp #0
+ bne :+
+ lda #1
+ sta ED_LINKS,x
+:
  pla
  tax
  inx
@@ -591,17 +793,19 @@ editor_show_cursor:
  lda ED_UNDER
  ora #$80
 :
- cpx #2
- bne @normal
+ ldx ED_LITERAL
+ beq @normal
  lda #$8c ; reverse L in cyan
 @normal:
  sta (ED_PTR),y
  lda #14
- cpx #0
+ ldx ED_LITERAL
+ bne @literal_color
+ ldx ED_MODE
  beq @color
  lda #0
- cpx #1
  beq @color
+@literal_color:
  lda #3
 @color:
  sta (ED_CPTR),y
@@ -702,11 +906,11 @@ editor_output_impl:
  cmp #13
  JEQ editor_output_cr
  cmp #147
- beq @clear
+ JEQ @clear
  cmp #$13
- beq @home
+ JEQ @home
  cmp #$14
- beq @delete
+ JEQ @delete
  cmp #$1d
  JEQ @right
  cmp #$9d
@@ -746,10 +950,17 @@ editor_output_impl:
  inc ED_OUT
  lda ED_OUT
  cmp #160
- bcc @done
+ bcc @wrap
  jsr editor_scroll_pane
  lda #120
  sta ED_OUT
+@wrap:
+ lda ED_OUT
+ jsr editor_row_index
+ cmp #0
+ bne @done
+ lda #1
+ sta ED_LINKS,x
 @done:
  rts
 @clear:
@@ -820,8 +1031,25 @@ editor_output_cr:
  lda #120
 @set:
  sta ED_OUT
+ jsr editor_row_index
+ lda #0
+ sta ED_LINKS,x
  rts
 editor_scroll_pane:
+ lda ED_LINKS+2
+ sta ED_LINKS+1
+ lda ED_LINKS+3
+ sta ED_LINKS+2
+ lda #0
+ sta ED_LINKS
+ sta ED_LINKS+3
+ lda ED_DRAFT_START
+ sec
+ sbc #40
+ bcs :+
+ lda #0
+:
+ sta ED_DRAFT_START
  ldx #0
 @move:
  lda $0770,x
@@ -918,12 +1146,33 @@ editor_listing_char:
 @glyph:
  lda ED_CODE
  jsr editor_screen_code
+ ; Keep the number cursor visible during differential source refreshes too.
+ ldx ED_ROUTE
+ cpx #1
+ bne @compare
+ ldx ED_INDENT
+ bne @compare
+ ldx ED_ANCHOR
+ cpx ED_SELECTED_ANCHOR
+ bne @compare
+ ldx ED_ANCHOR+1
+ cpx ED_SELECTED_ANCHOR+1
+ bne @compare
+ cmp #'0'
+ bcc @compare
+ cmp #'9'+1
+ bcs @compare
+ ora #$80
+@compare:
  ldy ED_COL
  cmp (ED_PTR),y
  beq @advance
  sta (ED_PTR),y
 @advance:
  inc ED_COL
+ lda ED_ROUTE
+ cmp #3
+ beq @wrap ; help has hard newlines and uses the full screen width
  lda ED_INDENT
  bne @wrap
  lda ED_CODE
@@ -1014,6 +1263,44 @@ editor_cached_selected:
  lda ED_SELECTED_ANCHOR+1
  sta ED_ANCHOR+1
  rts
+editor_select_submitted:
+ lda ED_SUBMITTED
+ cmp #1
+ bne @done
+ lda ED_AFFECTED+1
+ cmp #$ff
+ beq @done
+ lda ED_AFFECTED
+ cmp ED_SELECTED
+ bne @select
+ lda ED_AFFECTED+1
+ cmp ED_SELECTED+1
+ beq @done
+@select:
+ jsr editor_cursor_off
+ lda ED_AFFECTED
+ sta ED_SELECTED
+ lda ED_AFFECTED+1
+ sta ED_SELECTED+1
+ lda GENERATION
+ cmp ED_VIEW_GEN
+ bne @invalidate
+ lda GENERATION+1
+ cmp ED_VIEW_GEN+1
+ bne @invalidate
+ jsr editor_find_selected
+ jsr editor_is_end
+ beq @invalidate
+ jsr editor_move_selection
+ jsr editor_locate_selection
+ cmp #$ff
+ bne @done
+@invalidate:
+ lda #0
+ sta ED_VIEW_VALID
+@done:
+ rts
+
 editor_listing:
  ; Source commands that leave the program alone must not redraw the viewport.
  lda ED_VIEW_VALID
@@ -1026,10 +1313,15 @@ editor_listing:
  bne @changed
  jmp editor_line_cursor
 @changed:
- jsr editor_cursor_off
  ; Resolve numeric bookmarks only when the source graph may have changed.
  jsr editor_find_selected
  jsr editor_is_end
+ bne @selected
+ ; Deleting the final line selects its predecessor, if one survives.
+ COMMAND_CALL editor_previous
+ sta ED_ANCHOR
+ stx ED_ANCHOR+1
+ ora ED_ANCHOR+1
  bne @selected
  lda PROGRAM_HEAD
  sta ED_ANCHOR
@@ -1233,11 +1525,6 @@ editor_cursor_off:
  lda #0
  beq editor_cursor_mask
 editor_line_cursor:
- lda ED_FOCUS
- beq @on
- lda #0
- beq editor_cursor_mask
-@on:
  lda #$80
 editor_cursor_mask:
  sta ED_HIGHLIGHT_MASK
@@ -1680,6 +1967,18 @@ editor_status:
  iny
  bne @mode
 @keys:
+ lda ED_LITERAL
+ beq @shortcuts
+ ldx #0
+@literal:
+ lda editor_literal_text,x
+ beq @shortcuts
+ jsr editor_screen_code
+ ora #$80
+ sta $072c,x
+ inx
+ bne @literal
+@shortcuts:
  ldx #0
 @label:
  lda editor_key_label,x
@@ -1693,8 +1992,8 @@ editor_status:
 editor_insert_text: .byte "INSERT",0
 editor_overwrite_text: .byte "OVERWRITE",0
 editor_literal_text: .byte "LITERAL",0
-editor_modes_lo: .byte <editor_insert_text,<editor_overwrite_text,<editor_literal_text
-editor_modes_hi: .byte >editor_insert_text,>editor_overwrite_text,>editor_literal_text
+editor_modes_lo: .byte <editor_insert_text,<editor_overwrite_text
+editor_modes_hi: .byte >editor_insert_text,>editor_overwrite_text
 editor_key_label: .byte "F1 HELP F7 QUIT "
 
 editor_pane_message:
@@ -1807,7 +2106,8 @@ editor_help_text:
  .byte "CURSOR KEYS  SELECT / MOVE TEXT",13
  .byte "RETURN       COPY LINE / SUBMIT",13
  .byte 95,"            SWITCH LIST / EDIT",13
- .byte "SHIFT-DEL    INSERT/OVERWRITE/LITERAL",13
+ .byte "SHIFT-DEL    INSERT / OVERWRITE",13
+ .byte "CTRL+2       TOGGLE LITERAL",13
  .byte "DEL          DELETE PREVIOUS CHARACTER",13
  .byte "HOME         START OF EDIT LINE",13
  .byte "F1           HELP",13
@@ -1815,10 +2115,10 @@ editor_help_text:
  .byte "RUN          EXIT AND RUN PROGRAM",13,13
  .byte "ENTER A NUMBERED LINE TO ADD OR CHANGE.",13
  .byte "A LINE NUMBER ALONE DELETES THAT LINE.",13
- .byte "DIRECT COMMANDS PRINT IN THE LOWER PANE.",13
+ .byte "DIRECT COMMANDS USE THE LOWER PANE.",13
  .byte 95," TO LIST DISCARDS THE DRAFT.",13
  .byte "LITERAL TYPES CONTROL CODES AS GLYPHS.",13
- .byte "BASIC REOPENS AT YOUR LAST POSITION.",13,13
+ .byte "BASIC REOPENS AT YOUR LAST POSITION.",13
  .byte "PRESS ANY KEY TO RETURN",0
 editor_rows_lo:
  .repeat 20, I
@@ -1853,7 +2153,10 @@ editor_chrin:
  sta ED_SAVE_CURSOR
  lda ED_START
  sta ED_SAVE_START
+ lda ED_PAINT_LEN
+ sta ED_SAVE_PAINT
  lda #0
+ sta ED_PAINT_LEN
  sta ED_LEN
  sta ED_CURSOR
  lda ED_OUT
@@ -1895,13 +2198,17 @@ editor_input_wait:
 @enter:
  cmp #13
  JEQ @complete
+ cmp #5
+ bne @insert
+ lda ED_LITERAL
+ eor #1
+ sta ED_LITERAL
+ jmp @status
+@insert:
  cmp #$94
  bne @delete
- inc ED_MODE
  lda ED_MODE
- cmp #3
- bcc @status
- lda #0
+ eor #1
  sta ED_MODE
 @status:
  jsr editor_status
@@ -1926,9 +2233,8 @@ editor_input_wait:
  jsr editor_draw_text
  jmp @again
 @literal:
- ldx ED_MODE
- cpx #2
- beq @type
+ ldx ED_LITERAL
+ bne @type
  cmp #$9d
  beq @left
  cmp #$1d
@@ -1955,36 +2261,35 @@ editor_input_wait:
  sta ED_CURSOR
  beq @again
 @left:
- lda ED_CURSOR
+ jsr editor_absolute
  beq @again
- dec ED_CURSOR
+ sec
+ sbc #1
+ jsr editor_seek
  jmp @again
 @right:
- lda ED_CURSOR
- clc
- adc ED_START
+ jsr editor_absolute
  cmp #159
  bcs @again
- inc ED_CURSOR
+ clc
+ adc #1
+ jsr editor_seek
  jmp @again
 @up:
- lda ED_CURSOR
+ jsr editor_absolute
  cmp #40
  bcc @again
  sec
  sbc #40
- sta ED_CURSOR
+ jsr editor_seek
  jmp @again
 @down:
- lda ED_CURSOR
- clc
- adc ED_START
+ jsr editor_absolute
  cmp #120
  bcs @again
- lda ED_CURSOR
  clc
  adc #40
- sta ED_CURSOR
+ jsr editor_seek
  jmp @again
 @complete:
  lda ED_LEN
@@ -2036,6 +2341,8 @@ editor_input_wait:
  sta ED_CURSOR
  lda ED_SAVE_START
  sta ED_START
+ lda ED_SAVE_PAINT
+ sta ED_PAINT_LEN
  lda #0
  sta ED_INPUT_POS
  lda #1

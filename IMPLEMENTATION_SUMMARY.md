@@ -1,5 +1,9 @@
 # Assembly BASIC implementation summary
 
+## Revision 0.14 — pane navigation and independent literal entry
+
+Errors return to the start of the failed command, including after pane scrolling. Cursor keys revisit earlier visible commands and output, with wrapped rows kept together for editing and submission. Numbered entry selects the affected BASIC line and scrolls it into view; the number highlight remains visible while editing. INS switches INSERT/OVERWRITE, and CTRL+2 toggles literal entry independently in both command editing and keyboard INPUT. Help and status show both settings. The implementation uses existing editor RAM and leaves runtime ABI 7 and the user arena unchanged.
+
 ## Revision 0.13 — number cursor and incremental listing updates
 
 The listing cursor highlights only line-number digits. A cached row map makes visible cursor moves and focus switches update just the number cells. Scrolling shifts existing character rows, accounts for wrapped BASIC lines, and renders newly exposed rows while preserving a clipped line's continuation. Listing color RAM is left in place. Source refreshes write only differing characters; unchanged commands, identical edits and changes outside the viewport leave listing text alone.

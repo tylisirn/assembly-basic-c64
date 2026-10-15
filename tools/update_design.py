@@ -75,30 +75,32 @@ def synchronize():
                 if old.tag!=f'{{{W}}}sectPr':body.remove(old)
             break
     replacements={
+        'Design specification  |  Version 0.13  |  14 October 2026':
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.12  |  14 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.11  |  13 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.9  |  13 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'ABI 5':'ABI 7',
         'ABI 6':'ABI 7',
-        'Version 0.10':'Version 0.13',
+        'Version 0.10':'Version 0.14',
         '16.8 fixed-point':'16.16 fixed-point',
         'Design specification  |  Version 0.8  |  12 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.7  |  12 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.6  |  10 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'ABI 4':'ABI 7',
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         'Design specification  |  Version 0.5  |  9 October 2026':
-        'Design specification  |  Version 0.13  |  14 October 2026',
+        'Design specification  |  Version 0.14  |  15 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.13', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
+        'Version 0.4':'Version 0.14', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
         'runtime ABI 3':'runtime ABI 7', 'ABI 3':'ABI 7',
         'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
         'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
@@ -163,7 +165,7 @@ def synchronize():
         'declarations. Identical bounds are idempotent; occupied/overlapping bounds fail safely. '
         'Removing source or a failed import may leave a reservation until NEW. $C000 is not implicit '
         'scratch RAM, and stock BASIC memory-top POKEs at 55/56 do not configure this allocator.')
-    rewrites['READY runs the editor/compiler in the command map'] += (' Direct BASIC opens the bank-3 split editor: 20 listing rows, one status row and four edit/output rows. F1 shows help; F7/QUIT close and clear, and RUN closes before execution. Bookmarks retain selected and top BASIC line numbers. Return copies the selection or submits a draft; ← (PETSCII 95) changes focus and discards the draft on return to the list. INS cycles insert, overwrite and literal control-glyph modes. Errors preserve drafts and place the cursor at the pane top right, with diagnostics in the status bar. Keyboard INPUT, output and screen-clear controls stay within the pane, with no READY prompt. The visible draft is limited to 160 bytes; overlong source copying is rejected without truncation. KERNAL input/output vectors are restored on exit. Highlight only the line-number digits. Visible cursor moves use a cached row map without reformatting source. Scroll by shifting overlapping character rows and render only exposed rows, measuring wrapped line heights; leave listing color RAM in place. Skip unchanged-source refreshes and write only differing screen codes after source changes. Help saves/restores listing characters using inactive buffers. Row work at $0F80-$0FDF and the snapshot tail at $0FE0-$0FFF share the previously unused upper half of the 32-entry expression-stack page.')
+    rewrites['READY runs the editor/compiler in the command map'] += (' Direct BASIC opens the bank-3 split editor: 20 listing rows, one status row and four edit/output rows. F1 shows help; F7/QUIT close and clear, and RUN closes before execution. Bookmarks retain selected and top BASIC line numbers. Return copies the selection or submits a draft; ← (PETSCII 95) changes focus and discards the draft on return to the list. INS toggles insert/overwrite; CTRL+2 independently toggles literal control entry. Errors preserve drafts and return the cursor to the failed command start, adjusted for output scrolling, with diagnostics in the status bar. Cursor keys can revisit earlier visible pane lines; wrapped rows remain one logical line. Numbered submissions select the affected source line and bring it into view; the line-number highlight remains visible while editing. Keyboard INPUT, output and screen-clear controls stay within the pane, with no READY prompt. The visible draft is limited to 160 bytes; overlong source copying is rejected without truncation. KERNAL input/output vectors are restored on exit. Highlight only the line-number digits. Visible cursor moves use a cached row map without reformatting source. Scroll by shifting overlapping character rows and render only exposed rows, measuring wrapped line heights; leave listing color RAM in place. Skip unchanged-source refreshes and write only differing screen codes after source changes. Help saves/restores listing characters using inactive buffers. Row work at $0F80-$0FDF and the snapshot tail at $0FE0-$0FFF share the previously unused upper half of the 32-entry expression-stack page.')
     # Revision 0.6 changes the hardware/load contract while preserving source semantics.
     image=('Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident '
            'compiler for $1400-$2BFF (runtime ABI 7). Store raw load images in Magic Desk banks '
@@ -390,9 +392,9 @@ def synchronize():
             set_cell(cells[-1],f"Firmware-owned common RAM: {report['service_gateway_used_bytes']} bytes of banked-service/output entry stubs, copied after KERNAL initialization (RAMTAS clears page 3); {204-report['service_gateway_used_bytes']} bytes hold editor state at $03CC-$03FF. Tape transport stays unsupported.")
         elif address=='$8000-$BFFF':
             set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
-    marker='Appendix B — implementation status, revision 0.13'
+    marker='Appendix B — implementation status, revision 0.14'
     additions=[paragraph(marker,True),paragraph(
-        'This appendix records the development implementation on 14 October 2026. '
+        'This appendix records the development implementation on 15 October 2026. '
         'The full version-one contract is not yet complete. Original release '
         'requirements above remain the target unless an architectural choice is '
         'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.')]
@@ -435,8 +437,8 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='13'
-                    if n.tag.endswith('}modified'):n.text='2026-10-14T00:00:00Z'
+                    if n.tag.endswith('}revision'):n.text='14'
+                    if n.tag.endswith('}modified'):n.text='2026-10-15T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
     with zipfile.ZipFile(temporary) as z:
@@ -448,12 +450,12 @@ def synchronize():
     text=export_text(root)
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.13','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.14','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.13 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.14 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()

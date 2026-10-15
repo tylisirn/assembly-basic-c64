@@ -293,8 +293,17 @@ ED_MOVE_ROW = ED_RETAIN+1
 ED_LINE_START = ED_MOVE_ROW+1
 ED_SCAN_ROW = ED_LINE_START+1
 ED_HIGHLIGHT_MASK = ED_SCAN_ROW+1
+ED_LITERAL = ED_HIGHLIGHT_MASK+1
+ED_PAINT_LEN = ED_LITERAL+1
+ED_DRAFT_START = ED_PAINT_LEN+1
+ED_AFFECTED = ED_DRAFT_START+1 ; word; $ff high means no valid numbered submission
+ED_LINKS = ED_AFFECTED+2 ; four row continuation flags
+ED_TARGET = ED_LINKS+4
+ED_FIRST = ED_TARGET+1
+ED_END = ED_FIRST+1
+ED_SAVE_PAINT = ED_END+1
 ED_HELP_TAIL = EXPR_STACK+224 ; final 32 bytes of an 800-byte listing snapshot
-.assert ED_HIGHLIGHT_MASK < ED_HELP_TAIL, error, "Editor row workspace overflow"
+.assert ED_SAVE_PAINT < ED_HELP_TAIL, error, "Editor row workspace overflow"
 .assert ED_HELP_TAIL+32 = CONTROL_STACK, error, "Editor overlaps control stack"
 ED_PTR = $fb ; KERNAL's free user zero-page pointers; no language scratch borrowed
 ED_CPTR = $fd

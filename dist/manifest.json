@@ -1,42 +1,46 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.13",
+  "design_revision": "0.14",
   "runtime_abi": 7,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 133,
+  "validated_tests": 140,
   "artifacts": {
     "abi.json": {
       "bytes": 9019,
-      "sha256": "605d944513293c0f3d6e03f64501a0ea06bdb5730ed7d547a68075ba855aa518"
+      "sha256": "a4b653fe11d7259ef6a97e6deb8ddfe89bfefce278dc9975e58bcd64a2f37f57"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "b3f7d89e54e3cf9a18dd6cc2b12667133a67cfb9cbe9b207f02f7806ec355f03"
+      "sha256": "a563598c805897e26eb5becec19d59d191e8d02b8112aa92ea08d48399fe3007"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "87fc52cf5e4d9f00644a628094b05a7119242a4dc0e5a2a0686e00b9b1af16eb"
+      "sha256": "a194e2f172f34c4ee2cf328b9852d9bb667418812fa67c1db4728c4aef2aaf41"
     },
     "editor-rom-report.json": {
       "bytes": 346,
-      "sha256": "941278312c85b4f4a0cdd71b555ef09dd0588aba064175043d626ba074d5db09"
+      "sha256": "e844dbc943cee6ab5b197018c1c1569abbc946310b415249079f6b524fb60b18"
     },
     "examples/hello.ab": {
       "bytes": 62,
-      "sha256": "f846e3cf938d7ff57912658cf838afacd9695dc1521b332640606bc80b07309a"
+      "sha256": "530633a2507621ac3cbad89f3a292f56a06c2cab06a7d86fdd1a233a83e2c766"
     },
     "examples/integer_arithmetic.ab": {
       "bytes": 355,
       "sha256": "1e25ff3c3cdd56ee0db3f508e78d51985baf1e2159d4c25e596a7a8679a1b679"
     },
+    "examples/maze.ab": {
+      "bytes": 41,
+      "sha256": "32f1b595877ac4ccdca61d1146326ffeb7fc1e0bab8c93252ea1ec8856e94788"
+    },
     "examples/revision05.ab": {
       "bytes": 163,
-      "sha256": "12ab4a933a76d1924823022ae1e3585b7b5f0df36101bacd068c356b4fc65d8a"
+      "sha256": "c87289f3b69be15f639d7ceb735f180988d33e2c13983f2039a4f265dd58688a"
     },
     "examples/strings_arrays.ab": {
-      "bytes": 175,
-      "sha256": "7e911508a918dd4b95220abec8aea6d8a9a1eeaaad00efdb5f850e084b94b081"
+      "bytes": 182,
+      "sha256": "2cde06f159caf328511ce19a5442a6b3644747a3e05cc9c716cafe33f9b51d75"
     },
     "examples/unsigned.ab": {
       "bytes": 322,
@@ -52,11 +56,11 @@
     },
     "size-report.json": {
       "bytes": 3724,
-      "sha256": "d235f7f7f328f8e1f7138cd14543af5d5bda7c3d24dba5c9ddb8fb79a91bc0b2"
+      "sha256": "8b0e81d24a6d933c9544fac43463c4be03c90fe5050e2c9b75d19d9f87e28ab1"
     },
     "test-report.json": {
       "bytes": 266,
-      "sha256": "e328cd4d48306efde63da799b2ec2e7f8630eacd3605ea45f1856a3e587e8061"
+      "sha256": "81e4bf1634a59333c9c8d328036234c3deba7ca2574f0e9d308936dcdbc46d7b"
     }
   }
 }

@@ -12,7 +12,8 @@ BASIC line number and first displayed line number survive closing and reopening.
 | Cursor down/right | Next BASIC line | Move text cursor within the pane |
 | Return | Copy selected source into the pane, cursor at its end | Submit current draft |
 | `←` (PETSCII 95), left of 1 | Focus the edit pane | Discard the draft and focus the listing |
-| Shift-DEL (INS) | — | Cycle INSERT, OVERWRITE, LITERAL |
+| Shift-DEL (INS) | — | Toggle INSERT / OVERWRITE |
+| CTRL+2 | — | Toggle literal control entry |
 | DEL | — | Delete the preceding character |
 | HOME | — | Move to the start of the draft |
 | F1 | Show help; any key returns | Show help; any key returns |
@@ -20,9 +21,10 @@ BASIC line number and first displayed line number survive closing and reopening.
 
 Wrapped source continues after the line-number column. Moving the selection
 past the listing frame advances or backs up the viewport by five BASIC lines,
-clamped at the program's ends. Only the selected line number is highlighted;
-source text and continuation rows remain in normal video. Moving the cursor or
-switching focus updates just the number cells, without detokenizing the listing.
+clamped at the program's ends. Only the selected line number is highlighted,
+even while editing; source text and continuation rows remain in normal video.
+Listing cursor moves update only number cells, and switching focus retains the
+highlight without detokenizing the listing.
 
 Scrolling shifts the overlapping character rows in place and renders only the
 newly exposed rows. A clipped line at the bottom resumes in those new rows;
@@ -31,31 +33,37 @@ Listing color RAM is initialized on entry and is never shifted or rewritten
 during navigation or source updates. When no rows overlap, the new viewport is
 rendered normally. Commands that leave source alone skip the listing refresh.
 Source changes compare displayed characters and write only cells that differ,
-including after identical edits or changes outside the viewport. Numeric
-bookmarks are resolved against the current program, including after NEW, LOAD,
+including after identical edits. Numbered submissions move the selection to the
+affected line and bring it into view; deletion selects the next surviving line,
+or the preceding line when deleting the last one. Numeric bookmarks are
+resolved against the current program, including after NEW, LOAD,
 and CLEAN, so the editor never retains a pointer into freed source.
 
 Numbered drafts add, replace, or delete program lines through the existing
 on-machine tokenizer/compiler. Successful numbered submissions clear the edit
 pane. A line number alone deletes that line. Failed submissions retain the draft,
-show the error in the status row, and position the text cursor at the top right
-of the edit pane. Recoverable compilation errors still retain malformed source
-in the program, matching ordinary direct entry. Correct the retained draft and
-submit it again.
+show the error in the status row, and position the text cursor at the start of
+the command that failed, accounting for any output scrolling. Recoverable
+compilation errors still retain malformed source in the program, matching
+ordinary direct entry. Correct the retained draft and submit it again.
 
 Commands such as `PRINT 123`, LIST, SAVE, LOAD, and INPUT use the edit pane.
 Output, wrapping, screen-clear controls, and scrolling stay within its four rows;
 there is no READY prompt there. Keyboard INPUT uses the bounded pane editor;
 file/device input and output continue through their original KERNAL vectors.
+Cursor keys can revisit earlier commands or output still visible in the pane.
+Wrapped rows remain one logical line; Return submits the logical line containing
+the cursor. Editing an earlier line retains the surrounding screen contents.
 Moving the cursor down from the last pane row does not scroll.
 
 INSERT pushes subsequent characters right and uses the normal reverse cursor.
 OVERWRITE replaces the character at the cursor and displays it in reverse black.
-LITERAL inserts PETSCII control bytes as visible quoted-style glyphs and shows a
-cyan reverse L cursor. In LITERAL, cursor and HOME control codes become literal
-characters. Return, DEL, INS, F1, F7, and the `←` (PETSCII 95) focus key retain their
-editor functions. Other PETSCII control bytes are ignored while typing in INSERT
-or OVERWRITE, including inside quotes.
+CTRL+2 toggles LITERAL independently of INSERT/OVERWRITE. The status bar shows
+both settings. LITERAL enters PETSCII control bytes as visible quoted-style
+glyphs and shows a cyan reverse L cursor. In LITERAL, cursor and HOME control codes become literal
+characters. Return, DEL, INS, CTRL+2, F1, F7, and the `←` (PETSCII 95) focus key
+retain their editor functions. Other PETSCII control bytes are ignored while
+literal entry is off, including inside quotes. Literal entry follows the current insert/overwrite policy.
 
 The visible draft can hold 160 PETSCII bytes, including its line number. A stored
 line whose canonical spelling exceeds that capacity remains listable and is
@@ -91,5 +99,5 @@ On a deterministic 30-line workload, moving between visible lines now uses four
 character writes and no color writes, compared with 1,042 of each previously.
 Five-line scrolling retains 600 characters in place and writes only the exposed
 text. [Recorded instruction/write measurements](editor-scroll-measurements.json)
-compare against commit `bac143f`; these are software measurements, not hardware
+were recorded for revision 0.13 against commit `bac143f`; these are software measurements, not hardware
 timing claims.

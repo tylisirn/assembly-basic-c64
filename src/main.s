@@ -212,6 +212,10 @@ submit_input:
  sta LINE_NO+1
  cmp #$fa
  bcs command_quantity
+ lda LINE_NO
+ sta ED_AFFECTED
+ lda LINE_NO+1
+ sta ED_AFFECTED+1
  jsr skip_spaces
  lda INPUT_POS
  cmp INPUT_LEN
@@ -361,7 +365,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.13",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.14",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data

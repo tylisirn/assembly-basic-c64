@@ -72,7 +72,9 @@ def package():
     (destination/'abi.json').write_text(json.dumps(abi,indent=2)+'\n')
     (destination/'examples').mkdir(exist_ok=True)
     for example in sorted((ROOT/'examples').glob('*.bas')):
-        data=dumps(*text_program(example.read_text(encoding='latin-1')))
+        source=example.read_bytes()
+        encoding='utf-8-sig' if source.startswith(b'\xef\xbb\xbf') else 'latin-1'
+        data=dumps(*text_program(source.decode(encoding)))
         (destination/'examples'/example.with_suffix('.ab').name).write_bytes(data)
     manifest={'status':'development; version-one release acceptance incomplete',
               'design_revision':sync['design_revision'],'runtime_abi':report['runtime_abi'],

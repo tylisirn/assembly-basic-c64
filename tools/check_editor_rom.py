@@ -84,6 +84,13 @@ def verify(rom_dir):
     m.keys(b' \x14' + b'9\r')
     m.keys(b'PRINT 123\r')
     assert b' 123 ' in m.output
+    m.keys(b'\x91\x91')
+    assert bytes(m.memory.ram[0xa60:0xa69]) == b'PRINT 123'
+    m.keys(b'__')
+    m.keys(b'AB\x9d\x94\x05\x93\x05')
+    assert bytes(m.memory.ram[0xa60:0xa62]) == b'A\x93'
+    assert m.memory.ram[0x3cc+2] == 1
+    m.keys(b'\x94__')
     m.keys(b'INPUT A$:PRINT A$\r')
     assert m.cpu.pc == m.labels['editor_input_wait']
     m.keys(b'HELLO\x85 \r')
@@ -91,7 +98,7 @@ def verify(rom_dir):
     m.keys(b'PRINT CHR$(147):PRINT 1/0\r')
     draft = b'PRINT CHR$(147):PRINT 1/0'
     assert bytes(m.memory.ram[0xa60:0xa60+len(draft)]) == draft
-    assert m.memory.ram[0x3cc+16] == 39
+    assert m.memory.ram[0x3cc+16] == 0
     m.keys(b'__RUN\r')
     assert m.memory.ram[0x3cc] == 0
     assert m.word(0x326) == 0xf1ca

@@ -149,34 +149,38 @@ class SplitEditorTests(unittest.TestCase):
         self.keys('\x94Z')
         self.assertEqual(self.draft(), b'ABXZD')
         self.assertEqual(m.memory.ram[0xdb48+4], 0)
-        self.keys('\x94\x93\x11')
-        self.assertEqual(self.draft(), b'ABXZ\x93\x11D')
+        self.keys('\x05\x93\x11')  # literal + overwrite replaces both cells
+        self.assertEqual(self.draft(), b'ABXZ\x93\x11')
         pos = m.memory.ram[ED+16]
         self.assertEqual(m.memory.ram[PANE+pos], 0x8c)
         self.assertEqual(m.memory.ram[0xdb48+pos], 3)
-        self.keys('\x94')
+        self.assertEqual(m.memory.ram[ED+2], 1)
+        self.keys('\x94\x93')  # INS changes writing policy without disabling literal
+        self.assertEqual(self.draft(), b'ABXZ\x93\x11\x93')
+        self.assertEqual(m.memory.ram[ED+2], 0)
+        self.keys('\x05')
         before = self.draft()
-        self.keys('\x93\x05\x12')
+        self.keys('\x93\x12')
         self.assertEqual(self.draft(), before)
         listing = self.screen(0x400, 840)
         self.keys('\x11'*10+'\x1d'*170)
-        self.assertEqual(m.memory.ram[ED+16], 159)
+        self.assertEqual(m.memory.ram[ED+16]+m.memory.ram[ED+17], 159)
         self.assertEqual(self.screen(0x400, 840), listing)
         self.keys('\x91'*10+'\x9d'*170)
         self.assertEqual(m.memory.ram[ED+16], 0)
 
-    def test_errors_retain_source_and_put_cursor_at_top_right(self):
+    def test_errors_retain_source_and_put_cursor_at_line_start(self):
         m = self.m
         m.command('BASIC')
         self.keys('_10 A=(\r')
         self.assertEqual(self.draft(), b'10 A=(')
-        self.assertEqual(m.memory.ram[ED+16], 39)
+        self.assertEqual(m.memory.ram[ED+16], 0)
         self.assertIn(b'SYNTAX ERROR', m.output)
         self.assertEqual(self.screen(0x720, 7), bytes((ord(c) & 63) | 128 for c in '?SYNTAX'))
-        self.assertEqual(self.screen(PANE, 6), bytes((ord(c) & 63) if c >= '@' else ord(c) for c in '10 A=('))
+        self.assertEqual(bytes(b & 127 for b in self.screen(PANE, 6)), bytes((ord(c) & 63) if c >= '@' else ord(c) for c in '10 A=('))
         self.keys('_'+'_PRINT 1/0\r')
         self.assertEqual(self.draft(), b'PRINT 1/0')
-        self.assertEqual(m.memory.ram[ED+16], 39)
+        self.assertEqual(m.memory.ram[ED+16], 0)
         self.assertIn(b'DIVISION BY ZERO', m.output)
         self.assertEqual(m.memory.ram[ED], 1)
 
@@ -240,7 +244,7 @@ class SplitEditorTests(unittest.TestCase):
         self.keys('INPUT A$:PRINT 1/0\r')
         self.keys('WORLD\r')
         self.assertEqual(self.draft(), b'INPUT A$:PRINT 1/0')
-        self.assertEqual(m.memory.ram[ED+16], 39)
+        self.assertEqual(m.memory.ram[ED+16], 0)
         self.keys('_'+'_INPUT A$\r'+'\x88')
         self.assertEqual(m.memory.ram[ED], 0)
         self.assertEqual(m.word(0x324), 0xf157)
@@ -286,8 +290,8 @@ class SplitEditorTests(unittest.TestCase):
         m.command('BASIC')
         self.keys('_PRINT CHR$(147):PRINT 1/0\r')
         self.assertEqual(self.draft(), b'PRINT CHR$(147):PRINT 1/0')
-        self.assertEqual(m.memory.ram[ED+16], 39)
-        self.assertEqual(self.screen(PANE, 5), bytes(ord(c) & 63 for c in 'PRINT'))
+        self.assertEqual(m.memory.ram[ED+16], 0)
+        self.assertEqual(bytes(b & 127 for b in self.screen(PANE, 5)), bytes(ord(c) & 63 for c in 'PRINT'))
 
     def test_failed_load_and_allocation_keep_editable_source(self):
         m = self.m
@@ -300,7 +304,7 @@ class SplitEditorTests(unittest.TestCase):
         m.memory.ram[0xb00:0xb02] = bytes(2)  # deterministic allocator exhaustion
         self.keys('_'+'_20 REM '+ 'X'*100+'\r')
         self.assertEqual(self.draft(), b'20 REM '+b'X'*100)
-        self.assertEqual(m.memory.ram[ED+16], 39)
+        self.assertEqual(m.memory.ram[ED+16], 0)
         self.keys('\x88')
         listing=m.command('LIST')
         self.assertIn('10 PRINT 7', listing)
@@ -365,10 +369,11 @@ class SplitEditorTests(unittest.TestCase):
         writes = self.record_video_writes()
         self.keys('\r')
         self.assertEqual(self.draft(), b'10 PRINT 7')
-        self.assertEqual([p for p, _ in writes if p < 0x720], [0x400, 0x401])
+        self.assertEqual(self.screen(0x400, 2), b'\xb1\xb0')
+        self.assertEqual([p for p, _ in writes if p < 0x720], [])
         writes.clear()
         self.keys('_')
-        self.assertEqual([p for p, _ in writes if p < 0x720], [0x400, 0x401])
+        self.assertEqual([p for p, _ in writes if p < 0x720], [])
         self.keys('_')
         for command in ('PRINT 123', 'PRINT 1/0', 'CLR', 'CLEAN'):
             with self.subTest(command=command):
@@ -379,22 +384,105 @@ class SplitEditorTests(unittest.TestCase):
                 self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
                 self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
 
-    def test_identical_edits_and_offscreen_changes_do_not_write_listing(self):
+    def test_numbered_submissions_select_affected_lines_and_scroll_into_view(self):
         m = self.m
         for number in range(10, 261, 10):
             m.command(f'{number} PRINT {number}')
         m.command('BASIC')
         self.keys('_')
         writes = self.record_video_writes()
-        for command in ('10 PRINT 10', '260 PRINT 999', '260', '999'):
-            with self.subTest(command=command):
-                writes.clear()
-                self.keys(command+'\r')
-                self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
-                self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        self.keys('10 PRINT 10\r')
+        self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
+        self.keys('150 PRINT 999\r')
+        self.assertEqual(m.word(ED+3), 150)
+        self.assertEqual(m.word(ED+5), 10)
+        self.assertEqual(self.screen(0x400+14*40, 3), b'\xb1\xb5\xb0')
+        self.keys('260 PRINT 999\r')
+        self.assertEqual(m.word(ED+3), 260)
+        self.assertEqual(m.word(ED+5), 260)
+        self.assertEqual(self.screen(0x400, 3), b'\xb2\xb6\xb0')
+        self.keys('260\r')
+        self.assertEqual(m.word(ED+3), 250)
+        self.assertNotEqual(m.memory.ram[ED+50], 255)
+        self.keys('5 PRINT 1\r')
+        self.assertEqual(m.word(ED+3), 5)
+        self.assertEqual(self.screen(0x400, 1), b'\xb5')
+        self.keys('15 A=(\r')
+        self.assertEqual(m.word(ED+3), 15)
+        self.assertEqual(m.memory.ram[ED+1], 1)
+        row = m.memory.ram[ED+50]
+        self.assertEqual(self.screen(0x400+row*40, 2), b'\xb1\xb5')
+        self.keys('__64000 A=1\r')
+        self.assertEqual(m.word(ED+3), 15)  # invalid number leaves selection alone
+        self.keys('__17\r')
+        self.assertEqual(m.word(ED+3), 20)  # absent deletion selects next survivor
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+
+    def test_unchanged_numbered_submission_can_move_only_number_highlights(self):
+        m = self.m
+        m.command('10 PRINT 1')
+        m.command('20 PRINT 2')
+        m.command('BASIC')
+        self.keys('_')
+        writes = self.record_video_writes()
+        self.keys('20\r')  # deletion selects the preceding surviving line
+        self.assertEqual(m.word(ED+3), 10)
+        self.keys('20 PRINT 2\r')
+        self.keys('10 PRINT 1\r')
         writes.clear()
-        self.keys('10 PRINT 11\r')
-        self.assertEqual([(p, v) for p, v in writes if p < 0x720], [(0x40a, 49)])
+        self.keys('20 PRINT 2\r')
+        self.assertEqual(m.word(ED+3), 20)
+        self.assertEqual([p for p, _ in writes if p < 0x720],
+                         [0x400, 0x401, 0x428, 0x429])
+
+    def test_previous_visible_commands_and_wrapped_lines_can_be_edited(self):
+        m = self.m
+        m.command('BASIC')
+        self.keys('_PRINT 123\r')
+        listing = self.screen(0x400, 840)
+        self.keys('\x91\x91')  # blank prompt -> output -> original command
+        self.assertEqual(self.draft(), b'PRINT 123')
+        self.assertEqual(m.memory.ram[ED+16], 0)
+        self.keys('\x1d'*8+'\x14'+'4\r')
+        self.assertIn(b' 143 ', m.output)
+        self.assertEqual(self.screen(0x400, 840), listing)
+        self.keys('__REM '+ 'X'*45+'\r')
+        self.keys('\x91')  # the preceding physical row continues the command
+        self.assertEqual(self.draft(), b'REM '+b'X'*45)
+        self.assertEqual(m.memory.ram[ED+16], 40)
+        self.keys('\x91')
+        self.assertEqual(m.memory.ram[ED+16], 0)
+        self.keys('__PRINT CHR$(147):PRINT "'+ 'X'*45+'"\r')
+        self.keys('\x91\x91')  # output wrapping also preserves logical lines
+        self.assertEqual(self.draft().strip(), b'X'*45)
+
+    def test_error_returns_to_command_start_at_its_current_screen_row(self):
+        m = self.m
+        m.command('BASIC')
+        self.keys('_PRINT 1\r')
+        self.assertEqual(m.memory.ram[ED+17], 80)
+        self.keys('A=(\r')
+        self.assertEqual((m.memory.ram[ED+17], m.memory.ram[ED+16]), (80, 0))
+        self.assertEqual(self.draft(), b'A=(')
+        self.keys('\x91\x91')
+        self.assertEqual(self.draft(), b'PRINT 1')
+        self.keys('\x1d'*6+'\x94'+'2')
+        self.assertEqual(self.draft(), b'PRINT 2')
+        self.assertEqual(self.screen(PANE+80, 3), b'\x01=(')
+        # Editing earlier history must preserve the failed command below it.
+        self.keys('\x11\x11')
+        self.assertEqual(self.draft(), b'A=(')
+        self.keys('\x85 ')
+        self.assertEqual(self.draft(), b'A=(')
+
+    def test_input_uses_independent_literal_and_overwrite_modes(self):
+        m = self.m
+        m.command('BASIC')
+        self.keys('_INPUT A$:PRINT LEN(A$)\r')
+        self.keys('AB\x9d\x94\x05\x93\x05\r')
+        self.assertIn(b' 2 ', m.output)
+        self.assertEqual(m.memory.ram[ED+2], 1)
+        self.assertEqual(m.memory.ram[0xfb3], 0)
 
     def test_bidirectional_scroll_moves_rows_without_touching_color_ram(self):
         m = self.m
@@ -464,6 +552,7 @@ class SplitEditorTests(unittest.TestCase):
         before_services = len(m.services)
         self.keys('\x85')
         self.assertEqual(self.screen(0x400+4*40, 1), b'\x1f')
+        self.assertEqual(self.screen(0x400+19*40, 5), bytes(ord(c) & 63 for c in 'PRESS'))
         self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
         self.keys(' ')
         self.assertEqual(self.screen(0x400, 800), listing)
