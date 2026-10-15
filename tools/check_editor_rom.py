@@ -52,7 +52,7 @@ class StockKernelMachine(Machine):
         keyboard_input = (c.pc == 0xffcf and
                           self.word(0x324) == self.labels['editor_input_gate'])
         if (self.real_kernel and self.memory.ram[1] & 2 and
-                (c.pc in (0xffd2, 0xffe4) or keyboard_input)):
+                (c.pc in (0xffd2, 0xffe4, 0xffe1) or keyboard_input)):
             if c.pc == 0xffd2:
                 self.output.append(c.a)
             elif c.pc == 0xffe4:
@@ -71,8 +71,14 @@ class StockKernelMachine(Machine):
 
 def verify(rom_dir):
     m = StockKernelMachine(rom_dir)
-    for source in ('10 PRINT 77', '20 REM '+'X'*65, 'BASIC'):
+    for source in ('10 PRINT 77', '20 REM '+'X'*65):
         m.command(source)
+    m.memory.ram[0x91] = 0xff
+    assert '20 REM' in m.command('LIST')
+    m.memory.ram[0x91] = 0x7f  # actual KERNAL STOP matrix state
+    assert '10 PRINT' not in m.command('LIST')
+    m.memory.ram[0x91] = 0xff
+    m.command('BASIC')
     assert m.memory.ram[0x3cc] == 1
     assert m.word(0x326) == m.labels['editor_output_gate']
     assert m.memory.ram[0x400:0x402] == bytes((177, 176))
@@ -119,9 +125,19 @@ def verify(rom_dir):
     m.keys(b'\x88')
     m.command('BASIC')
     assert bytes(m.memory.ram[0x400:0x720]) == screen
+    m.keys(b'\x8610\r\x86260\r')
+    assert (m.word(0x3cf), m.word(0x3d1)) == (260, 230)
+    row = m.memory.ram[0x3cc+50]
+    assert bytes(m.memory.ram[0x400+row*40:0x403+row*40]) == b'\xb2\xb6\xb0'
     m.keys(b'\x88')
+    # Device bytes are supplied by the file harness; keyboard/output still
+    # execute the real KERNAL. This adds no IEC/disk timing claim.
+    m.files['STOCK'] = bytearray.fromhex('010809080a00993432000000')
+    m.command('LOAD "STOCK",8')
+    assert '10 PRINT 42' in m.command('LIST')
+    assert ' 42 ' in m.command('RUN')
     print('Stock 901227-03 KERNAL: RESTOR/CINT, GETIN, CHRIN, CHROUT, '
-          'F1/95 glyph, number cursor, scrolling, editing, PRINT, INPUT, '
+          'STOP/LIST, F1/95 glyph, F3/context, PRG import, number cursor, scrolling, editing, PRINT, INPUT, '
           'error retention and RUN/exit passed.')
     return {'kernal': '901227-03', 'passed': True,
             'rom_sha256': hashlib.sha256(m.memory.rom).hexdigest(),

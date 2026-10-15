@@ -302,8 +302,12 @@ ED_TARGET = ED_LINKS+4
 ED_FIRST = ED_TARGET+1
 ED_END = ED_FIRST+1
 ED_SAVE_PAINT = ED_END+1
+ED_GOTO = ED_SAVE_PAINT+1
+ED_GOTO_NO = ED_GOTO+1 ; word
+ED_GOTO_LEN = ED_GOTO_NO+2
+ED_CONTEXT_ROWS = ED_GOTO_LEN+1
 ED_HELP_TAIL = EXPR_STACK+224 ; final 32 bytes of an 800-byte listing snapshot
-.assert ED_SAVE_PAINT < ED_HELP_TAIL, error, "Editor row workspace overflow"
+.assert ED_CONTEXT_ROWS < ED_HELP_TAIL, error, "Editor row workspace overflow"
 .assert ED_HELP_TAIL+32 = CONTROL_STACK, error, "Editor overlaps control stack"
 ED_PTR = $fb ; KERNAL's free user zero-page pointers; no language scratch borrowed
 ED_CPTR = $fd
@@ -318,3 +322,16 @@ ED_HELP_SCREEN = LEX_BUFFER ; INPUT staging borrows this only before allocation
  .byte BANK_COMMAND,7
  .word target
 .endmacro
+
+; PRG conversion is synchronous inside staged LOAD. Compiler scratch begins at
+; $13C0; the old graph's saved heads occupy $1300-$130F.
+PRG_ADDRESS = LOAD_OLD+16
+PRG_NEXT = PRG_ADDRESS+2
+PRG_LAST = PRG_NEXT+2
+PRG_HAVE_LINE = PRG_LAST+2
+PRG_MODE = PRG_HAVE_LINE+1 ; 0 normal, 1 quote, 2 REM, 3 DATA, 4 quoted DATA
+PRG_IDENT = PRG_MODE+1 ; 0 boundary, 1/2 significant name bytes, 3 number
+PRG_CHAR = PRG_IDENT+1
+PRG_GO = PRG_CHAR+1
+PRG_NAME_START = PRG_GO+1
+.assert PRG_NAME_START < SCRATCH, error, "PRG state overlaps compiler scratch"

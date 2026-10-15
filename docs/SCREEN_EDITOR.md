@@ -16,6 +16,7 @@ BASIC line number and first displayed line number survive closing and reopening.
 | CTRL+2 | — | Toggle literal control entry |
 | DEL | — | Delete the preceding character |
 | HOME | — | Move to the start of the draft |
+| F3 | Go to a line number | Go to a line number, retaining the draft |
 | F1 | Show help; any key returns | Show help; any key returns |
 | F7 | Clear screen and quit | Clear screen and quit |
 
@@ -39,6 +40,19 @@ or the preceding line when deleting the last one. Numeric bookmarks are
 resolved against the current program, including after NEW, LOAD,
 and CLEAN, so the editor never retains a pointer into freed source.
 
+F3 opens a `GO LINE` prompt in the status bar. Each digit immediately selects
+the requested BASIC line, or the next higher line; requests beyond the program
+select its last line. Enter or any non-digit closes the prompt without submitting
+the edit pane. This includes F1/F7 while the prompt is open. The draft, text
+cursor, focus and writing settings survive, including during keyboard INPUT.
+Numbers are bounded to 0–63999; excess digits or overflow are ignored.
+
+When a numbered submission or F3 jump selects an off-screen destination, the
+viewport includes up to three preceding BASIC lines. Wrapped context can occupy
+more than three screen rows; fewer predecessors are used if needed to keep the
+destination visible. Near the program start, all available predecessors are
+shown. An already visible destination does not scroll or redraw source text.
+
 Numbered drafts add, replace, or delete program lines through the existing
 on-machine tokenizer/compiler. Successful numbered submissions clear the edit
 pane. A line number alone deletes that line. Failed submissions retain the draft,
@@ -48,6 +62,8 @@ compilation errors still retain malformed source in the program, matching
 ordinary direct entry. Correct the retained draft and submit it again.
 
 Commands such as `PRINT 123`, LIST, SAVE, LOAD, and INPUT use the edit pane.
+LIST polls RUN/STOP and pending breaks between source lines. LOAD also imports
+[stock BASIC PRG files](PRG_IMPORT.md).
 Output, wrapping, screen-clear controls, and scrolling stay within its four rows;
 there is no READY prompt there. Keyboard INPUT uses the bounded pane editor;
 file/device input and output continue through their original KERNAL vectors.

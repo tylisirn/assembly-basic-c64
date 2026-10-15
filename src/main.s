@@ -365,7 +365,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.14",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.15",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
@@ -499,6 +499,7 @@ command_free:
 .include "services.s"
 .include "service_gateway.s"
 .include "screen_editor.s"
+.include "prg_import.s"
 
 ; Every auxiliary bank has a recovery header pointing into common RAM. This
 ; lets KERNAL cartridge NMI dispatch recover even during a banked image copy.

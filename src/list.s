@@ -52,6 +52,10 @@ command_list:
  lda PROGRAM_HEAD+1
  sta LIST_ANCHOR+1
 list_line:
+ lda PENDING
+ JNE ready
+ jsr $ffe1
+ JEQ ready
  lda LIST_ANCHOR
  cmp #<run_end
  bne @load
@@ -427,12 +431,14 @@ print_hex_digit:
  clc
  adc #'0'
  jmp $ffd2
-print_source_number:
+print_source_number_buffer:
  lda #<format_source
  sta gateway_call+1
  lda #>format_source
  sta gateway_call+2
- jsr call_ram
+ jmp call_ram
+print_source_number:
+ jsr print_source_number_buffer
  ldy #0
 @digit:
  sty NUM_LENGTH

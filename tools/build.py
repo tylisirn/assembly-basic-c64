@@ -18,7 +18,7 @@ BANK_ROLES = (
     'boot, command editor, tokenizer, LIST and source transport',
     'raw resident compiler image',
     'raw RAM execution runtime image and banked ROM services',
-    'split screen editor; remaining space reserved for BASIC PRG conversion',
+    'split screen editor and stock BASIC PRG import; PRG export reserved',
     'reserved: 16.16 fixed-point and PRINT formatting extensions',
     'reserved: sprite, VIC and SID commands',
     'reserved: numeric tables, fonts and optional resources',

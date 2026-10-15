@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "a563598c805897e26eb5becec19d59d191e8d02b8112aa92ea08d48399fe3007",
+  "rom_sha256": "28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 7939,
-      "spare_bytes": 253,
+      "used_bytes": 7953,
+      "spare_bytes": 239,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5952,
-      "spare_bytes": 2240,
+      "used_bytes": 5994,
+      "spare_bytes": 2198,
       "reserved": false
     },
     {
@@ -49,9 +49,9 @@
         32768,
         40960
       ],
-      "role": "split screen editor; remaining space reserved for BASIC PRG conversion",
-      "used_bytes": 5466,
-      "spare_bytes": 2726,
+      "role": "split screen editor and stock BASIC PRG import; PRG export reserved",
+      "used_bytes": 7180,
+      "spare_bytes": 1012,
       "reserved": false
     },
     {
@@ -125,7 +125,7 @@
   ],
   "screen_editor": {
     "bank": 3,
-    "rom_bytes": 5457,
+    "rom_bytes": 7171,
     "text_workspace": [
       2656,
       2816
@@ -236,14 +236,14 @@
   "image_loads": {
     "gateway": {
       "bank": 0,
-      "rom_address": 39962,
+      "rom_address": 39976,
       "run_address": 2048,
       "bytes": 593,
       "encoding": "raw"
     },
     "service_gateway": {
       "bank": 0,
-      "rom_address": 40555,
+      "rom_address": 40569,
       "run_address": 820,
       "bytes": 152,
       "encoding": "raw"
@@ -252,7 +252,7 @@
       "bank": 1,
       "rom_address": 32777,
       "run_address": 5120,
-      "bytes": 5943,
+      "bytes": 5985,
       "encoding": "raw"
     },
     "runtime": {

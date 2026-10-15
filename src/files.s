@@ -1,11 +1,14 @@
 .segment "COMMAND"
-; Sequential source transport. Native filename bytes have been staged in BRIDGE.
+; Source transport; reads accept both SEQ and PRG DOS file types. Native filename bytes have been staged in BRIDGE.
 file_command:
  jsr $ffcc
  lda FILE_NAME_LEN
  cmp #252
  JCS file_fail
  tax
+ lda FILE_OPERATION
+ cmp #$34
+ bne @name_ready
  lda #','
  sta BRIDGE,x
  inx
@@ -15,16 +18,10 @@ file_command:
  lda #','
  sta BRIDGE,x
  inx
- lda FILE_OPERATION
- cmp #$34
- bne :+
  lda #'W'
- bne @suffix
-:
- lda #'R'
-@suffix:
  sta BRIDGE,x
  inx
+@name_ready:
  txa
  ldx #<BRIDGE
  ldy #>BRIDGE
@@ -542,7 +539,18 @@ file_load:
  lda #$ff
  sta FILE_CRC
  sta FILE_CRC+1
- ldx #0
+ jsr file_get
+ cmp #1
+ bne @native
+ jsr file_get
+ cmp #8
+ JNE load_fail
+ EDITOR_CALL prg_import
+ jmp load_commit
+@native:
+ cmp #'A'
+ JNE load_fail
+ ldx #1
 @header:
  jsr file_get
  cmp source_header,x
@@ -650,6 +658,12 @@ file_load:
  lda $90
  and #$40
  beq load_fail
+load_commit:
+ ; Even an empty load replaces the graph and invalidates cached editor anchors.
+ inc GENERATION
+ bne :+
+ inc GENERATION+1
+:
  ; New graph is valid; release old graph and keep the allocator's merged free list.
  lda #0
  sta LOADING

@@ -1,5 +1,11 @@
 # Assembly BASIC implementation summary
 
+## Revision 0.15 — LIST break, F3 line navigation and stock PRG import
+
+LIST responds to RUN/STOP and pending cartridge breaks. F3 opens an incremental line-number prompt; any non-digit closes it without submitting the pane. Off-screen F3 and numbered-entry jumps retain up to three preceding BASIC lines for context, with wrapped context bounded so the destination stays visible.
+
+LOAD recognizes stock BASIC V2 PRGs at $0801 and converts them on the cartridge into the existing staged source graph. It preserves two-character stock variable identity, maps signed `%` variables to distinct signed `PRGINT` names, and retains literal strings and REM/DATA bytes. Malformed, truncated or oversized PRGs and appended machine-code payloads roll back to the prior program. The existing integer execution contract still applies; SAVE writes native `.AB` source. The importer shares bank 3 with the editor, with ABI 7 and the arena unchanged. See [PRG import rules](docs/PRG_IMPORT.md).
+
 ## Revision 0.14 — pane navigation and independent literal entry
 
 Errors return to the start of the failed command, including after pane scrolling. Cursor keys revisit earlier visible commands and output, with wrapped rows kept together for editing and submission. Numbered entry selects the affected BASIC line and scrolls it into view; the number highlight remains visible while editing. INS switches INSERT/OVERWRITE, and CTRL+2 toggles literal entry independently in both command editing and keyboard INPUT. Help and status show both settings. The implementation uses existing editor RAM and leaves runtime ABI 7 and the user arena unchanged.

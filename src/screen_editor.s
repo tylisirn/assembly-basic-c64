@@ -83,6 +83,7 @@ editor_open:
  sta ED_FOCUS
  sta ED_MODE
  sta ED_LITERAL
+ sta ED_GOTO
  sta ED_HELP
  sta ED_SUBMITTED
  sta ED_CURSOR_ON
@@ -211,6 +212,11 @@ editor_wait:
  beq editor_wait
  sta ED_CHAR
  jsr editor_hide_cursor
+ lda ED_GOTO
+ beq @dispatch
+ jsr editor_goto_key
+ jmp editor_read
+@dispatch:
  lda ED_CHAR
  cmp #$88 ; F7
  JEQ @quit
@@ -220,6 +226,11 @@ editor_wait:
  jmp editor_read
 @normal:
  lda ED_CHAR
+ cmp #$86
+ bne @help
+ jsr editor_begin_goto
+ jmp editor_read
+@help:
  cmp #$85 ; F1
  bne @focus
  jsr editor_help_on
@@ -1352,11 +1363,7 @@ editor_listing:
  jsr editor_find_selected
  jsr editor_is_end
  beq @done
- lda ED_SELECTED
- sta ED_TOP
- lda ED_SELECTED+1
- sta ED_TOP+1
- jsr editor_paint_listing
+ jsr editor_reveal_selection
 @done:
  lda GENERATION
  sta ED_VIEW_GEN
@@ -1365,6 +1372,195 @@ editor_listing:
  lda #1
  sta ED_VIEW_VALID
  jmp editor_line_cursor
+
+editor_reveal_selection:
+ ; Keep up to three preceding BASIC lines, but never hide the destination
+ ; behind a context line taller than the frame. Reuse screen rows when possible.
+ jsr editor_find_top
+ lda ED_ANCHOR
+ sta ED_OLD_TOP
+ lda ED_ANCHOR+1
+ sta ED_OLD_TOP+1
+ jsr editor_cached_selected
+ lda #0
+ sta ED_CONTEXT_ROWS
+ lda #3
+ sta ED_STEPS
+@previous:
+ lda ED_ANCHOR
+ sta ED_SAVE
+ lda ED_ANCHOR+1
+ sta ED_SAVE+1
+ COMMAND_CALL editor_previous
+ sta ED_ANCHOR
+ stx ED_ANCHOR+1
+ ora ED_ANCHOR+1
+ beq @restore
+ lda ED_ANCHOR
+ sta LIST_ANCHOR
+ lda ED_ANCHOR+1
+ sta LIST_ANCHOR+1
+ lda #0
+ sta ED_ROW
+ lda #5
+ sta ED_ROUTE
+ jsr editor_render_line
+ clc
+ lda ED_ROW
+ adc ED_CONTEXT_ROWS
+ bcs @restore
+ cmp #20
+ bcs @restore
+ sta ED_CONTEXT_ROWS
+ dec ED_STEPS
+ bne @previous
+ beq @scroll
+@restore:
+ lda ED_SAVE
+ sta ED_ANCHOR
+ lda ED_SAVE+1
+ sta ED_ANCHOR+1
+@scroll:
+ lda #0
+ sta ED_ROUTE
+ jsr editor_anchor_number
+ cmp ED_TOP+1
+ bcc @down
+ bne @up
+ cpx ED_TOP
+ bcc @down
+@up:
+ jmp editor_scroll_up
+@down:
+ jmp editor_scroll_down
+
+; F3 is an incremental numeric search. Any non-digit ends the prompt without
+; submitting a pane draft; its focus, cursor, literal setting and bytes survive.
+editor_begin_goto:
+ lda #1
+ sta ED_GOTO
+ lda #0
+ sta ED_GOTO_LEN
+ sta ED_GOTO_NO
+ sta ED_GOTO_NO+1
+ jmp editor_goto_prompt
+
+editor_goto_key:
+ lda ED_CHAR
+ cmp #'0'
+ JCC @cancel
+ cmp #'9'+1
+ JCS @cancel
+ lda ED_GOTO_LEN
+ cmp #5
+ JCS @prompt
+ sec
+ lda ED_CHAR
+ sbc #'0'
+ sta ED_TARGET
+ lda ED_GOTO_NO+1
+ cmp #25
+ JCS @prompt
+ lda ED_GOTO_NO
+ sta ED_SAVE
+ lda ED_GOTO_NO+1
+ sta ED_SAVE+1
+ asl ED_SAVE
+ rol ED_SAVE+1
+ asl ED_SAVE
+ rol ED_SAVE+1
+ clc
+ lda ED_SAVE
+ adc ED_GOTO_NO
+ sta ED_SAVE
+ lda ED_SAVE+1
+ adc ED_GOTO_NO+1
+ sta ED_SAVE+1
+ asl ED_SAVE
+ rol ED_SAVE+1
+ clc
+ lda ED_SAVE
+ adc ED_TARGET
+ tax
+ lda ED_SAVE+1
+ adc #0
+ cmp #$fa
+ JCS @prompt
+ stx ED_GOTO_NO
+ sta ED_GOTO_NO+1
+ inc ED_GOTO_LEN
+ lda ED_GOTO_NO
+ sta LINE_NO
+ lda ED_GOTO_NO+1
+ sta LINE_NO+1
+ ; Resolve without disturbing either the source graph or the old highlight.
+ COMMAND_CALL editor_find
+ sta ED_ANCHOR
+ stx ED_ANCHOR+1
+ jsr editor_is_end
+ bne @found
+ COMMAND_CALL editor_previous
+ sta ED_ANCHOR
+ stx ED_ANCHOR+1
+ ora ED_ANCHOR+1
+ beq @prompt
+@found:
+ lda ED_ANCHOR
+ cmp ED_SELECTED_ANCHOR
+ bne @move
+ lda ED_ANCHOR+1
+ cmp ED_SELECTED_ANCHOR+1
+ beq @prompt
+@move:
+ jsr editor_move_selection
+ jsr editor_locate_selection
+ cmp #$ff
+ bne @highlight
+ jsr editor_reveal_selection
+@highlight:
+ jsr editor_line_cursor
+@prompt:
+ jmp editor_goto_prompt
+@cancel:
+ lda #0
+ sta ED_GOTO
+ jmp editor_status
+editor_goto_prompt:
+ jsr editor_status
+ ldx #39
+@clear:
+ lda #' '|$80
+ sta $0720,x
+ dex
+ bpl @clear
+ ldx #0
+@label:
+ lda editor_goto_label,x
+ jsr editor_screen_code
+ ora #$80
+ sta $0720,x
+ inx
+ cpx #8
+ bne @label
+ lda ED_GOTO_LEN
+ beq @done
+ ; Decimal formatting uses compiler scratch, never the edit draft buffers.
+ lda ED_GOTO_NO
+ sta IO_A
+ lda ED_GOTO_NO+1
+ sta IO_X
+ COMMAND_CALL print_source_number_buffer
+ ldx #0
+@digits:
+ lda NUM_BUFFER,x
+ ora #$80
+ sta $0728,x
+ inx
+ cpx COUNT
+ bcc @digits
+@done:
+ rts
+editor_goto_label: .byte "GO LINE "
 
 editor_paint_listing:
  lda #0
@@ -1994,7 +2190,7 @@ editor_overwrite_text: .byte "OVERWRITE",0
 editor_literal_text: .byte "LITERAL",0
 editor_modes_lo: .byte <editor_insert_text,<editor_overwrite_text
 editor_modes_hi: .byte >editor_insert_text,>editor_overwrite_text
-editor_key_label: .byte "F1 HELP F7 QUIT "
+editor_key_label: .byte "F1? F3# F7 QUIT"
 
 editor_pane_message:
  sta ED_PTR
@@ -2110,8 +2306,8 @@ editor_help_text:
  .byte "CTRL+2       TOGGLE LITERAL",13
  .byte "DEL          DELETE PREVIOUS CHARACTER",13
  .byte "HOME         START OF EDIT LINE",13
- .byte "F1           HELP",13
- .byte "F7 / QUIT    CLEAR SCREEN AND EXIT",13
+ .byte "F1 HELP / F3 GO LINE / F7 QUIT",13
+ .byte "F3: TYPE NUMBER; OTHER KEYS FINISH.",13
  .byte "RUN          EXIT AND RUN PROGRAM",13,13
  .byte "ENTER A NUMBERED LINE TO ADD OR CHANGE.",13
  .byte "A LINE NUMBER ALONE DELETES THAT LINE.",13
@@ -2170,6 +2366,8 @@ editor_input_wait:
  beq editor_input_wait
  sta ED_CHAR
  jsr editor_hide_cursor
+ lda ED_GOTO
+ bne @go_key
  lda ED_CHAR
  cmp #$88
  JEQ editor_input_quit
@@ -2189,8 +2387,28 @@ editor_input_wait:
  pla
  sta STRING_LENGTH
  jmp @again
+@go_key:
+ lda STRING_LENGTH
+ pha
+ lda SELECTOR
+ pha
+ lda INPUT_KIND
+ pha
+ jsr editor_goto_key
+ pla
+ sta INPUT_KIND
+ pla
+ sta SELECTOR
+ pla
+ sta STRING_LENGTH
+ jmp @again
 @normal:
  lda ED_CHAR
+ cmp #$86
+ bne @help
+ jsr editor_begin_goto
+ jmp @again
+@help:
  cmp #$85
  bne @enter
  jsr editor_help_on

@@ -399,8 +399,8 @@ class SplitEditorTests(unittest.TestCase):
         self.assertEqual(self.screen(0x400+14*40, 3), b'\xb1\xb5\xb0')
         self.keys('260 PRINT 999\r')
         self.assertEqual(m.word(ED+3), 260)
-        self.assertEqual(m.word(ED+5), 260)
-        self.assertEqual(self.screen(0x400, 3), b'\xb2\xb6\xb0')
+        self.assertEqual(m.word(ED+5), 230)
+        self.assertEqual(self.screen(0x400+3*40, 3), b'\xb2\xb6\xb0')
         self.keys('260\r')
         self.assertEqual(m.word(ED+3), 250)
         self.assertNotEqual(m.memory.ram[ED+50], 255)
@@ -614,3 +614,82 @@ class SplitEditorTests(unittest.TestCase):
         self.keys('\x85 \x88')
         self.assertEqual(self.screen(0x1000, 512), frames)
         self.assertIn(' 7 ', m.command('CONT'))
+
+    def test_f3_go_line_is_incremental_and_non_digits_only_cancel_the_prompt(self):
+        m = self.m
+        for number in range(10, 311, 10):
+            m.command(f'{number} PRINT {number}')
+        m.command('BASIC')
+        self.keys('\rXYZ')
+        draft, pane = self.draft(), self.screen(PANE, 160)
+        generation = m.word(0xb11)
+        self.keys('\x86')
+        self.assertEqual(bytes(b & 127 for b in self.screen(0x720, 8)),
+                         bytes((7, 15, 32, 12, 9, 14, 5, 32)))
+        self.keys('260')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (260, 230))
+        self.assertEqual(m.memory.ram[ED+50], 3)
+        self.assertEqual(self.screen(0x400+3*40, 3), b'\xb2\xb6\xb0')
+        self.keys('\r')
+        self.assertEqual(self.draft(), draft)
+        self.assertEqual(self.screen(PANE, 160), pane)
+        self.assertEqual(m.word(0xb11), generation)
+        self.assertEqual(m.memory.ram[ED+1], 1)
+        self.keys('\x86265 ')
+        self.assertEqual(m.word(ED+3), 270)
+        self.keys('\x86639999\x88')  # overflow ignored; F7 cancels the prompt
+        self.assertEqual(m.word(ED+3), 310)
+        self.assertEqual(m.memory.ram[ED], 1)
+        self.assertEqual(self.draft(), draft)
+        self.keys('\x86\x85')  # F1 also only cancels, without opening help
+        self.assertEqual(m.memory.ram[ED+29], 0)
+
+    def test_go_line_visible_destination_only_changes_number_cells(self):
+        m = self.m
+        for number in (10, 20, 30):
+            m.command(f'{number} PRINT {number}')
+        m.command('BASIC')
+        writes = self.record_video_writes()
+        self.keys('\x8610\r')
+        self.assertFalse(any(0x400 <= p < 0x720 for p, _ in writes))
+        writes.clear()
+        self.keys('\x8620\r')
+        self.assertEqual([p for p, _ in writes if p < 0x720],
+                         [0x400, 0x401, 0x428, 0x429])
+        self.assertFalse(any(0xd800 <= p < 0xdb20 for p, _ in writes))
+        self.assertEqual(m.word(ED+5), 10)
+
+    def test_go_line_and_submission_keep_wrapped_context_and_destination_visible(self):
+        m = self.m
+        for number in range(10, 311, 10):
+            m.command(f'{number} REM '+ 'X'*55)
+        m.command('BASIC')
+        self.keys('\x86260\r')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (260, 230))
+        self.assertEqual(m.memory.ram[ED+50], 6)
+        self.keys('_300 PRINT 1\r')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (300, 230))
+        # Three very tall context lines must not displace the destination.
+        from ab64.cli import text_program
+        from ab64.container import dumps
+        # Native token lines have a 255-byte limit; use long repeated identifiers
+        # so the formatter expands a compact token stream beyond the frame.
+        name = 'V'*200
+        source = (f'10 {name}={name}+{name}+{name}+{name}'
+                  '\n20 PRINT 2\n30 PRINT 3\n40 PRINT 4')
+        m.files['TALL'] = bytearray(dumps(*text_program(source)))
+        self.keys('LOAD "TALL",8\r')
+        self.keys('\x8640\r')
+        self.assertEqual((m.word(ED+3), m.word(ED+5)), (40, 20))
+        self.assertEqual(m.memory.ram[ED+50], 2)
+
+    def test_f3_while_collecting_input_preserves_runtime_fields_and_draft(self):
+        m = self.m
+        for number in range(10, 311, 10):
+            m.command(f'{number} PRINT {number}')
+        m.command('BASIC')
+        self.keys('_INPUT A$,B:PRINT A$;B\r')
+        self.keys('HELLO\x86260\r,12\r')
+        self.assertIn(b'HELLO 12 ', m.output)
+        self.assertEqual(m.word(ED+3), 260)
+        self.assertEqual(m.memory.ram[ED], 1)

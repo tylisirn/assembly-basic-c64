@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "a563598c805897e26eb5becec19d59d191e8d02b8112aa92ea08d48399fe3007",
+  "rom_sha256": "28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 7939,
-      "spare_bytes": 253,
+      "used_bytes": 7953,
+      "spare_bytes": 239,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5952,
-      "spare_bytes": 2240,
+      "used_bytes": 5994,
+      "spare_bytes": 2198,
       "reserved": false
     },
     {
@@ -49,9 +49,9 @@
         32768,
         40960
       ],
-      "role": "split screen editor; remaining space reserved for BASIC PRG conversion",
-      "used_bytes": 5466,
-      "spare_bytes": 2726,
+      "role": "split screen editor and stock BASIC PRG import; PRG export reserved",
+      "used_bytes": 7180,
+      "spare_bytes": 1012,
       "reserved": false
     },
     {
@@ -118,7 +118,7 @@
   "service_gateway_budget_bytes": 204,
   "service_gateway_code_budget_bytes": 152,
   "editor_bank": 3,
-  "editor_rom_bytes": 5457,
+  "editor_rom_bytes": 7171,
   "editor_text_workspace": [
     2656,
     2816
@@ -150,19 +150,19 @@
   ],
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,
-  "compiler_used_bytes": 5943,
-  "compiler_rom_bytes": 5943,
+  "compiler_used_bytes": 5985,
+  "compiler_rom_bytes": 5985,
   "compiler_image_encoding": "raw",
   "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
-    "COMMAND": 7185,
+    "COMMAND": 7199,
     "GATEWAY": 593,
-    "COMPILER": 5943,
+    "COMPILER": 5985,
     "RUNTIME": 5922,
     "SERVICES": 1282,
     "SERVICE_GATEWAY": 152,
-    "SCREEN_EDITOR": 5457,
+    "SCREEN_EDITOR": 7171,
     "HEADER1": 9,
     "HEADER2": 9,
     "HEADER3": 9,
@@ -171,6 +171,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 26606,
-  "rom_spare_bytes": 38930
+  "rom_used_bytes": 28376,
+  "rom_spare_bytes": 37160
 }
