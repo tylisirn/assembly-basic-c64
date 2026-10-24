@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c",
+  "rom_sha256": "7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -62,8 +62,8 @@
         40960
       ],
       "role": "binary, reservation and sprite editor",
-      "used_bytes": 6821,
-      "spare_bytes": 1371,
+      "used_bytes": 7466,
+      "spare_bytes": 726,
       "reserved": false
     },
     {
@@ -136,7 +136,7 @@
     4096
   ],
   "binary_editor_bank": 4,
-  "binary_editor_rom_bytes": 6812,
+  "binary_editor_rom_bytes": 7457,
   "binary_storage_bank": 5,
   "binary_storage_rom_bytes": 3307,
   "binary_metadata_workspaces": [
@@ -182,7 +182,7 @@
     "SERVICE_GATEWAY": 152,
     "SCREEN_EDITOR": 7281,
     "BINARY_STORAGE": 3307,
-    "BINARY_EDITOR": 6812,
+    "BINARY_EDITOR": 7457,
     "HEADER1": 9,
     "HEADER2": 9,
     "HEADER3": 9,
@@ -191,6 +191,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 38370,
-  "rom_spare_bytes": 27166
+  "rom_used_bytes": 39015,
+  "rom_spare_bytes": 26521
 }

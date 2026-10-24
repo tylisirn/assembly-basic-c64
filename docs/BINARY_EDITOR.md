@@ -10,7 +10,8 @@ bookmarks. F5 is also available while collecting keyboard INPUT.
 
 Cursor up/down selects a reservation. Return enters its blob list; Return on a
 blob opens its editor. SPR opens the sprite view; BIN and ASM open the hex view.
-ASM is a type label reserved for a future assembler.
+ASM is a type label reserved for a future assembler. The current reservation
+remains highlighted while selecting its blobs.
 
 | Key | Reservation selection | Blob selection |
 | --- | --- | --- |
@@ -59,10 +60,12 @@ S/L exchange bytes, and `←` returns to blob selection.
 ## Sprite view
 
 The enlarged 24×21 view uses one character per hires pixel, or two characters
-per multicolor pixel. Top/bottom column rulers and left row rulers surround it.
+per multicolor pixel. Light-blue borders surround the grid; the top/bottom
+column rulers and left row rulers use reversed numbers.
 The 1X and 2X previews use hardware sprites. Two complementary hires hardware
 sprites create the black/white hatched cursor outline, widened for multicolor.
-The preview's transparent pixels show the sprite's own background color.
+The entire preview panel below the labels uses the sprite's background color,
+including the space around and between the centered 1X/2X hardware sprites.
 
 | Key | Action |
 | --- | --- |
@@ -121,6 +124,13 @@ objects allow creating v2 files on the host. Text decoding exports BASIC source
 only; use `.AB` or individual `.BIN` files to retain binary content.
 
 ## Implementation and validation
+
+Scenes are composed one row at a time and compared with screen and color RAM;
+only changed cells are written, without clearing the screen between updates.
+Visible hex navigation updates the old/new byte cells and the value footer.
+Sprite painting updates just its enlarged pixel and the preview data byte; cursor
+motion and palette selection leave the rest of the screen intact. Prompts also
+update only changed cells and restore their covered rows when dismissed.
 
 ROM bank 4 contains the UI and bank 5 the metadata/reservation/file services.
 The existing bank-call gateway restores bank, mapping and interrupt state.

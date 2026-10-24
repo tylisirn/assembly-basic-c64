@@ -8,12 +8,12 @@ The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at `$8000–$9FFF
 | 1 | Raw resident compiler load image | 5,712 / 8,192 | Compiler and native emitter growth |
 | 2 | Raw runtime load image and banked execution services | 7,213 / 8,192 | RAM helpers plus DATA, DEF FN activation and device/input services |
 | 3 | Split screen editor, PRG importer and recovery header | 7,290 / 8,192 | Screen UI and stock BASIC PRG import; remaining space for PRG export |
-| 4 | Binary/sprite editor UI and recovery header | 6,821 / 8,192 | Binary/sprite editor |
+| 4 | Binary/sprite editor UI and recovery header | 7,466 / 8,192 | Binary/sprite editor |
 | 5 | Binary metadata, reservation and persistence services | 3,316 / 8,192 | Reservation and binary file services |
 | 6 | Recovery header; otherwise erased | 9 / 8,192 | Numeric tables, fonts and optional resources |
 | 7 | Recovery header; otherwise erased | 9 / 8,192 | Expansion and diagnostics |
 
-The editor and stock BASIC PRG importer are implemented in bank 3. Banks 4/5 implement the binary/sprite UI and metadata services. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 38,370 bytes, leaving 27,166 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 441 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
+The editor and stock BASIC PRG importer are implemented in bank 3. Banks 4/5 implement the binary/sprite UI and metadata services. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 39,015 bytes, leaving 26,521 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 441 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
 
 ## Maps and bank ownership
 

@@ -402,6 +402,16 @@ BE_BLOB_COUNT = BE_STATE+55
 BE_WORK = BE_STATE+56 ; 32-byte storage/reservation scratch
 BE_RECORD = BE_STATE+88 ; eight-byte blob record buffer
 BE_PROPOSED = BE_STATE+96 ; proposed [start,end), reservation and type
+; One retained row is composed before comparing it with screen/color RAM.
+; This stays below the saved VIC state and preserves suspended INPUT buffers.
+BE_PAINT_CHARS = BE_STATE+102 ; 40 screen codes
+BE_PAINT_COLORS = BE_STATE+142 ; 40 color nibbles
+BE_PAINT_SEEN = BE_STATE+182 ; four-byte row bitset
+BE_PAINT_ROW = BE_STATE+186
+BE_PAINT_BIT = BE_STATE+187
+BE_PAINT_STYLE = BE_STATE+188 ; sprite frame defaults when nonzero
+BE_OLD_POS = BE_STATE+189 ; previous hex cursor offset word
+BE_OVERLAY = BE_STATE+191 ; restore prompt/error-covered rows before next key
 BE_VIC = $0f00 ; saved VIC registers and CIA2 bank; $0f80 row map untouched
 BE_PANE = $1200 ; 160 screen cells plus 160 colors, safe while waiting for GETIN
 BE_LOAD_META = $0f00 ; 169-byte LOAD backup; invalidate listing row cache first

@@ -282,7 +282,7 @@ Bank 0: boot, command editor, tokenizer, LIST and source transport	8192 / 8000 b
 Bank 1: raw resident compiler image	8192 / 5712 bytes
 Bank 2: raw RAM execution runtime image and banked ROM services	8192 / 7213 bytes
 Bank 3: split screen editor and stock BASIC PRG import; PRG export reserved	8192 / 7290 bytes
-Bank 4: binary, reservation and sprite editor	8192 / 6821 bytes
+Bank 4: binary, reservation and sprite editor	8192 / 7466 bytes
 Bank 5: binary metadata, memory reservation and source persistence	8192 / 3316 bytes
 Bank 6: reserved: numeric tables, fonts and optional resources	8192 / 9 bytes
 Bank 7: reserved: expansion and diagnostics	8192 / 9 bytes
@@ -478,7 +478,7 @@ This appendix records the development implementation on 24 October 2026. The ful
 Measured linked build
 Build property	Measured value
 ROM bytes	65,536
-ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
+ROM SHA-256	7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b
 Cartridge type	19
 Cartridge format	classic Magic Desk
 Bank bytes	8,192
@@ -504,7 +504,7 @@ Editor state workspace	[$03CC, $0400) (exclusive end)
 Editor view workspace	[$0F80, $0FE0) (exclusive end)
 Editor help tail workspace	[$0FE0, $1000) (exclusive end)
 Binary editor bank	4
-Binary editor ROM bytes	6,812
+Binary editor ROM bytes	7,457
 Binary storage bank	5
 Binary storage ROM bytes	3,307
 Binary metadata workspaces	[$0200, $0259); [$02A7, $0300) (exclusive ends)
@@ -518,8 +518,8 @@ Compiler used bytes	5,703
 Compiler ROM bytes	5,703
 Compiler image encoding	raw
 Compiler budget bytes	6,144
-ROM used bytes	38,370
-ROM spare bytes	27,166
+ROM used bytes	39,015
+ROM spare bytes	26,521
 
 User arena spans
 Start	Exclusive end	Raw bytes
@@ -533,7 +533,7 @@ Bank	ROM offset	Contents	Used bytes	Spare bytes	Reserved
 1	8,192	raw resident compiler image	5,712	2,480	No
 2	16,384	raw RAM execution runtime image and banked ROM services	7,213	979	No
 3	24,576	split screen editor and stock BASIC PRG import; PRG export reserved	7,290	902	No
-4	32,768	binary, reservation and sprite editor	6,821	1,371	No
+4	32,768	binary, reservation and sprite editor	7,466	726	No
 5	40,960	binary metadata, memory reservation and source persistence	3,316	4,876	No
 6	49,152	reserved: numeric tables, fonts and optional resources	9	8,183	Yes
 7	57,344	reserved: expansion and diagnostics	9	8,183	Yes
@@ -549,7 +549,7 @@ SERVICES	1,282
 SERVICE_GATEWAY	152
 SCREEN_EDITOR	7,281
 BINARY_STORAGE	3,307
-BINARY_EDITOR	6,812
+BINARY_EDITOR	7,457
 HEADER1	9
 HEADER2	9
 HEADER3	9
@@ -559,11 +559,11 @@ HEADER6	9
 HEADER7	9
 
 Validation and implementation context
-Automated validation: 174 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
+Automated validation: 179 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
 Source v1/v2 and runtime ABI 7 are distinct; v2 carries binary metadata and bytes. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
 Instruction-level measurements and capacity scenario
 Measurement context	Value
-ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
+ROM SHA-256	7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b
 Environment	py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing
 Cold start instructions	163,510
 
@@ -618,7 +618,7 @@ READY.
 
 Captured Void Runner collection replay
 Replay property	Value
-ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
+ROM SHA-256	7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b
 Environment	instruction-level py65; no IRQ/VIC timing
 Captured physical blocks	1,636
 Initial free blocks	253
@@ -660,6 +660,7 @@ Runtime ABI and source-container version are separate. Source-only files remain 
 Revision 0.16 binary/sprite editor — 24 October 2026
 F5 and direct SPRDEF open the reservation/blob manager. Manual byte-granular reservations and SPR/BIN/ASM blobs support creation, deletion, bounds/type changes and exact sequential BIN exchange. BASIC RESERVE entries have locked bounds. Metadata edits retain data bytes; allocator page protection persists until NEW.
 The hex view provides eight-byte rows, PETSCII text, bounded cursor/scrolling, nibble entry, byte/word decimal+hex status and explicit initialization. Sprite editing uses character cells, actual 1X/2X VIC sprites and two overlaid hatched hires cursor sprites; hires/multicolor drawing, per-sprite palettes, pixel initialization and byte 64 editing are implemented. ASM opens the hex view pending a future assembler.
+Binary screens compose retained rows and write only changed screen/color cells. Visible hex moves update the old/new cells and footer; sprite painting updates one enlarged pixel and its hardware-preview byte. Prompts/palettes avoid clearing and repainting unchanged text. Blob selection retains its reservation highlight. Sprite borders are light blue with reversed rulers, and the entire preview panel uses the sprite BG with centered hardware previews.
 Source v2 adds reservations, blob metadata and exact blob bytes under the file CRC. Plain source remains v1; both load. LOAD validates before restoring bytes in a second streaming pass, avoiding blob-sized staging allocations. The host codec retains sections on its ProgramLines mapping. CLEAN/GC and BASIC/INPUT state remain protected.
 Banks 4 and 5 now contain the UI and persistence/reservation services. Firmware-owned page-2 metadata leaves KERNAL file tables/keyboard RAM intact. Runtime ABI stays 7 and the arena stays 43,008 bytes. Automated native workflows, malformed-file checks and genuine-KERNAL software checks cover the mode; rendered previews include hardware-sprite composition. Cycle-accurate and physical-machine acceptance remain open. See usage and implementation limits.
 Revision 0.15 breakable LIST, F3 navigation and PRG import — 15 October 2026
@@ -740,12 +741,12 @@ Bank	Current contents	Used / available bytes	Extension role
 1	Raw resident compiler load image	5,712 / 8,192	Compiler and native emitter growth
 2	Raw runtime load image and banked execution services	7,213 / 8,192	RAM helpers plus DATA, DEF FN activation and device/input services
 3	Split screen editor, PRG importer and recovery header	7,290 / 8,192	Screen UI and stock BASIC PRG import; remaining space for PRG export
-4	Binary/sprite editor UI and recovery header	6,821 / 8,192	Binary/sprite editor
+4	Binary/sprite editor UI and recovery header	7,466 / 8,192	Binary/sprite editor
 5	Binary metadata, reservation and persistence services	3,316 / 8,192	Reservation and binary file services
 6	Recovery header; otherwise erased	9 / 8,192	Numeric tables, fonts and optional resources
 7	Recovery header; otherwise erased	9 / 8,192	Expansion and diagnostics
 
-The editor and stock BASIC PRG importer are implemented in bank 3. Banks 4/5 implement the binary/sprite UI and metadata services. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 38,370 bytes, leaving 27,166 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 441 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
+The editor and stock BASIC PRG importer are implemented in bank 3. Banks 4/5 implement the binary/sprite UI and metadata services. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 39,015 bytes, leaving 26,521 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 441 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
 Maps and bank ownership
 Command execution uses $01 low bits 7: bank 0 at $8000, stock BASIC ROM at $A000, I/O and KERNAL visible. BASIC ROM is visible but the language does not call its routines. Generated native code uses low bits 5: cartridge/BASIC/KERNAL hidden, I/O visible. This retains writable shadow RAM and the existing program arena. Writes beneath visible ROM reach underlying RAM.
 The bank latch at $DE00 is write-only. Firmware records its current bank at $0BE3 (CART_BANK), outside user allocation. Every firmware bank selection updates both locations. Do not infer the latch from a read of $DE00. I/O must be visible when writing the latch. Native user code that selects a different bank must update the shadow too if it expects interrupted banked operations to resume that bank; SYS/USR normalize the bank to zero on return.
@@ -827,7 +828,7 @@ After loading, use BASIC to inspect/edit the listing, RUN to execute supported s
 Binary and sprite editor
 Press F5 in the BASIC editor, or enter the direct command SPRDEF. The editor starts at the reservation list. F7 exits; ← (PETSCII 95) goes back one level. The border is the standard light blue and the character-mode background is dark blue. Returning with F5 preserves the BASIC draft, output pane, focus and listing bookmarks. F5 is also available while collecting keyboard INPUT.
 Reservations and blobs
-Cursor up/down selects a reservation. Return enters its blob list; Return on a blob opens its editor. SPR opens the sprite view; BIN and ASM open the hex view. ASM is a type label reserved for a future assembler.
+Cursor up/down selects a reservation. Return enters its blob list; Return on a blob opens its editor. SPR opens the sprite view; BIN and ASM open the hex view. ASM is a type label reserved for a future assembler. The current reservation remains highlighted while selecting its blobs.
 Key	Reservation selection	Blob selection
 N	Enter start address and byte count	Choose S=SPR, B=BIN or A=ASM; enter size for BIN/ASM
 R	Redefine start and size for a manual reservation	Redefine the selected blob's start and size
@@ -844,7 +845,7 @@ Hex view
 The view shows eight bytes per row: an address, hex values, and PETSCII text. Controls are displayed as periods. Cursor keys stay within the blob and scroll the viewport as needed. Type one or two hex digits to change the selected byte; space, comma or Return advances to the next byte. Typing alone does not advance.
 The bottom line shows the selected address, byte hex/decimal value, and the little-endian word formed with the next byte. At the final byte the high byte is zero; the editor never reads outside the blob. I fills the complete blob with a prompted byte value. T changes its metadata type while keeping the hex view open. S/L exchange bytes, and ← returns to blob selection.
 Sprite view
-The enlarged 24×21 view uses one character per hires pixel, or two characters per multicolor pixel. Top/bottom column rulers and left row rulers surround it. The 1X and 2X previews use hardware sprites. Two complementary hires hardware sprites create the black/white hatched cursor outline, widened for multicolor. The preview's transparent pixels show the sprite's own background color.
+The enlarged 24×21 view uses one character per hires pixel, or two characters per multicolor pixel. Light-blue borders surround the grid; the top/bottom column rulers and left row rulers use reversed numbers. The 1X and 2X previews use hardware sprites. Two complementary hires hardware sprites create the black/white hatched cursor outline, widened for multicolor. The entire preview panel below the labels uses the sprite's background color, including the space around and between the centered 1X/2X hardware sprites.
 Key	Action
 Cursor keys	Move within the 24×21 or 12×21 logical pixels
 1	Background: value 0 / multicolor bits 00
@@ -866,6 +867,7 @@ The v2 byte layout is the eight-byte AB64SRC/zero magic, version/flags 2,0, a on
 LOAD stages source and metadata and validates the complete stream before writing blob bytes. It then reopens the validated file and restores data without needing an additional blob-sized RAM buffer; keep the file available and unchanged until LOAD finishes. CRC/truncation errors in validation preserve the old source, metadata and blob bytes. An I/O failure during the second pass can leave already restored bytes changed. As with existing staged source loads, NEW before loading can help when the old program occupies pages required by the incoming program. CLEAN and garbage collection preserve the metadata and protected bytes.
 The host ab64.container codec retains metadata on its ProgramLines mapping, so dumps(*loads(data)) preserves the binary sections. Reservation and Blob objects allow creating v2 files on the host. Text decoding exports BASIC source only; use .AB or individual .BIN files to retain binary content.
 Implementation and validation
+Scenes are composed one row at a time and compared with screen and color RAM; only changed cells are written, without clearing the screen between updates. Visible hex navigation updates the old/new byte cells and the value footer. Sprite painting updates just its enlarged pixel and the preview data byte; cursor motion and palette selection leave the rest of the screen intact. Prompts also update only changed cells and restore their covered rows when dismissed.
 ROM bank 4 contains the UI and bank 5 the metadata/reservation/file services. The existing bank-call gateway restores bank, mapping and interrupt state. Persistent metadata occupies $0200–$0258 and $02A7–$02FF, leaving KERNAL file tables and keyboard state intact. These ranges are firmware-owned. Transient buffers use existing inactive workspace, preserving the BASIC draft and frozen control stack. VIC registers and sprite pointers are restored on exit.
 The sprite organization follows the original Commodore documentation: 24×21 sprite geometry and 63 pixel bytes, multicolor pairs and pointers.
 Run the regression suite with python3 tools/test.py. For supplied stock ROMs:

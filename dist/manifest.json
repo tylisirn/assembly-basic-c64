@@ -8,27 +8,27 @@
     1,
     2
   ],
-  "validated_tests": 174,
+  "validated_tests": 179,
   "artifacts": {
     "abi.json": {
-      "bytes": 9302,
-      "sha256": "45dadf5ccb15fb6d8da50efa426aa9feab4e4dcd252345b5c0973ae9e068994c"
+      "bytes": 9301,
+      "sha256": "b9ded2fac043e9bcd40a9fe1744fc68312cb9ab8d1f6b552d2d6a955d7288923"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c"
+      "sha256": "7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "a066bd3c9f40affa8f88e15358864d45944f4a47b7a6ac48120f615b4330c7da"
+      "sha256": "9102f59ccb24e34e59a18d3b7a008be6f613daf856b88b5381d1caa40a203d6c"
     },
     "binary-editor-rom-report.json": {
       "bytes": 301,
-      "sha256": "b30164c0d5fb2f1405b44b879f4948ad999d0cbde611f204e012b9c7f017abc0"
+      "sha256": "18e11b84245d60a56cef0aab1c6fcc0111e5dad04d51e303e1d35550944a2aae"
     },
     "editor-rom-report.json": {
       "bytes": 346,
-      "sha256": "8f25708d124cebdae1bbfc55e69538348787d98b24566178755d446778eb5813"
+      "sha256": "782f9b0f614faaf0d1814f826b6610ff75eded30fb68316b17e609a5a8a42e17"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -63,12 +63,12 @@
       "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
     "size-report.json": {
-      "bytes": 4054,
-      "sha256": "79b3795c7308be142454aa71e6048135545c39bdee6246dd42702825e0ad6542"
+      "bytes": 4053,
+      "sha256": "f10c51c0d332879c443829d1703139f93e1bd012f56f6d3280a138b0bebf70a3"
     },
     "test-report.json": {
       "bytes": 266,
-      "sha256": "ee6a08dbab4555030695b5a9a0ff0e48afbd58ebb63904fd1abeb5c11c46c29e"
+      "sha256": "5ba078ea03a331091dcd4f259c6536e34bbdc902397f31404330b2eee1ae0b42"
     }
   }
 }

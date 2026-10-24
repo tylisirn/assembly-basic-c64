@@ -1,5 +1,5 @@
 {
-  "rom_sha256": "8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c",
+  "rom_sha256": "7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b",
   "environment": "py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing",
   "cold_start_instructions": 163510,
   "workloads": {

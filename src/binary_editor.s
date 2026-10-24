@@ -22,6 +22,7 @@ be_open:
  sta BE_TOP
  sta BE_TOP+1
  sta BE_FLAGS
+ sta BE_OVERLAY
  sta BE_RES_SEL
  lda #$ff
  sta BE_BLOB_SEL
@@ -112,6 +113,11 @@ be_wait:
  cmp #0
  beq be_wait
  sta BE_CHAR
+ lda BE_OVERLAY
+ beq :+
+ jsr be_render_scene
+:
+ lda BE_CHAR
  cmp #$88
  JEQ be_exit
  cmp #95
@@ -196,7 +202,7 @@ be_exit:
  bne @pane
  jmp @cursor
 @stock:
- jsr be_clear
+ jsr be_clear_screen
 @cursor:
  lda BE_OLD_CC
  sta $cc
@@ -208,7 +214,7 @@ be_back:
  bne @blobs
  lda #0
  sta BE_MODE
- jmp @reset
+ jmp be_render
 @blobs:
  lda #1
  sta BE_MODE
@@ -227,7 +233,7 @@ be_upper:
  and #$df
 @done:
  rts
-be_clear:
+be_clear_screen:
  ldx #0
  lda #32
 @chars:
@@ -263,6 +269,183 @@ be_clear:
  lda #14
  sta BE_COLOR
  rts
+; Compose a row before touching video memory. Revisited rows retain cells
+; already drawn in this frame; first visits start with the scene background.
+be_paint_begin:
+ lda #0
+ sta BE_PAINT_STYLE
+ ldx #3
+@seen:
+ sta BE_PAINT_SEEN,x
+ dex
+ bpl @seen
+ lda #$ff
+ sta BE_PAINT_ROW
+ rts
+be_patch_begin:
+ jsr be_paint_begin
+ ldx #3
+@seen:
+ sta BE_PAINT_SEEN,x
+ dex
+ bpl @seen
+ rts
+be_begin_scene:
+ jsr be_paint_begin
+ lda #0
+ sta BE_OVERLAY
+ lda BE_MODE
+ cmp #3
+ bne :+
+ inc BE_PAINT_STYLE
+:
+ lda #0
+ sta BE_ROW
+ sta BE_COL
+ sta BE_REVERSE
+ lda #14
+ sta BE_COLOR
+ rts
+be_paint_pointer:
+ ldx BE_PAINT_ROW
+ lda be_rows_lo,x
+ sta ED_PTR
+ sta ED_CPTR
+ lda be_rows_hi,x
+ sta ED_PTR+1
+ clc
+ adc #$d4
+ sta ED_CPTR+1
+ rts
+be_flush:
+ lda BE_PAINT_ROW
+ cmp #25
+ bcs @done
+ jsr be_paint_pointer
+ ldy #39
+@cell:
+ lda BE_PAINT_CHARS,y
+ cmp (ED_PTR),y
+ beq :+
+ sta (ED_PTR),y
+:
+ lda (ED_CPTR),y
+ and #15
+ cmp BE_PAINT_COLORS,y
+ beq :+
+ lda BE_PAINT_COLORS,y
+ sta (ED_CPTR),y
+:
+ dey
+ bpl @cell
+@done:
+ rts
+be_paint_row:
+ lda BE_ROW
+ cmp BE_PAINT_ROW
+ beq @done
+ jsr be_flush
+ lda BE_ROW
+ sta BE_PAINT_ROW
+ and #7
+ tax
+ lda be_paint_bits,x
+ sta BE_PAINT_BIT
+ lda BE_ROW
+ lsr
+ lsr
+ lsr
+ tay
+ lda BE_PAINT_SEEN,y
+ and BE_PAINT_BIT
+ bne @retain
+ lda BE_PAINT_SEEN,y
+ ora BE_PAINT_BIT
+ sta BE_PAINT_SEEN,y
+ ldx #39
+@blank:
+ lda #32
+ sta BE_PAINT_CHARS,x
+ lda #14
+ sta BE_PAINT_COLORS,x
+ dex
+ bpl @blank
+ lda BE_PAINT_STYLE
+ beq @done
+ ; Light-blue frame around the 24x21 character grid.
+ ldx #26
+@border:
+ cpx #2
+ bcc @solid
+ cpx #26
+ beq @solid
+ lda BE_ROW
+ cmp #2
+ bcc @solid
+ cmp #23
+ bcc @next
+@solid:
+ lda #$a0
+ sta BE_PAINT_CHARS,x
+@next:
+ dex
+ bpl @border
+ ; The entire preview panel below the labels uses this sprite's BG.
+ lda BE_ROW
+ beq @done
+ cmp #10
+ bcs @done
+ lda BE_RECORD+6
+ and #15
+ ldx #39
+@preview:
+ sta BE_PAINT_COLORS,x
+ pha
+ lda #$a0
+ sta BE_PAINT_CHARS,x
+ pla
+ dex
+ cpx #28
+ bcs @preview
+@done:
+ rts
+@retain:
+ jsr be_paint_pointer
+ ldy #39
+@load:
+ lda (ED_PTR),y
+ sta BE_PAINT_CHARS,y
+ lda (ED_CPTR),y
+ and #15
+ sta BE_PAINT_COLORS,y
+ dey
+ bpl @load
+ rts
+be_end_scene:
+ lda #0
+ sta BE_ROW
+@row:
+ lda BE_ROW
+ and #7
+ tax
+ lda be_paint_bits,x
+ sta BE_PAINT_BIT
+ lda BE_ROW
+ lsr
+ lsr
+ lsr
+ tay
+ lda BE_PAINT_SEEN,y
+ and BE_PAINT_BIT
+ bne @next
+ jsr be_paint_row
+@next:
+ inc BE_ROW
+ lda BE_ROW
+ cmp #25
+ bcc @row
+ jmp be_flush
+be_paint_bits: .byte 1,2,4,8,16,32,64,128
 be_putc:
  pha
  txa
@@ -276,25 +459,18 @@ be_putc:
  jsr be_code
  ora BE_REVERSE
  pha
- ldx BE_ROW
- cpx #25
+ lda BE_ROW
+ cmp #25
  bcs @skip
- lda be_rows_lo,x
- sta ED_PTR
- lda be_rows_hi,x
- sta ED_PTR+1
- clc
- adc #$d4
- sta ED_CPTR+1
- lda ED_PTR
- sta ED_CPTR
+ lda BE_COL
+ cmp #40
+ bcs @skip
+ jsr be_paint_row
  ldy BE_COL
- cpy #40
- bcs @skip
  pla
- sta (ED_PTR),y
+ sta BE_PAINT_CHARS,y
  lda BE_COLOR
- sta (ED_CPTR),y
+ sta BE_PAINT_COLORS,y
  jmp @advance
 @skip:
  pla
@@ -450,8 +626,76 @@ be_line_end:
  sta BE_REVERSE
  inc BE_LINE
  rts
+; Find the viewport before painting, so scrolling never draws an intermediate
+; frame and then immediately redraws it at a different offset.
+be_list_view:
+ lda #0
+ sta BE_LINE
+ sta BE_INDEX
+ lda #$ff
+ sta BE_SELECTED_ROW
+@res:
+ lda BE_INDEX
+ STORAGE_CALL be_res_used
+ beq @next_res
+ lda BE_INDEX
+ cmp BE_RES_SEL
+ bne :+
+ lda BE_LINE
+ sta BE_SELECTED_ROW
+:
+ inc BE_LINE
+ lda #0
+ sta BE_MATCH
+@blob:
+ lda BE_MATCH
+ STORAGE_CALL be_blob_used
+ beq @next_blob
+ lda BE_MATCH
+ STORAGE_CALL be_get_blob
+ lda BE_RECORD
+ cmp BE_INDEX
+ bne @next_blob
+ lda BE_MODE
+ beq :+
+ lda BE_MATCH
+ cmp BE_BLOB_SEL
+ bne :+
+ lda BE_LINE
+ sta BE_SELECTED_ROW
+:
+ inc BE_LINE
+@next_blob:
+ inc BE_MATCH
+ lda BE_MATCH
+ cmp #16
+ bne @blob
+ inc BE_LINE
+ inc BE_LINE
+@next_res:
+ inc BE_INDEX
+ lda BE_INDEX
+ cmp #8
+ bne @res
+ lda BE_SELECTED_ROW
+ cmp #$ff
+ beq @done
+ cmp BE_TOP
+ bcc @above
+ sec
+ sbc BE_TOP
+ cmp #19
+ bcc @done
+ sec
+ lda BE_SELECTED_ROW
+ sbc #18
+@above:
+ sta BE_TOP
+@done:
+ rts
 be_list_draw:
- jsr be_clear
+ jsr be_list_view
+ jsr be_begin_scene
  BE_TEXT be_res_title
  lda #0
  sta BE_LINE
@@ -465,8 +709,6 @@ be_list_draw:
  lda BE_INDEX
  STORAGE_CALL be_get_res
  jsr be_list_line
- lda BE_MODE
- bne @header
  lda BE_INDEX
  cmp BE_RES_SEL
  bne @header
@@ -562,23 +804,6 @@ be_list_draw:
  lda BE_INDEX
  cmp #8
  JNE @res
- lda BE_SELECTED_ROW
- cmp #$ff
- beq @status
- cmp BE_TOP
- bcc @above
- sec
- sbc BE_TOP
- cmp #19
- bcc @status
- sec
- lda BE_SELECTED_ROW
- sbc #18
- sta BE_TOP
- jmp be_list_draw
-@above:
- sta BE_TOP
- jmp be_list_draw
 @status:
  lda #20
  sta BE_ROW
@@ -611,10 +836,10 @@ be_list_draw:
  lda BE_MODE
  bne @blob_keys
  BE_TEXT be_res_keys
- rts
+ jmp be_end_scene
 @blob_keys:
  BE_TEXT be_blob_keys
- rts
+ jmp be_end_scene
 be_record_range:
  lda BE_RECORD+1
  sta BE_RANGE
@@ -730,7 +955,6 @@ be_enter:
  lda #1
  sta BE_MODE
  lda #0
- sta BE_TOP
  sta BE_INDEX
  lda #$ff
  sta BE_BLOB_SEL
@@ -1066,34 +1290,35 @@ be_prompt_wait:
  sec
  rts
 be_prompt_label:
+ jsr be_prompt_layout
+ jmp be_flush
+be_prompt_layout:
  sta BE_STRING
  stx BE_STRING+1
+ lda #1
+ sta BE_OVERLAY
+ jsr be_paint_begin
  lda #22
  sta BE_ROW
-@clear:
  lda #0
  sta BE_COL
-@line:
- lda #' '
- jsr be_putc
- lda BE_COL
- cmp #40
- bcc @line
+ sta BE_REVERSE
+ lda #14
+ sta BE_COLOR
+ jsr be_paint_row
  inc BE_ROW
- lda BE_ROW
- cmp #25
- bcc @clear
- lda #23
+ lda BE_STRING
+ ldx BE_STRING+1
+ jsr be_puts
+ lda #24
  sta BE_ROW
  lda #0
  sta BE_COL
- lda BE_STRING
- ldx BE_STRING+1
- jmp be_puts
+ jmp be_paint_row
 be_prompt_redraw:
  lda BE_STRING
  ldx BE_STRING+1
- jsr be_prompt_label
+ jsr be_prompt_layout
  lda #24
  sta BE_ROW
  lda #0
@@ -1119,7 +1344,7 @@ be_prompt_redraw:
  jsr be_putc
  lda #0
  sta BE_REVERSE
- rts
+ jmp be_flush
 be_modal_key:
  jsr $ffe4
  cmp #0
@@ -1326,7 +1551,7 @@ be_hex_draw:
  jsr be_hex_draw_scene
  jmp be_wait
 be_hex_draw_scene:
- jsr be_clear
+ jsr be_begin_scene
  lda BE_BLOB_SEL
  STORAGE_CALL be_get_blob
  jsr be_record_range
@@ -1407,11 +1632,79 @@ be_hex_draw_scene:
  lda #0
  sta BE_MATCH
 @cell:
+ jsr be_hex_cell
+ inc BE_WORK+10
+ bne :+
+ inc BE_WORK+11
+:
+ inc BE_MATCH
+ lda BE_MATCH
+ cmp #8
+ JNE @cell
+ inc BE_INDEX
+ lda BE_INDEX
+ cmp #20
+ JNE @row
+ jsr be_hex_footer
+ lda #24
+ sta BE_ROW
+ lda #0
+ sta BE_COL
+ BE_TEXT be_hex_keys
+ jmp be_end_scene
+; Visible byte moves/edits repaint just the old/new cells and the footer.
+; Scrolling changes the viewport and uses the retained full-scene compositor.
+be_hex_refresh:
+ sec
+ lda BE_POS
+ sbc BE_TOP
+ sta LEFT
+ lda BE_POS+1
+ sbc BE_TOP+1
+ JNE be_render
+ lda LEFT
+ cmp #160
+ JCS be_render
+ jsr be_patch_begin
+ lda BE_OLD_POS
+ ldx BE_OLD_POS+1
+ jsr be_hex_patch
+ lda BE_POS
+ cmp BE_OLD_POS
+ bne @new
+ lda BE_POS+1
+ cmp BE_OLD_POS+1
+ beq @footer
+@new:
+ lda BE_POS
+ ldx BE_POS+1
+ jsr be_hex_patch
+@footer:
+ jsr be_hex_footer
+ jsr be_flush
+ jmp be_wait
+be_hex_patch:
+ sta BE_WORK+10
+ stx BE_WORK+11
+ sec
+ sbc BE_TOP
+ tax
+ and #7
+ sta BE_MATCH
+ txa
+ lsr
+ lsr
+ lsr
+ clc
+ adc #2
+ sta BE_ROW
+ jmp be_hex_cell
+be_hex_cell:
  lda BE_WORK+10
  cmp BE_SIZE
  lda BE_WORK+11
  sbc BE_SIZE+1
- bcs @empty
+ bcs @done
  clc
  lda BE_RANGE
  adc BE_WORK+10
@@ -1457,19 +1750,9 @@ be_hex_draw_scene:
  jsr be_putc
  lda #0
  sta BE_REVERSE
-@empty:
- inc BE_WORK+10
- bne :+
- inc BE_WORK+11
-:
- inc BE_MATCH
- lda BE_MATCH
- cmp #8
- JNE @cell
- inc BE_INDEX
- lda BE_INDEX
- cmp #20
- JNE @row
+@done:
+ rts
+be_hex_footer:
  lda #23
  sta BE_ROW
  lda #0
@@ -1524,13 +1807,20 @@ be_hex_draw_scene:
  jsr be_decimal
  lda #')'
  jsr be_putc
- lda #24
- sta BE_ROW
- lda #0
- sta BE_COL
- BE_TEXT be_hex_keys
+@tail:
+ lda BE_COL
+ cmp #40
+ bcs @done
+ lda #' '
+ jsr be_putc
+ jmp @tail
+@done:
  rts
 be_hex_key:
+ lda BE_POS
+ sta BE_OLD_POS
+ lda BE_POS+1
+ sta BE_OLD_POS+1
  lda BE_CHAR
  cmp #$9d
  JEQ @left
@@ -1578,7 +1868,7 @@ be_hex_key:
  jsr be_at_position
  lda BE_PIXEL
  jsr be_write_byte
- jmp be_render
+ jmp be_hex_refresh
 @left:
  lda BE_POS
  ora BE_POS+1
@@ -1628,7 +1918,7 @@ be_hex_key:
 @moved:
  lda #0
  sta BE_NIBBLE
- jmp be_render
+ jmp be_hex_refresh
 be_hex_value:
  cmp #'0'
  bcc @bad
@@ -1669,7 +1959,7 @@ be_sprite_draw:
  jsr be_sprite_draw_scene
  jmp be_wait
 be_sprite_draw_scene:
- jsr be_clear
+ jsr be_begin_scene
  lda BE_BLOB_SEL
  STORAGE_CALL be_get_blob
  jsr be_record_range
@@ -1681,6 +1971,8 @@ be_sprite_draw_scene:
  BE_TEXT be_2x
  lda #0
  sta BE_ROW
+ lda #$80
+ sta BE_REVERSE
  lda #11
  sta BE_COL
  lda BE_RECORD+5
@@ -1721,6 +2013,8 @@ be_sprite_draw_scene:
  lda #2
  sta BE_COL
  lda #0
+ sta BE_REVERSE
+ lda #0
  sta BE_MATCH
 @pixel:
  jsr be_pixel_get
@@ -1741,44 +2035,16 @@ be_sprite_draw_scene:
  cmp #24
  bcc @pixel
 @next_row:
+ lda #$80
+ sta BE_REVERSE
  lda #14
  sta BE_COLOR
  inc BE_INDEX
  lda BE_INDEX
  cmp #21
  bne @row
- ; Solid character backgrounds make transparent preview pixels use this
- ; sprite's own background color, independently of the editor background.
- lda BE_RECORD+6
- and #15
- sta BE_COLOR
- lda #2
- sta BE_INDEX
-@preview_row:
- lda BE_INDEX
- sta BE_ROW
- lda #34
- sta BE_COL
- ldx #6
-@preview:
- jsr be_solid
- dex
- bne @preview
- lda BE_INDEX
- cmp #5
- bcs @preview_next
- lda #28
- sta BE_COL
- ldx #3
-@small:
- jsr be_solid
- dex
- bne @small
-@preview_next:
- inc BE_INDEX
- lda BE_INDEX
- cmp #8
- bne @preview_row
+ lda #0
+ sta BE_REVERSE
  lda #14
  sta BE_COLOR
  lda #10
@@ -1888,7 +2154,7 @@ be_sprite_draw_scene:
  sta BE_COL
  BE_TEXT be_back_key
  jsr be_sprite_hardware
- rts
+ jmp be_end_scene
 be_sprite_ruler:
  sta BE_ROW
  lda #2
@@ -2043,9 +2309,9 @@ be_sprite_hardware:
  lda #$30
  sta $07fa
  sta $07fb
- lda #248
+ lda #252
  sta $d004
- lda #40
+ lda #32
  sta $d006
  lda #66
  sta $d005
@@ -2109,9 +2375,9 @@ be_sprite_cursor:
 be_sprite_key:
  lda BE_CHAR
  cmp #$9d
- beq @left
+ JEQ @left
  cmp #$1d
- beq @right
+ JEQ @right
  cmp #$91
  JEQ @up
  cmp #$11
@@ -2155,7 +2421,40 @@ be_sprite_key:
  and BE_TEMP
  ora BE_WORK+19
  jsr be_write_byte
- jmp be_render
+ ; One changed byte feeds both hardware previews; only its enlarged pixel
+ ; needs repainting. Cursor patterns, labels and rulers remain untouched.
+ pha
+ sec
+ lda BE_ADDR
+ sbc BE_RANGE
+ tax
+ pla
+ sta $0c00,x
+ jsr be_patch_begin
+ lda BE_Y
+ sta BE_INDEX
+ clc
+ adc #2
+ sta BE_ROW
+ lda BE_X
+ sta BE_MATCH
+ ldx BE_RECORD+5
+ bpl :+
+ asl
+:
+ clc
+ adc #2
+ sta BE_COL
+ jsr be_pixel_get
+ jsr be_pixel_color
+ sta BE_COLOR
+ jsr be_solid
+ lda BE_RECORD+5
+ bpl :+
+ jsr be_solid
+:
+ jsr be_flush
+ jmp be_wait
 @left:
  lda BE_X
  beq @cursor
@@ -2373,6 +2672,7 @@ be_color_get:
  lsr
  rts
 be_palette:
+ jsr be_paint_begin
  lda #23
  sta BE_ROW
  lda #0
@@ -2409,7 +2709,7 @@ be_palette:
  sta BE_COLOR
  lda #0
  sta BE_REVERSE
- rts
+ jmp be_flush
 be_1x: .byte "1X",0
 be_2x: .byte "2X",0
 be_sprite_name: .byte "SPR ",0

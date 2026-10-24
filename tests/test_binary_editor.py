@@ -27,6 +27,112 @@ class BinaryEditorTests(unittest.TestCase):
         self.keys('N$3C00\r$200\r\rNB'+str(size)+'\r\r')
         self.assertEqual(self.m.memory.ram[0xe40], 2)
 
+    def record_video_writes(self):
+        from machine import Memory
+
+        class RecordingMemory(Memory):
+            def __setitem__(self, address, value):
+                if 0x400 <= address < 0x7e8 or 0xd800 <= address < 0xdbe8:
+                    self.video_writes.append((address, value))
+                super().__setitem__(address, value)
+
+        self.m.memory.__class__ = RecordingMemory
+        self.m.memory.video_writes = []
+        return self.m.memory.video_writes
+
+    def test_blob_focus_retains_reservation_and_updates_only_changed_rows(self):
+        self.sprite()
+        self.keys('_NS_')  # two sprites, reservation focus
+        m = self.m
+        reservation = bytes(m.memory.ram[0x428:0x450])
+        self.assertTrue(all(c & 128 for c in reservation))
+        writes = self.record_video_writes()
+        self.keys('\r')
+        self.assertEqual(bytes(m.memory.ram[0x428:0x450]), reservation)
+        self.assertFalse(any(0x428 <= p < 0x450 for p, _ in writes))
+        writes.clear()
+        self.keys('\x11')
+        self.assertTrue(writes)
+        self.assertTrue(all(0x400 <= p < 0x7e8 and (p-0x400)//40 in (2,3,20)
+                            for p, _ in writes))
+        self.assertEqual(len(writes), len({p for p, _ in writes}))
+        self.assertEqual(bytes(m.memory.ram[0x428:0x450]), reservation)
+
+    def test_sprite_paint_and_palette_do_not_redraw_other_cells(self):
+        self.sprite()
+        self.keys('I1')
+        m = self.m
+        writes = self.record_video_writes()
+        self.keys('2')
+        self.assertEqual(writes, [(0xd800+2*40+2, 7)])
+        self.assertEqual(m.memory.ram[0xc00], m.memory.ram[0x3c00])
+        writes.clear()
+        self.keys('2\x1d')
+        self.assertEqual(writes, [])
+        self.keys('TC2')
+        writes.clear()
+        self.keys('\x1d')
+        self.assertEqual(len(writes), 2)  # old/new palette selection digits
+        self.assertTrue(all(0x400+23*40 <= p < 0x400+24*40 for p, _ in writes))
+
+    def test_sprite_preview_frame_negative_rulers_and_centered_hardware(self):
+        self.sprite()
+        self.keys('C12\r')
+        m = self.m
+        for row in range(1,10):
+            for col in range(28,40):
+                self.assertEqual(m.memory.ram[0x400+row*40+col], 0xa0)
+                self.assertEqual(m.memory.ram[0xd800+row*40+col], 2)
+        for row in range(25):
+            self.assertEqual(m.memory.ram[0x400+row*40+26], 0xa0)
+            self.assertEqual(m.memory.ram[0xd800+row*40+26], 14)
+        for row,col in [(0,11),(0,21),(1,2),(23,2),(2,0)]:
+            self.assertEqual(m.memory.ram[0x400+row*40+col], ord('1' if col!=21 else '2')|128)
+            self.assertEqual(m.memory.ram[0xd800+row*40+col], 14)
+        for col in range(27):
+            self.assertEqual(m.memory.ram[0x400+24*40+col], 0xa0)
+        self.assertEqual(m.memory.ram[0xd004]+12, 24+(29+1)*8)
+        self.assertEqual(m.memory.ram[0xd006]+256+24, 24+(35+1)*8)
+        self.keys('T')
+        self.assertEqual(m.memory.ram[0x400+40+3], ord('.')|128)
+
+    def test_hex_navigation_and_noop_entry_only_write_changed_cells(self):
+        self.binary()
+        self.keys('00')
+        writes = self.record_video_writes()
+        self.keys('0')
+        self.assertEqual(writes, [])
+        before = self.m.steps
+        self.keys('\x1d')
+        self.assertLess(self.m.steps-before, 10000)  # no full viewport formatting
+        self.assertTrue(writes)
+        self.assertTrue(all(0x400 <= p < 0x7e8 and (p-0x400)//40 in (2,23)
+                            for p, _ in writes))
+        self.assertEqual(len(writes), len({p for p, _ in writes}))
+        # A shorter decimal word must erase the previous footer's suffix.
+        self.m.memory.ram[0x3c01:0x3c04] = b'\xff\xff\0'
+        self.keys('FF')
+        self.assertIn(b'65535', bytes(self.m.memory.ram[0x798:0x7c0]))
+        self.m.memory.ram[0x3c02] = 0
+        self.keys('00')
+        self.assertEqual(bytes(self.m.memory.ram[0x798:0x7c0]).rstrip(),
+                         b'$3\x0301  $00 (0)  $0000 (0)')
+
+    def test_error_overlay_restores_covered_rows_before_incremental_edits(self):
+        self.binary()
+        m = self.m
+        help_row = bytes(m.memory.ram[0x7c0:0x7e8])
+        self.keys('I256\r')
+        self.assertNotEqual(bytes(m.memory.ram[0x7c0:0x7e8]), help_row)
+        self.keys('\x1d')
+        self.assertEqual(bytes(m.memory.ram[0x7c0:0x7e8]), help_row)
+        self.keys('_CS\r')
+        self.assertEqual(m.memory.ram[0xe40], 3)
+        bottom = bytes(m.memory.ram[0x798:0x7e8])
+        self.keys('B256\r')
+        self.keys('2')
+        self.assertEqual(bytes(m.memory.ram[0x798:0x7e8]), bottom)
+
     def test_manual_reservations_blobs_resize_and_types_preserve_bytes(self):
         m = self.m
         original = bytes((i*3)&255 for i in range(1024))
