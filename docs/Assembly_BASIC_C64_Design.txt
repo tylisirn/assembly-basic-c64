@@ -1,7 +1,7 @@
 Assembly BASIC for the Commodore 64
 Implementation design for an integer and string BASIC ROM cartridge
 Implementation status: working development cartridge; the full version-one release is not complete. See Appendix B for measured implementation facts, explicit differences and pending acceptance work.
-Design specification  |  Version 0.15  |  15 October 2026
+Design specification  |  Version 0.16  |  24 October 2026
 Implement Assembly BASIC as a 64 KiB classic Magic Desk autostart cartridge containing the command/editor firmware, tokenizer, compiler and an execution runtime load image. Copy compiler/runtime helpers to fixed RAM and execute native programs with cartridge, BASIC and KERNAL ROM hidden. Retain custom tokens beside native code and link each body through its final successor JMP. LIST expands source tokens into canonical PETSCII.
 Use a seven-byte stable anchor per line and a single allocation containing its tokens and native body. Bind full identifiers to an interned name dictionary. Keywords, operators and the first 128 name references each occupy one byte; valid integer immediates are binary values. Runtime calls use fixed RAM helpers or common-RAM service entry stubs. Cold DATA/READ/RESTORE, DEF FN activation and device/input helpers execute from bank-2 ROM through bank_call; hot arithmetic, arrays, strings, function calls and collection remain in RAM.
 Version 0.3 replaces the earlier ROM-resident execution model, 32-byte nodes and stock BASIC token storage. It adds RAM beneath both cartridge ROM and KERNAL to the allocation map, removes persistent statement and relocation tables, and adopts the custom source format specified in Appendix A. Source and file tokens have no binary compatibility requirement with stock BASIC. Familiar BASIC syntax, integer/string behavior and device interaction remain the compatibility goals.
@@ -99,7 +99,7 @@ $E400-$FFF9	7162 bytes	Copied execution helpers, tables and constants; permanent
 $FFFA-$FFFF	6 bytes	RAM hardware vectors beneath KERNAL.
 
 The implemented allocator has two spans: [$2C00,$D000) and [$E000,$E400). Their raw total is 42 KiB (43008 bytes), before anchors, names, source, generated code, arrays, strings and free-block overhead. The $1400-$2BFF range is permanently reserved for a 6 KiB compiler image copied from bank 1 at startup. The $E000-$E3FF shadow span supplies 1 KiB; $E400-$FFFF is permanently reserved for the runtime and six vector bytes. This is the lower-runtime-base adjustment permitted by the original design.
-These are ABI 7 build limits. The 65536-byte cartridge has eight 8192-byte banks. Runtime helpers occupy 5922 of 7162 bytes at $E400-$FFF9; the compiler occupies 5985 of 6144 bytes at $1400-$2BFF; the gateway occupies 593 of 768 bytes and service entry stubs occupy 152 of 204 bytes at $0334-$03FF. Native ROM-off execution remains required. No allocation may cross the I/O hole or overlap firmware. Future RAM-layout changes require a new ABI and source recompilation.
+These are ABI 7 build limits. The 65536-byte cartridge has eight 8192-byte banks. Runtime helpers occupy 5922 of 7162 bytes at $E400-$FFF9; the compiler occupies 5703 of 6144 bytes at $1400-$2BFF; the gateway occupies 593 of 768 bytes and service entry stubs occupy 152 of 204 bytes at $0334-$03FF. Native ROM-off execution remains required. No allocation may cross the I/O hole or overlap firmware. Future RAM-layout changes require a new ABI and source recompilation.
 Fixed workspace within $0800-$13FF	Bytes
 Language state, arena heads and saved context	256
 Input and binary-token scratch	512
@@ -266,7 +266,7 @@ SYS uses a common-RAM trampoline and the stock $030C-$030F register convention t
 Before resuming language execution, the trampoline restores the execution map and clears decimal mode. User code must return with the expected stack shape. POKE can still corrupt gateway bytes, allocation state, runtime helpers, hardware vectors or $0000/$0001; ordinary C64 memory access provides no protection. Supported reservations and the gateway ABI make deliberate machine-code integration possible without allocator collisions.
 12 File formats and program persistence
 Custom authoritative source container
-SAVE writes Assembly BASIC source format version 1, specified in Appendix A. The container has magic/version, names, sorted line/token records and CRC; it has no pointers, native bodies, anchors or C64 load address. SAVE, LOAD and VERIFY accept filename[,device[,secondary]], defaulting device to 8. The optional secondary is evaluated once and checked as a byte 0..255, then ignored for source-only .AB files. Use a Commodore sequential byte file; transport retains channel 2 regardless of the compatibility argument. Validate the complete argument list before emitting the file operation, so malformed file arguments cannot write/load first and raise a syntax trap afterward. Colon and ELSE are legitimate boundaries. LOAD keeps its existing staged publication and return-to-READY behavior.
+SAVE writes Assembly BASIC source format version 1 for plain programs, as specified in Appendix A, or version 2 when binary reservations/blobs are present. Version 2 prefixes reservation descriptors before dictionary/source allocation and appends blob/type/palette metadata and exact bytes before the CRC. LOAD accepts both versions. The container has magic/version, names, sorted line/token records and CRC; it has no pointers, native bodies, anchors or C64 load address. SAVE, LOAD and VERIFY accept filename[,device[,secondary]], defaulting device to 8. The optional secondary is evaluated once and checked as a byte 0..255, then ignored for source-only .AB files. Use a Commodore sequential byte file; transport retains channel 2 regardless of the compatibility argument. Validate the complete argument list before emitting the file operation, so malformed file arguments cannot write/load first and raise a syntax trap afterward. Colon and ELSE are legitimate boundaries. LOAD keeps its existing staged publication and return-to-READY behavior.
 The native source format uses the compact vocabulary rather than stock BASIC V2 keyword assignments or linked PRG records. Existing stock tokenized PRGs require an external or optional text conversion path; they are not the native loader’s input. Canonical PETSCII text produced by LIST is the exchange representation for other editors and languages.
 SAVE includes only names referenced by live source and assigns dense export IDs in ascending order of their existing IDs. Each export ID is therefore no greater than its original ID: remapping can shorten a reference but never widen it or overflow a valid 255-byte line. Rewrite references during serialization and omit unused tombstones, deleted names and values. LOAD stages a fresh dictionary in file-ID order with new stable bindings; it does not append names to the old program’s ID space. Pointer values never come from the file.
 Validate magic, format version, limits, full name spelling, dictionary uniqueness, token payload lengths, minimal integer encodings, ID bounds, DATA spelling consistency, sorted unique line numbers, end marker and CRC before publication. Reject reserved codes and truncated payloads. A token count is a byte count, not an instruction count. Raw literal bytes can include zero and token-valued bytes, so zero does not terminate a record.
@@ -278,12 +278,12 @@ VERIFY compares canonical serialized source, including dictionary remapping and 
 Do not save machine code in version 1. A future native cache must include a cartridge/runtime ABI identifier and complete binding validation; discarded relocation tables cannot be assumed to exist. Invalid caches regenerate from retained tokens. The compact source container remains authoritative for LIST, editing and rebuilds.
 13 Capacity performance and ROM budget
 Cartridge contents	Bank budget / measured used bytes
-Bank 0: boot, command editor, tokenizer, LIST and source transport	8192 / 7953 bytes
-Bank 1: raw resident compiler image	8192 / 5994 bytes
+Bank 0: boot, command editor, tokenizer, LIST and source transport	8192 / 8000 bytes
+Bank 1: raw resident compiler image	8192 / 5712 bytes
 Bank 2: raw RAM execution runtime image and banked ROM services	8192 / 7213 bytes
-Bank 3: split screen editor and stock BASIC PRG import; PRG export reserved	8192 / 7180 bytes
-Bank 4: reserved: 16.16 fixed-point and PRINT formatting extensions	8192 / 9 bytes
-Bank 5: reserved: sprite, VIC and SID commands	8192 / 9 bytes
+Bank 3: split screen editor and stock BASIC PRG import; PRG export reserved	8192 / 7290 bytes
+Bank 4: binary, reservation and sprite editor	8192 / 6821 bytes
+Bank 5: binary metadata, memory reservation and source persistence	8192 / 3316 bytes
 Bank 6: reserved: numeric tables, fonts and optional resources	8192 / 9 bytes
 Bank 7: reserved: expansion and diagnostics	8192 / 9 bytes
 Hard cartridge limit	64 KiB (65536 bytes)
@@ -473,12 +473,12 @@ The container deliberately separates name spelling from occurrences and excludes
 A7 Canonical validation and invariants
 Valid binary streams use the smallest decimal encoding, direct name codes for IDs below 128, and nonzero payload lengths for BADTEXT, NUMTEXT and DATA_SPELLING. Require REM followed by exactly one REMTEXT token. Check DATA-only forms in context, reject delimiter bytes in DATA_TEXT and require numeric fields to use binary values rather than hiding them in DATA_TEXT. Validate syntax separately from lexical structure: safe tokens may still compile to a reached BASIC syntax error. Reserved codes, out-of-range IDs or payload overruns cannot enter the live graph.
 Keep source tokens authoritative. Constant folding modifies native code only. Canonical LIST and the text importer must preserve numeric magnitude/radix, full names, signs, literal bytes and DATA spelling semantics. A format version change is required before reassigning any code or altering its payload interpretation.
-Appendix B — implementation status, revision 0.15
-This appendix records the development implementation on 15 October 2026. The full version-one contract is not yet complete. Original release requirements above remain the target unless an architectural choice is explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.
+Appendix B — implementation status, revision 0.16
+This appendix records the development implementation on 24 October 2026. The full version-one contract is not yet complete. Original release requirements above remain the target unless an architectural choice is explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.
 Measured linked build
 Build property	Measured value
 ROM bytes	65,536
-ROM SHA-256	28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48
+ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
 Cartridge type	19
 Cartridge format	classic Magic Desk
 Bank bytes	8,192
@@ -498,22 +498,28 @@ Service gateway used bytes	152
 Service gateway budget bytes	204
 Service gateway code budget bytes	152
 Editor bank	3
-Editor ROM bytes	7,171
+Editor ROM bytes	7,281
 Editor text workspace	[$0A60, $0B00) (exclusive end)
 Editor state workspace	[$03CC, $0400) (exclusive end)
 Editor view workspace	[$0F80, $0FE0) (exclusive end)
 Editor help tail workspace	[$0FE0, $1000) (exclusive end)
+Binary editor bank	4
+Binary editor ROM bytes	6,812
+Binary storage bank	5
+Binary storage ROM bytes	3,307
+Binary metadata workspaces	[$0200, $0259); [$02A7, $0300) (exclusive ends)
+Source versions	1, 2
 Services bank	2
 Services ROM address	$972B (38,699)
 Services ROM bytes	1,282
 Arena raw bytes	43,008
 Compiler run address	$1400 (5,120)
-Compiler used bytes	5,985
-Compiler ROM bytes	5,985
+Compiler used bytes	5,703
+Compiler ROM bytes	5,703
 Compiler image encoding	raw
 Compiler budget bytes	6,144
-ROM used bytes	28,376
-ROM spare bytes	37,160
+ROM used bytes	38,370
+ROM spare bytes	27,166
 
 User arena spans
 Start	Exclusive end	Raw bytes
@@ -523,25 +529,27 @@ $E000	$E400	1,024
 Cartridge bank allocation
 Each bank uses the CPU window [$8000, $A000), with an exclusive upper bound. ROM offsets below are byte offsets.
 Bank	ROM offset	Contents	Used bytes	Spare bytes	Reserved
-0	0	boot, command editor, tokenizer, LIST and source transport	7,953	239	No
-1	8,192	raw resident compiler image	5,994	2,198	No
+0	0	boot, command editor, tokenizer, LIST and source transport	8,000	192	No
+1	8,192	raw resident compiler image	5,712	2,480	No
 2	16,384	raw RAM execution runtime image and banked ROM services	7,213	979	No
-3	24,576	split screen editor and stock BASIC PRG import; PRG export reserved	7,180	1,012	No
-4	32,768	reserved: 16.16 fixed-point and PRINT formatting extensions	9	8,183	Yes
-5	40,960	reserved: sprite, VIC and SID commands	9	8,183	Yes
+3	24,576	split screen editor and stock BASIC PRG import; PRG export reserved	7,290	902	No
+4	32,768	binary, reservation and sprite editor	6,821	1,371	No
+5	40,960	binary metadata, memory reservation and source persistence	3,316	4,876	No
 6	49,152	reserved: numeric tables, fonts and optional resources	9	8,183	Yes
 7	57,344	reserved: expansion and diagnostics	9	8,183	Yes
 
 Linked segment sizes
 Segment	Bytes
 HEADER	9
-COMMAND	7,199
+COMMAND	7,246
 GATEWAY	593
-COMPILER	5,985
+COMPILER	5,703
 RUNTIME	5,922
 SERVICES	1,282
 SERVICE_GATEWAY	152
-SCREEN_EDITOR	7,171
+SCREEN_EDITOR	7,281
+BINARY_STORAGE	3,307
+BINARY_EDITOR	6,812
 HEADER1	9
 HEADER2	9
 HEADER3	9
@@ -551,18 +559,18 @@ HEADER6	9
 HEADER7	9
 
 Validation and implementation context
-Automated validation: 157 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
-Source/container version 1 and runtime ABI 7 are distinct. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
+Automated validation: 174 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
+Source v1/v2 and runtime ABI 7 are distinct; v2 carries binary metadata and bytes. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
 Instruction-level measurements and capacity scenario
 Measurement context	Value
-ROM SHA-256	28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48
+ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
 Environment	py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing
-Cold start instructions	166,531
+Cold start instructions	163,510
 
 Integer loop
 Counter	Instructions
 Source entry	25,063
-RUN	150,392
+RUN	150,400
 Captured output (spaces and line breaks preserved):
  5050
 
@@ -574,7 +582,7 @@ BASIC line	Token bytes	Native bytes	Physical payload bytes
 Strings arrays
 Counter	Instructions
 Source entry	46,446
-RUN	85,001
+RUN	85,009
 Captured output (spaces and line breaks preserved):
  246 ROOT
 
@@ -587,7 +595,7 @@ BASIC line	Token bytes	Native bytes	Physical payload bytes
 Shadow address
 Counter	Instructions
 Source entry	19,917
-RUN	80,979
+RUN	80,987
 Captured output (spaces and line breaks preserved):
 -12288  1
 
@@ -610,7 +618,7 @@ READY.
 
 Captured Void Runner collection replay
 Replay property	Value
-ROM SHA-256	28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48
+ROM SHA-256	8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c
 Environment	instruction-level py65; no IRQ/VIC timing
 Captured physical blocks	1,636
 Initial free blocks	253
@@ -621,11 +629,11 @@ New full CPU cycles	1,269,981
 Final free blocks	9
 Final free bytes	5,651
 
-Implementation status — design revision 0.15
+Implementation status — design revision 0.16
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 Area	Implemented behavior	Remaining work
 Platform	64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies, generic banked-service calls and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame	Broader VICE/stock-ROM acceptance, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts
-Editing and storage	Bank-3 split screen editor with persistent line/viewport bookmarks, bounded four-row command/INPUT pane, insert/overwrite with independent literal entry, F1 help, F3 numeric jumps, stock BASIC PRG import and clean exit; seven-byte stable anchors in 250-byte slabs, exact adjacent tokens/native bodies, final successor JMP, sorted insertion/replacement/deletion, tombstones, coalescing allocator with payloads allocated from the high end, staged failed edits, page-based graphics/machine-code RESERVE declarations, direct CLEAN rebuild of dense slabs and symbols with complete native rebinding	General arena sliding compaction, full graph-integrity preflight before every traversal, complete name-allocation rollback on failed edits
+Editing and storage	Bank-3 split screen editor with persistent line/viewport bookmarks, bounded four-row command/INPUT pane, insert/overwrite with independent literal entry, F1 help, F3 numeric jumps, F5 binary/sprite editing, stock BASIC PRG import and clean exit; seven-byte stable anchors in 250-byte slabs, exact adjacent tokens/native bodies, final successor JMP, sorted insertion/replacement/deletion, tombstones, coalescing allocator with payloads allocated from the high end, staged failed edits, page-based graphics/machine-code RESERVE declarations, direct CLEAN rebuild of dense slabs and symbols with complete native rebinding	General arena sliding compaction, full graph-integrity preflight before every traversal, complete name-allocation rollback on failed edits
 Source	Custom Appendix A vocabulary, binary words and hexadecimal radix, whole/full identifiers up to 255 imported bytes, shifted-letter abbreviations, raw comments/strings/DATA, dense export dictionary, ranged canonical LIST on a fresh line, compact call/group delimiters with spaced operators, entry diagnostics while retaining malformed source	Broader malformed text-recovery coverage; host period abbreviations are an extra host convenience
 Compilation	Bounded two-pass Pratt parser, real 6502 machine code, stable scalar cells, native branch/line linkage, IF/THEN/ELSE with nearest-IF binding and line targets, context and deferred error stubs, literal power-of-two shift lowering	Helper-heavy expression code lacks the proposed inline scalar arithmetic optimizations; no stock-ROM differential corpus yet
 Integer operations	Wrapped 16-bit arithmetic, signed and unsigned % division/comparison/formatting, eager logical operators, precedence, checked byte/address and allocation quantities, integer VAL, arithmetic shifts, clock-seeded word RND with repeat/reseed semantics	Full INPUT conversion/retry compatibility and unsupported numeric diagnostic corpus
@@ -633,7 +641,7 @@ Control	GOTO, ON GOTO/GOSUB, GOSUB/RETURN, dynamic FOR/NEXT including variable r
 Strings and arrays	Immutable heap strings, concatenation/slicing/conversion, numeric/string arrays, checked bounds/products, eight dimensions, READ array targets, registered-root collection with windowed bitmap marking and a monotonic free-list sweep	Reduce observable collection pauses; broader failure injection and automatic collection/fragmentation stress under IRQ/VIC activity
 Functions	Full-name DEF FN, compiled expression bodies, stable parameter cells restored after calls, guarded recursion	Activations use a bounded hardware stack with depth limit eight; move them to the designed tagged software activation stack and audit interrupt headroom
 Devices and clocks	PRINT#/INPUT#/GET#/OPEN/CLOSE/CMD, staged filenames, SYS/USR map recovery, ST, low-word TI, six-digit TI$ read/set	INPUT and GET accept scalar targets only; custom INPUT prompts, line retry, missing/extra-field handling, real serial/device-status tests
-Persistence	Source-only SAVE, CRC, dense referenced-name IDs, bounded sequential LOAD including empty strings/text with second-graph publication and failure rollback, target VERIFY	Target VERIFY compares canonical output bytes rather than canonicalizing arbitrary valid file dictionaries; target loader lacks every DATA_SPELLING equality/context check in Appendix A; host validator is stricter
+Persistence	Source v1 plus v2 reservation/blob metadata and bytes, CRC, dense referenced-name IDs, bounded sequential LOAD including empty strings/text with second-graph publication and failure rollback, target VERIFY	Target VERIFY compares canonical output bytes rather than canonicalizing arbitrary valid file dictionaries; target loader lacks every DATA_SPELLING equality/context check in Appendix A; host validator is stricter
 Release evidence	Automated instruction-level regression suite, all 65,536 word round trips in both radices, malformed-container fuzzing, runtime dependency/opcode and size gates	Capacity/fragmentation workload corpus, cycle-accurate latency and speedup comparison, PAL/NTSC and real-device release checklist
 
 User-reported VICE validation — 10 October 2026
@@ -648,7 +656,12 @@ String collection is nonmoving mark-and-sweep, followed by free-list coalescing,
 Name interning compares complete normalized spellings through a linked dictionary. It preserves full identity but has linear compilation lookup rather than hash buckets. Scalar references bind stable cells at compile time.
 Language zero page is $02–$78; KERNAL service state uses $90–$FF. Common workspace is $0800–$13FF. A supported stock KERNAL audit remains a release requirement.
 $0334–$03FF (204 bytes) is firmware-owned common RAM: 152 bytes hold service/output entry stubs and 52 bytes hold editor state. The main gateway holds 593 code bytes and a keyboard-input stub; $0A60–$0AFF holds the 160-byte editor draft. Cold start copies the stubs after KERNAL initialization because RAMTAS clears page 3. Tape transport remains unsupported. See the banked-service ABI.
-Runtime ABI and source-container version are separate. Source files remain version 1, magic AB64SRC\0, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+Runtime ABI and source-container version are separate. Source-only files remain version 1, with version 2 for binary metadata, magic AB64SRC\0, little-endian fields and CRC-16/CCITT-FALSE. Host validation is authoritative for the complete Appendix A structural and canonical checks currently implemented.
+Revision 0.16 binary/sprite editor — 24 October 2026
+F5 and direct SPRDEF open the reservation/blob manager. Manual byte-granular reservations and SPR/BIN/ASM blobs support creation, deletion, bounds/type changes and exact sequential BIN exchange. BASIC RESERVE entries have locked bounds. Metadata edits retain data bytes; allocator page protection persists until NEW.
+The hex view provides eight-byte rows, PETSCII text, bounded cursor/scrolling, nibble entry, byte/word decimal+hex status and explicit initialization. Sprite editing uses character cells, actual 1X/2X VIC sprites and two overlaid hatched hires cursor sprites; hires/multicolor drawing, per-sprite palettes, pixel initialization and byte 64 editing are implemented. ASM opens the hex view pending a future assembler.
+Source v2 adds reservations, blob metadata and exact blob bytes under the file CRC. Plain source remains v1; both load. LOAD validates before restoring bytes in a second streaming pass, avoiding blob-sized staging allocations. The host codec retains sections on its ProgramLines mapping. CLEAN/GC and BASIC/INPUT state remain protected.
+Banks 4 and 5 now contain the UI and persistence/reservation services. Firmware-owned page-2 metadata leaves KERNAL file tables/keyboard RAM intact. Runtime ABI stays 7 and the arena stays 43,008 bytes. Automated native workflows, malformed-file checks and genuine-KERNAL software checks cover the mode; rendered previews include hardware-sprite composition. Cycle-accurate and physical-machine acceptance remain open. See usage and implementation limits.
 Revision 0.15 breakable LIST, F3 navigation and PRG import — 15 October 2026
 LIST polls KERNAL RUN/STOP and the cartridge pending-break flag between lines, in both direct and split-editor modes. Breaking returns to input without altering the source.
 F3 opens an incremental numeric status-bar prompt; Enter or any non-digit closes it without submitting the draft. Exact or next-higher lines are selected, falling back to the last line above the program end. Off-screen F3/submission jumps show up to three preceding BASIC lines, reducing context if wrapping would hide the destination. Visible jumps update only number highlights; character-row scrolling and unchanged listing color RAM are retained.
@@ -720,19 +733,19 @@ The later Void Runner freeze was a very long collection pause on a valid heap. C
 Error output and command allocator wrappers share the resident compiler image. Its RAM reservation remains unchanged in revision 0.6.
 Releasing version one
 Resolve the remaining behavior above, then execute the original section 14 acceptance corpus with genuine KERNAL ROMs, a cycle-accurate emulator, and PAL/NTSC machines. Include every bank-transition interrupt boundary, hardware stack maximum, allocation-failure site and source corruption boundary. Publish measured capacity, startup/copy latency and representative native speedups with normal VIC/IRQ activity. The current harness results cannot substitute for that evidence.
-Magic Desk cartridge architecture — revision 0.15
+Magic Desk cartridge architecture — revision 0.16
 The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at $8000–$9FFF. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the VICE cartridge specification; VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
 Bank	Current contents	Used / available bytes	Extension role
-0	Autostart, command editor, tokenizer, LIST, source transport, gateway load image	7,953 / 8,192	Command dispatch and shared entry points
-1	Raw resident compiler load image	5,994 / 8,192	Compiler and native emitter growth
+0	Autostart, command editor, tokenizer, LIST, source transport, gateway load image	8,000 / 8,192	Command dispatch and shared entry points
+1	Raw resident compiler load image	5,712 / 8,192	Compiler and native emitter growth
 2	Raw runtime load image and banked execution services	7,213 / 8,192	RAM helpers plus DATA, DEF FN activation and device/input services
-3	Split screen editor, PRG importer and recovery header	7,180 / 8,192	Screen UI and stock BASIC PRG import; remaining space for PRG export
-4	Recovery header; otherwise erased	9 / 8,192	16.16 fixed-point helpers and improved PRINT
-5	Recovery header; otherwise erased	9 / 8,192	Sprite, VIC and SID commands
+3	Split screen editor, PRG importer and recovery header	7,290 / 8,192	Screen UI and stock BASIC PRG import; remaining space for PRG export
+4	Binary/sprite editor UI and recovery header	6,821 / 8,192	Binary/sprite editor
+5	Binary metadata, reservation and persistence services	3,316 / 8,192	Reservation and binary file services
 6	Recovery header; otherwise erased	9 / 8,192	Numeric tables, fonts and optional resources
 7	Recovery header; otherwise erased	9 / 8,192	Expansion and diagnostics
 
-The editor and stock BASIC PRG importer are implemented in bank 3. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 28,376 bytes, leaving 37,160 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 159 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
+The editor and stock BASIC PRG importer are implemented in bank 3. Banks 4/5 implement the binary/sprite UI and metadata services. The remaining reserved roles guide future allocation; they do not add their planned language features. Total linked ROM use is 38,370 bytes, leaving 27,166 bytes across the eight banks. Spare space in different banks is not interchangeable without changing placement or adding a bank call. In particular, the compiler's RAM reservation has only 441 unused bytes and the runtime's has 1,240; additional ROM capacity does not enlarge those reservations.
 Maps and bank ownership
 Command execution uses $01 low bits 7: bank 0 at $8000, stock BASIC ROM at $A000, I/O and KERNAL visible. BASIC ROM is visible but the language does not call its routines. Generated native code uses low bits 5: cartridge/BASIC/KERNAL hidden, I/O visible. This retains writable shadow RAM and the existing program arena. Writes beneath visible ROM reach underlying RAM.
 The bank latch at $DE00 is write-only. Firmware records its current bank at $0BE3 (CART_BANK), outside user allocation. Every firmware bank selection updates both locations. Do not infer the latch from a read of $DE00. I/O must be visible when writing the latch. Native user code that selects a different bank must update the shadow too if it expects interrupted banked operations to resume that bank; SYS/USR normalize the bank to zero on return.
@@ -769,8 +782,8 @@ The ABI 7 service migration shrank the high runtime by 1,115 bytes, increasing i
 Bank 2 has 979 ROM bytes free with both images present. Filling all 1,240 bytes of runtime RAM headroom would require shifting some ROM services to another bank; the descriptor ABI already supports that placement change.
 Future banked routines
 The call ABI now supports moving additional cold helpers to ROM. Each migration must declare arguments, results, shadow reads, RAM callbacks, error behavior and stack use. Keep the allocator, collection, active control state and native return addresses in stable RAM. ROM helpers must enter common RAM before selecting a different bank.
-Moving compiler work out of $1400–$2BFF could recover RAM, but requires auditing its calls into bank 0 and scratch ownership. Adding fixed-point values changes cell/array/expression layouts and arithmetic semantics; publish a new ABI and recompile all source then. Existing version-one .AB source files remain authoritative; stock PRG import is implemented and export is still planned. The editor uses bank 3; planned PRG export routines can share its spare space, numeric/PRINT routines bank 4 and hardware command compilation tables bank 5, while execution helpers are placed deliberately in RAM or reached through defined bank gates.
-Runtime ABI is now 7 because helper entry addresses and the banked-service contract changed. Source/container version remains 1. Hard-reset with the new cartridge and reload/reenter source; old snapshots contain the earlier ROM, gateways and compiled helper references.
+Moving compiler work out of $1400–$2BFF could recover RAM, but requires auditing its calls into bank 0 and scratch ownership. Adding fixed-point values changes cell/array/expression layouts and arithmetic semantics; publish a new ABI and recompile all source then. Existing version-one .AB source files remain authoritative; stock PRG import is implemented and export is still planned. The editor uses bank 3; planned PRG export routines can share its spare space, planned numeric/PRINT and hardware extensions can use banks 6/7, while execution helpers are placed deliberately in RAM or reached through defined bank gates.
+Runtime ABI is now 7 because helper entry addresses and the banked-service contract changed. Source-only containers remain 1; binary metadata uses 2. Both load. Hard-reset with the new cartridge and reload/reenter source; old snapshots contain the earlier ROM, gateways and compiled helper references.
 Validation
 Automated tests cover nested ROM/RAM/KERNAL service calls, IRQ/NMI injection at nested transition boundaries, blocking input, shadow DATA/DEF FN operands, page-3 stub installation, eight-bank CRT parsing, latch mirrors and PLA visibility, exact startup copies, bank/port/flag restoration, IRQ and NMI frames during banked work, KERNAL calls, SYS/USR map changes and auxiliary-bank warm recovery. The complete existing language suite also runs, including Void Runner gameplay and collection replay. The py65 harness uses deterministic KERNAL stubs; independent cartridge tests validate the current eight-bank CRT format. Earlier cartconv and user-reported VICE disk-load/gameplay validation applied to the revision 0.6 Magic Desk conversion. The editor has additional software integration checks with actual 901227-03 KERNAL initialization, keyboard, input and output instructions. Keyboard bytes and raster status are injected in py65; this adds no VIC/IEC timing evidence. Fresh VICE/genuine-ROM gameplay remains open. Visible collection pauses remain a performance backlog item. Broader genuine-ROM/cycle-accurate acceptance and physical-machine execution remain release work. See the validation record.
 Cartridge screen editor
@@ -784,6 +797,7 @@ Shift-DEL (INS)	—	Toggle INSERT / OVERWRITE
 CTRL+2	—	Toggle literal control entry
 DEL	—	Delete the preceding character
 HOME	—	Move to the start of the draft
+F5	Open binary/sprite editor	Open binary/sprite editor, retaining the draft
 F3	Go to a line number	Go to a line number, retaining the draft
 F1	Show help; any key returns	Show help; any key returns
 F7	Clear screen and quit	Clear screen and quit
@@ -802,6 +816,7 @@ python3 tools/check_editor_rom.py --rom-dir /path/to/VICE/C64 \
     --preview build/editor-preview.png
 This runs actual 901227-03 RESTOR/CINT/GETIN/CHRIN/CHROUT instructions in py65, with injected keyboard bytes and synthetic raster registers. It is a software integration check, not cycle-accurate VIC/IEC or physical-machine acceptance.
 On a deterministic 30-line workload, moving between visible lines now uses four character writes and no color writes, compared with 1,042 of each previously. Five-line scrolling retains 600 characters in place and writes only the exposed text. Recorded instruction/write measurements were recorded for revision 0.13 against commit bac143f; these are software measurements, not hardware timing claims.
+F5 opens the binary/sprite editor. Returning preserves pane contents, focus and bookmarks, including during keyboard INPUT.
 Stock C64 BASIC PRG import
 LOAD "PROGRAM",8 accepts both the native .AB source container and stock C64 BASIC V2 PRG files. Detection uses the bytes in the file, not its extension. Reads let Commodore DOS determine PRG/SEQ file type; SAVE continues to create native sequential .AB containers. Imported source is compiled on the cartridge. Empty programs replace the current program and clear the editor listing.
 The importer accepts the standard little-endian load address $0801, followed by linked BASIC line records and the final zero link. It verifies physical next links, increasing line numbers in 0–63999, line terminators, supported stock token codes, file status and the final end marker. This follows the original BASIC line-link format and BASIC V2 token spellings. The load address identifies the format; bytes are streamed through the source converter rather than written over the cartridge's live workspace.
@@ -809,6 +824,54 @@ Stock keywords, operators and the two-token GO TO spelling are converted to nati
 Stock signed integer names require a separate namespace because native % means unsigned. For example, stock A% becomes the signed native name PRGINTA, while stock A and A$ remain distinct. The prefix cannot collide with a stock name normalized to at most two letters/digits. Numeric execution otherwise uses the cartridge's existing wrapping 16-bit integer contract. This does not add floating-point execution: fractional/exponent source and unsupported expressions remain listable, editable source with the existing compiler/runtime diagnostics.
 LOAD constructs a second source graph and publishes it only after validation. Malformed or truncated files, invalid links/numbers/tokens, allocation failure, or a converted line exceeding 255 text bytes roll back to the old program. Native token lines also retain their 255-byte limit. Appended machine code or resource bytes after the BASIC end marker are rejected rather than discarded; relocated or extended-dialect programs are outside this importer. Imported machine addresses and SYS/USR calls are not relocated.
 After loading, use BASIC to inspect/edit the listing, RUN to execute supported source, and SAVE to retain it in .AB format. Stock PRG export remains planned.
+Binary and sprite editor
+Press F5 in the BASIC editor, or enter the direct command SPRDEF. The editor starts at the reservation list. F7 exits; ← (PETSCII 95) goes back one level. The border is the standard light blue and the character-mode background is dark blue. Returning with F5 preserves the BASIC draft, output pane, focus and listing bookmarks. F5 is also available while collecting keyboard INPUT.
+Reservations and blobs
+Cursor up/down selects a reservation. Return enters its blob list; Return on a blob opens its editor. SPR opens the sprite view; BIN and ASM open the hex view. ASM is a type label reserved for a future assembler.
+Key	Reservation selection	Blob selection
+N	Enter start address and byte count	Choose S=SPR, B=BIN or A=ASM; enter size for BIN/ASM
+R	Redefine start and size for a manual reservation	Redefine the selected blob's start and size
+DEL	Delete; confirm Y/N if it contains blobs	Remove the blob metadata
+C	—	Change blob type
+S / L	Save/load the reservation's bytes	Save/load the blob's bytes
+Return	Select its blobs	Open the appropriate editor
+← (PETSCII 95)	Exit	Return to reservations
+
+Numeric prompts accept decimal or $-prefixed hexadecimal. ← cancels a prompt; F7 exits. New blobs use the first available space in their reservation. A sprite always occupies 64 bytes. Types, bounds and colors change how bytes are interpreted; these operations do not initialize, relocate or copy the data. Resizing rejects bounds that exclude existing blobs. Blob bounds must fit their reservation and must not overlap another blob.
+RESERVE declarations create entries marked (BASIC). Their bounds are read only in this editor; blobs can be created, moved and edited inside them. Manual reservations accept byte-granular bounds within the existing user arena. Their containing pages are excluded from source, code, heap allocation and collection; firmware, I/O and runtime memory cannot be reserved. Occupied allocator pages are rejected, preserving the current program.
+There are eight logical reservation slots and sixteen blob slots. The existing allocator supports eight page ranges. Deleted or moved ranges remain protected until NEW, so removing metadata does not overwrite bytes with allocator headers. Their protected pages can be reused by other editor reservations. NEW clears all metadata and releases the page exclusions. SAVE/NEW/LOAD also consolidates page claims to the surviving logical reservations.
+Hex view
+The view shows eight bytes per row: an address, hex values, and PETSCII text. Controls are displayed as periods. Cursor keys stay within the blob and scroll the viewport as needed. Type one or two hex digits to change the selected byte; space, comma or Return advances to the next byte. Typing alone does not advance.
+The bottom line shows the selected address, byte hex/decimal value, and the little-endian word formed with the next byte. At the final byte the high byte is zero; the editor never reads outside the blob. I fills the complete blob with a prompted byte value. T changes its metadata type while keeping the hex view open. S/L exchange bytes, and ← returns to blob selection.
+Sprite view
+The enlarged 24×21 view uses one character per hires pixel, or two characters per multicolor pixel. Top/bottom column rulers and left row rulers surround it. The 1X and 2X previews use hardware sprites. Two complementary hires hardware sprites create the black/white hatched cursor outline, widened for multicolor. The preview's transparent pixels show the sprite's own background color.
+Key	Action
+Cursor keys	Move within the 24×21 or 12×21 logical pixels
+1	Background: value 0 / multicolor bits 00
+2	Sprite color: hires 1 / multicolor bits 10
+3	Multicolor common color 1: bits 01
+4	Multicolor common color 2: bits 11
+C	Choose a color definition, then select 0–F in the palette
+T	Toggle hires/multicolor interpretation without changing bytes
+I	Initialize the 63 pixel bytes to a chosen color number
+B	Set the unused 64th byte; its value is shown in the legend
+S / L	Save/load all 64 bytes
+←	Return to blob selection
+
+Hires hides the common-color commands. In the palette, left/right moves the selection, hex keys select a color directly, Return commits, and ← cancels. Each sprite retains its own four palette definitions and multicolor flag. Initializing sprite pixels preserves byte 64; the B command edits it explicitly.
+Files and program persistence
+S/L prompt for a filename of up to 51 characters. .BIN is added when no extension is supplied. Disk operations use device 8 and a sequential byte stream. There is no load address, length prefix or metadata in a .BIN. Save writes the exact selected extent. Load stops at the end of the file or the selected extent; short files leave the remaining memory unchanged and long files never write past the boundary.
+BASIC SAVE uses source-container version 2 when binary metadata is present; source-only files remain byte-identical version 1. Both versions can be loaded. Version 2 saves reservations, BASIC/manual ownership, blob bounds/types, each sprite's colors/mode, and the exact bytes in every blob. Unassigned reservation bytes are not included. All sections participate in the file CRC.
+The v2 byte layout is the eight-byte AB64SRC/zero magic, version/flags 2,0, a one-byte reservation count and five-byte reservation descriptors (start word, size word, BASIC flag), followed by the unchanged v1 dictionary and line records. After the FFFF line marker comes a one-byte blob count. Each blob has an eight-byte descriptor (reservation index, start word, size word, type/multicolor flags, two packed palette bytes) and its raw data. The final two bytes are the CRC-16/CCITT-FALSE. Words are little-endian. Reservation descriptors precede compilation so even low-arena blob pages are protected before any source allocation.
+LOAD stages source and metadata and validates the complete stream before writing blob bytes. It then reopens the validated file and restores data without needing an additional blob-sized RAM buffer; keep the file available and unchanged until LOAD finishes. CRC/truncation errors in validation preserve the old source, metadata and blob bytes. An I/O failure during the second pass can leave already restored bytes changed. As with existing staged source loads, NEW before loading can help when the old program occupies pages required by the incoming program. CLEAN and garbage collection preserve the metadata and protected bytes.
+The host ab64.container codec retains metadata on its ProgramLines mapping, so dumps(*loads(data)) preserves the binary sections. Reservation and Blob objects allow creating v2 files on the host. Text decoding exports BASIC source only; use .AB or individual .BIN files to retain binary content.
+Implementation and validation
+ROM bank 4 contains the UI and bank 5 the metadata/reservation/file services. The existing bank-call gateway restores bank, mapping and interrupt state. Persistent metadata occupies $0200–$0258 and $02A7–$02FF, leaving KERNAL file tables and keyboard state intact. These ranges are firmware-owned. Transient buffers use existing inactive workspace, preserving the BASIC draft and frozen control stack. VIC registers and sprite pointers are restored on exit.
+The sprite organization follows the original Commodore documentation: 24×21 sprite geometry and 63 pixel bytes, multicolor pairs and pointers.
+Run the regression suite with python3 tools/test.py. For supplied stock ROMs:
+python3 tools/check_binary_editor_rom.py --rom-dir /path/to/VICE/C64 \
+    --previews build/binary-previews
+This executes genuine KERNAL keyboard/display instructions with injected device bytes and renders character/sprite state for review. It does not replace cycle-accurate VIC/IEC or physical-machine validation.
 Proposed specification: 16-bit integer signedness and arithmetic
 1. Numeric types
 Variable syntax	Type	Range

@@ -75,34 +75,36 @@ def synchronize():
                 if old.tag!=f'{{{W}}}sectPr':body.remove(old)
             break
     replacements={
+        'Design specification  |  Version 0.15  |  15 October 2026':
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.14  |  15 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.13  |  14 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.12  |  14 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.11  |  13 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.9  |  13 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'ABI 5':'ABI 7',
         'ABI 6':'ABI 7',
-        'Version 0.10':'Version 0.15',
+        'Version 0.10':'Version 0.16',
         '16.8 fixed-point':'16.16 fixed-point',
         'Design specification  |  Version 0.8  |  12 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.7  |  12 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.6  |  10 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'ABI 4':'ABI 7',
         'Design specification  |  Version 0.3  |  9 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         'Design specification  |  Version 0.5  |  9 October 2026':
-        'Design specification  |  Version 0.15  |  15 October 2026',
+        'Design specification  |  Version 0.16  |  24 October 2026',
         '$E800-$FFF9':'$E400-$FFF9', '$E000-$E7FF':'$E000-$E3FF',
         '[$E000,$E800)':'[$E000,$E400)', '49 KiB':'42 KiB', '48 KiB':'42 KiB',
-        'Version 0.4':'Version 0.15', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
+        'Version 0.4':'Version 0.16', 'runtime ABI 2':'runtime ABI 7', 'ABI 2':'ABI 7',
         'runtime ABI 3':'runtime ABI 7', 'ABI 3':'ABI 7',
         'Normal cartridge and CPU maps':'Magic Desk cartridge and CPU maps',
         'Release only when the standard cartridge boots':'Release only when the Magic Desk cartridge boots',
@@ -285,7 +287,7 @@ def synchronize():
         'four uppercase digits. PRINT/STR$ still use expression-directed runtime formatting. '
         'Both target/host tokenizers accept whitespace before TAB/SPC opening parentheses.')
     rewrites['SAVE writes Assembly BASIC source format version 1'] = (
-        'SAVE writes Assembly BASIC source format version 1, specified in Appendix A. The '
+        'SAVE writes Assembly BASIC source format version 1 for plain programs, as specified in Appendix A, or version 2 when binary reservations/blobs are present. Version 2 prefixes reservation descriptors before dictionary/source allocation and appends blob/type/palette metadata and exact bytes before the CRC. LOAD accepts both versions. The '
         'container has magic/version, names, sorted line/token records and CRC; it has no '
         'pointers, native bodies, anchors or C64 load address. SAVE, LOAD and VERIFY accept '
         'filename[,device[,secondary]], defaulting device to 8. The optional secondary is '
@@ -394,9 +396,9 @@ def synchronize():
             set_cell(cells[-1],f"Firmware-owned common RAM: {report['service_gateway_used_bytes']} bytes of banked-service/output entry stubs, copied after KERNAL initialization (RAMTAS clears page 3); {204-report['service_gateway_used_bytes']} bytes hold editor state at $03CC-$03FF. Tape transport stays unsupported.")
         elif address=='$8000-$BFFF':
             set_cell(cells[-1],'User tokens, native bodies, arrays and strings beneath cartridge/BASIC ROM; common bindings remain below $8000.')
-    marker='Appendix B — implementation status, revision 0.15'
+    marker='Appendix B — implementation status, revision 0.16'
     additions=[paragraph(marker,True),paragraph(
-        'This appendix records the development implementation on 15 October 2026. '
+        'This appendix records the development implementation on 24 October 2026. '
         'The full version-one contract is not yet complete. Original release '
         'requirements above remain the target unless an architectural choice is '
         'explicitly revised here. Original revision 0.3 is preserved in Git commit 9480026.')]
@@ -407,7 +409,7 @@ def synchronize():
                   f"{tests['runtime_instructions_checked']} documented runtime instructions checked. "
                   'Environment: instruction-level py65 with deterministic KERNAL stubs; '
                   'this is not cycle-accurate or physical-machine acceptance evidence.'),
-        paragraph('Source/container version 1 and runtime ABI 7 are distinct. '
+        paragraph('Source v1/v2 and runtime ABI 7 are distinct; v2 carries binary metadata and bytes. '
                   'Language zero page is $02-$78; common workspace is $0800-$13FF. '
                   'Function activations currently use a guarded hardware stack with depth eight. '
                   'The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.')])
@@ -418,7 +420,7 @@ def synchronize():
     assert collection['rom_sha256']==report['rom_sha256'], 'Collection measurements refer to a different cartridge'
     additions.extend(collection_tables(word,collection))
     sources=[(name,(ROOT/'docs'/name).read_text(encoding='utf-8-sig')) for name in
-             ('IMPLEMENTATION_STATUS.md','MAGIC_DESK_BANKS.md','SCREEN_EDITOR.md','PRG_IMPORT.md',
+             ('IMPLEMENTATION_STATUS.md','MAGIC_DESK_BANKS.md','SCREEN_EDITOR.md','PRG_IMPORT.md','BINARY_EDITOR.md',
               'integer_arithmetic_design.md')]
     word.prepare_sources(sources)
     for name,text in sources:
@@ -439,8 +441,8 @@ def synchronize():
                 core_namespaces=namespaces(data)
                 core=ET.fromstring(data)
                 for n in core:
-                    if n.tag.endswith('}revision'):n.text='15'
-                    if n.tag.endswith('}modified'):n.text='2026-10-15T00:00:00Z'
+                    if n.tag.endswith('}revision'):n.text='16'
+                    if n.tag.endswith('}modified'):n.text='2026-10-24T00:00:00Z'
                 data=serialize(core,core_namespaces)
             z.writestr(info,data)
     with zipfile.ZipFile(temporary) as z:
@@ -452,12 +454,12 @@ def synchronize():
     text=export_text(root)
     (ROOT/'docs/Assembly_BASIC_C64_Design.txt').write_text(text)
     (ROOT/'docs/design-sync.json').write_text(json.dumps({
-        'design_revision':'0.15','runtime_abi':report['runtime_abi'],
+        'design_revision':'0.16','runtime_abi':report['runtime_abi'],
         'design_sha256':hashlib.sha256(DOC.read_bytes()).hexdigest(),
         'rom_sha256':report['rom_sha256'],'runtime_run_address':report['runtime_run_address'],
         'arena_raw_bytes':report['arena_raw_bytes'],
         'compiler_run_address':report['compiler_run_address'],
         'compiler_budget_bytes':report['compiler_budget_bytes']},indent=2)+'\n')
-    print('Updated design revision 0.15 and readable export; original revision remains in Git.')
+    print('Updated design revision 0.16 and readable export; original revision remains in Git.')
 
 if __name__=='__main__':synchronize()

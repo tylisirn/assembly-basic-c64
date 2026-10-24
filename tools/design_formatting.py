@@ -313,6 +313,10 @@ def scalar(key, value):
             return f'${value:04X} ({value:,})'
         return f'{value:,}'
     if isinstance(value, list):
+        if key.endswith('versions'):
+            return ', '.join(str(v) for v in value)
+        if value and all(isinstance(v, list) and len(v) == 2 for v in value):
+            return '; '.join(f'[${lo:04X}, ${hi:04X})' for lo, hi in value) + ' (exclusive ends)'
         return f'[${value[0]:04X}, ${value[1]:04X}) (exclusive end)'
     # Long fingerprints need discretionary breaks to fit inside a table cell.
     if key == 'rom_sha256':

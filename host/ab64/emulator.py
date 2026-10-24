@@ -82,6 +82,9 @@ class Machine:
         if (c.pc in (self.labels.get('editor_wait'), self.labels.get('editor_input_wait')) and self.memory.bank == 3
                 and m[0x3cc] and not self.input and not m[0x77]):
             return False
+        if (c.pc in tuple(self.labels.get(n) for n in ('be_wait','be_prompt_wait','be_modal_key','be_color_wait'))
+                and self.memory.bank == 4 and m[0x2f7] and not self.input):
+            return False
         if c.pc == self.labels['report_error']:
             self.errors.append(c.a)
         if c.pc == 0xea31 and m[1]&2:
@@ -101,10 +104,15 @@ class Machine:
                 self.file_cursor=0
                 if self.file_write:
                     self.files[self.channel]=bytearray()
-                c.p &= ~1
+                if self.filename.endswith(',S,R') and self.channel not in self.files:
+                    c.p |= 1
+                else:
+                    c.p &= ~1
             elif c.pc == 0xffc6:
                 m[0x90]=0
                 self.input_channel=True
+                if self.channel in self.files and not self.files[self.channel]:
+                    m[0x90]=64
                 c.p &= ~1
             elif c.pc == 0xffc9:
                 self.output_channel=True

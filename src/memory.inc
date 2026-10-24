@@ -335,3 +335,87 @@ PRG_CHAR = PRG_IDENT+1
 PRG_GO = PRG_CHAR+1
 PRG_NAME_START = PRG_GO+1
 .assert PRG_NAME_START < SCRATCH, error, "PRG state overlaps compiler scratch"
+
+; Binary editor metadata uses stock BASIC's unused input buffer and the unused
+; page-2 tail. KERNAL file tables ($0259-$0276) and keyboard state stay intact.
+BANK_BINARY = 4
+BANK_BINARY_STORE = 5
+BE_RES = $0200 ; 8 exact [start,end) word pairs
+BE_ACTIVE = $0220 ; logical reservation bitset
+BE_BASIC = $0221 ; BASIC-owned/immutable bounds bitset
+BE_FILE_RES_COUNT = $0222 ; imported v2 prefix count
+BE_OCCUPIED = $0223 ; 16 blob slots, two bitset bytes
+BE_MAGIC = $0225
+BE_BLOBS0 = $0228 ; first six eight-byte records, ends before KERNAL file tables
+BE_BLOBS1 = $02a7 ; final ten records, ends $02f6
+; Blob: reservation byte,start word,size word,type/multicolor byte,packed colors2.
+BE_UI_ACTIVE = $02f7
+BE_CALLER = $02f8 ; 0 direct,1 BASIC,2 suspended keyboard INPUT
+BE_BACKUP = $02f9 ; temporary LOAD metadata/filename backup pointer
+BE_STAGE = $02fb ; reserved for transaction bookkeeping
+BE_VERSION = $02fd
+BE_LOADING = $02fe
+BE_ERROR = $02ff
+
+; Transient workspace is only used while compiler and native execution wait.
+BE_INPUT = $0e00 ; 64-byte numeric/filename prompt
+BE_STATE = $0e40
+BE_MODE = BE_STATE ; 0 reservations,1 blobs,2 hex,3 sprite
+BE_RES_SEL = BE_STATE+1
+BE_BLOB_SEL = BE_STATE+2
+BE_CHAR = BE_STATE+3
+BE_X = BE_STATE+4
+BE_Y = BE_STATE+5
+BE_COL = BE_STATE+6
+BE_ROW = BE_STATE+7
+BE_COLOR = BE_STATE+8
+BE_REVERSE = BE_STATE+9
+BE_TOP = BE_STATE+10 ; list first physical row, or hex byte offset word
+BE_POS = BE_STATE+12 ; selected byte offset word
+BE_RANGE = BE_STATE+14 ; current operation start word
+BE_SIZE = BE_STATE+16 ; current operation byte count word
+BE_END = BE_STATE+18 ; current operation exclusive end word
+BE_NUMBER = BE_STATE+20 ; parsed or formatted word
+BE_TEMP = BE_STATE+22
+BE_INDEX = BE_STATE+23
+BE_LIMIT = BE_STATE+24
+BE_PTR_SAVE = BE_STATE+25 ; word
+BE_PROMPT_LEN = BE_STATE+27
+BE_NIBBLE = BE_STATE+28
+BE_PIXEL = BE_STATE+29
+BE_COUNT = BE_STATE+30 ; word
+BE_ADDR = BE_STATE+32 ; word
+BE_STRING = BE_STATE+34 ; word
+BE_SELECTED_ROW = BE_STATE+36
+BE_LINE = BE_STATE+37
+BE_PROMPT_KIND = BE_STATE+38
+BE_OLD_COLOR = BE_STATE+39
+BE_OLD_CC = BE_STATE+40
+BE_FLAGS = BE_STATE+41
+BE_FILE_LEN = BE_STATE+42
+BE_FILE_OP = BE_STATE+43
+BE_SCAN = BE_STATE+44
+BE_MATCH = BE_STATE+45
+BE_RES_MAP = BE_STATE+46 ; eight dense export IDs
+BE_RES_COUNT = BE_STATE+54
+BE_BLOB_COUNT = BE_STATE+55
+BE_WORK = BE_STATE+56 ; 32-byte storage/reservation scratch
+BE_RECORD = BE_STATE+88 ; eight-byte blob record buffer
+BE_PROPOSED = BE_STATE+96 ; proposed [start,end), reservation and type
+BE_VIC = $0f00 ; saved VIC registers and CIA2 bank; $0f80 row map untouched
+BE_PANE = $1200 ; 160 screen cells plus 160 colors, safe while waiting for GETIN
+BE_LOAD_META = $0f00 ; 169-byte LOAD backup; invalidate listing row cache first
+BE_LOAD_NAME = $0c00 ; native v2 loader does not tokenize text
+BE_LOAD_NAME_LEN = $02fb
+BE_LOAD_DEVICE = $02fc
+BE_INPUT_BACKUP = $0d60 ; suspended CHRIN command backup restored before LIST work
+.macro BINARY_CALL target
+ jsr bank_call
+ .byte BANK_BINARY,7
+ .word target
+.endmacro
+.macro STORAGE_CALL target
+ jsr bank_call
+ .byte BANK_BINARY_STORE,7
+ .word target
+.endmacro

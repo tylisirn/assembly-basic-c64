@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48",
+  "rom_sha256": "8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 7953,
-      "spare_bytes": 239,
+      "used_bytes": 8000,
+      "spare_bytes": 192,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5994,
-      "spare_bytes": 2198,
+      "used_bytes": 5712,
+      "spare_bytes": 2480,
       "reserved": false
     },
     {
@@ -50,8 +50,8 @@
         40960
       ],
       "role": "split screen editor and stock BASIC PRG import; PRG export reserved",
-      "used_bytes": 7180,
-      "spare_bytes": 1012,
+      "used_bytes": 7290,
+      "spare_bytes": 902,
       "reserved": false
     },
     {
@@ -61,10 +61,10 @@
         32768,
         40960
       ],
-      "role": "reserved: 16.16 fixed-point and PRINT formatting extensions",
-      "used_bytes": 9,
-      "spare_bytes": 8183,
-      "reserved": true
+      "role": "binary, reservation and sprite editor",
+      "used_bytes": 6821,
+      "spare_bytes": 1371,
+      "reserved": false
     },
     {
       "bank": 5,
@@ -73,10 +73,10 @@
         32768,
         40960
       ],
-      "role": "reserved: sprite, VIC and SID commands",
-      "used_bytes": 9,
-      "spare_bytes": 8183,
-      "reserved": true
+      "role": "binary metadata, memory reservation and source persistence",
+      "used_bytes": 3316,
+      "spare_bytes": 4876,
+      "reserved": false
     },
     {
       "bank": 6,
@@ -125,7 +125,7 @@
   ],
   "screen_editor": {
     "bank": 3,
-    "rom_bytes": 7171,
+    "rom_bytes": 7281,
     "text_workspace": [
       2656,
       2816
@@ -236,14 +236,14 @@
   "image_loads": {
     "gateway": {
       "bank": 0,
-      "rom_address": 39976,
+      "rom_address": 40023,
       "run_address": 2048,
       "bytes": 593,
       "encoding": "raw"
     },
     "service_gateway": {
       "bank": 0,
-      "rom_address": 40569,
+      "rom_address": 40616,
       "run_address": 820,
       "bytes": 152,
       "encoding": "raw"
@@ -252,7 +252,7 @@
       "bank": 1,
       "rom_address": 32777,
       "run_address": 5120,
-      "bytes": 5985,
+      "bytes": 5703,
       "encoding": "raw"
     },
     "runtime": {
@@ -262,6 +262,26 @@
       "bytes": 5922,
       "encoding": "raw"
     }
+  },
+  "binary_editor": {
+    "bank": 4,
+    "storage_bank": 5,
+    "metadata_workspaces": [
+      [
+        512,
+        601
+      ],
+      [
+        679,
+        768
+      ]
+    ],
+    "source_versions": [
+      1,
+      2
+    ],
+    "reservation_slots": 8,
+    "blob_slots": 16
   },
   "gateways": {
     "bank_call": 2048,

@@ -1,26 +1,34 @@
 {
   "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.15",
+  "design_revision": "0.16",
   "runtime_abi": 7,
   "cartridge_type": 19,
   "source_version": 1,
-  "validated_tests": 157,
+  "supported_source_versions": [
+    1,
+    2
+  ],
+  "validated_tests": 174,
   "artifacts": {
     "abi.json": {
-      "bytes": 9016,
-      "sha256": "f1be1d480b2eff2fc7a039776525451d14b405d0723315e46c774fcaaf29a3c4"
+      "bytes": 9302,
+      "sha256": "45dadf5ccb15fb6d8da50efa426aa9feab4e4dcd252345b5c0973ae9e068994c"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "28bd3f109dfe2fb6b251a086cd1467efe1ccf34af15eeca7c12ca4d89a26dd48"
+      "sha256": "8dc9147d3c21cfd8c30b263cf613922fc30e98f36f09b0e2f1c46351d1f7735c"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "fdc2cefacb56226999809626cf097b402047b91e02d4db85a7c37144c2e2b36b"
+      "sha256": "a066bd3c9f40affa8f88e15358864d45944f4a47b7a6ac48120f615b4330c7da"
+    },
+    "binary-editor-rom-report.json": {
+      "bytes": 301,
+      "sha256": "b30164c0d5fb2f1405b44b879f4948ad999d0cbde611f204e012b9c7f017abc0"
     },
     "editor-rom-report.json": {
       "bytes": 346,
-      "sha256": "cf37be46ed130d85811b29842dba7bf84c4ff07891e7eb7f8ac9994c8bc319ad"
+      "sha256": "8f25708d124cebdae1bbfc55e69538348787d98b24566178755d446778eb5813"
     },
     "examples/hello.ab": {
       "bytes": 62,
@@ -55,12 +63,12 @@
       "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
     "size-report.json": {
-      "bytes": 3721,
-      "sha256": "fa532f662094064168eabc9b2e4bdce56333a9d4c25773d688c93729cab1298f"
+      "bytes": 4054,
+      "sha256": "79b3795c7308be142454aa71e6048135545c39bdee6246dd42702825e0ad6542"
     },
     "test-report.json": {
       "bytes": 266,
-      "sha256": "9b2d68c4978078d4158760f0e6a4aa62a86ede2413bd9aedd883cb1d39cd114f"
+      "sha256": "ee6a08dbab4555030695b5a9a0ff0e48afbd58ebb63904fd1abeb5c11c46c29e"
     }
   }
 }

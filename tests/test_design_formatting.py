@@ -62,6 +62,12 @@ class DesignFormattingTests(unittest.TestCase):
         word.markdown(source, 'sample.md')
         self.assertEqual(ET.tostring(word.numbering), before)
 
+    def test_binary_workspaces_and_container_versions_have_distinct_notation(self):
+        from design_formatting import scalar
+        self.assertEqual(scalar('binary_metadata_workspaces', [[0x200,0x259],[0x2a7,0x300]]),
+                         '[$0200, $0259); [$02A7, $0300) (exclusive ends)')
+        self.assertEqual(scalar('source_versions', [1,2]), '1, 2')
+
 
 if __name__ == '__main__':
     unittest.main()

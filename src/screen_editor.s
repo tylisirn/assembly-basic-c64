@@ -22,12 +22,26 @@ editor_check_command:
  lda INPUT_BUFFER,x
  and #$df
  cmp editor_quit_word,y
- bne @no
+ bne @sprite_start
  inx
  iny
  cpy #4
  bne @quit
  lda #2
+ bne @tail
+@sprite_start:
+ ldx INPUT_POS
+ ldy #0
+@sprite:
+ lda INPUT_BUFFER,x
+ and #$df
+ cmp editor_sprite_word,y
+ bne @no
+ inx
+ iny
+ cpy #6
+ bne @sprite
+ lda #3
 @tail:
  pha
 @space:
@@ -51,6 +65,7 @@ editor_check_command:
  rts
 editor_basic_word: .byte "BASIC"
 editor_quit_word: .byte "QUIT"
+editor_sprite_word: .byte "SPRDEF"
 
 editor_open:
  lda ED_ACTIVE
@@ -226,6 +241,12 @@ editor_wait:
  jmp editor_read
 @normal:
  lda ED_CHAR
+ cmp #$87
+ bne @go
+ lda #1
+ BINARY_CALL be_open
+ jmp editor_read
+@go:
  cmp #$86
  bne @help
  jsr editor_begin_goto
@@ -1436,6 +1457,12 @@ editor_reveal_selection:
 
 ; F3 is an incremental numeric search. Any non-digit ends the prompt without
 ; submitting a pane draft; its focus, cursor, literal setting and bytes survive.
+editor_binary_restore:
+ jsr editor_listing_colors
+ jsr editor_paint_listing
+ jsr editor_line_cursor
+ jmp editor_status
+
 editor_begin_goto:
  lda #1
  sta ED_GOTO
@@ -1546,9 +1573,7 @@ editor_goto_prompt:
  beq @done
  ; Decimal formatting uses compiler scratch, never the edit draft buffers.
  lda ED_GOTO_NO
- sta IO_A
- lda ED_GOTO_NO+1
- sta IO_X
+ ldx ED_GOTO_NO+1
  COMMAND_CALL print_source_number_buffer
  ldx #0
 @digits:
@@ -2190,7 +2215,7 @@ editor_overwrite_text: .byte "OVERWRITE",0
 editor_literal_text: .byte "LITERAL",0
 editor_modes_lo: .byte <editor_insert_text,<editor_overwrite_text
 editor_modes_hi: .byte >editor_insert_text,>editor_overwrite_text
-editor_key_label: .byte "F1? F3# F7 QUIT"
+editor_key_label: .byte "F1? F3# F5B F7X"
 
 editor_pane_message:
  sta ED_PTR
@@ -2306,7 +2331,7 @@ editor_help_text:
  .byte "CTRL+2       TOGGLE LITERAL",13
  .byte "DEL          DELETE PREVIOUS CHARACTER",13
  .byte "HOME         START OF EDIT LINE",13
- .byte "F1 HELP / F3 GO LINE / F7 QUIT",13
+ .byte "F1 HELP  F3 GO LINE  F5 BINARY  F7 QUIT",13
  .byte "F3: TYPE NUMBER; OTHER KEYS FINISH.",13
  .byte "RUN          EXIT AND RUN PROGRAM",13,13
  .byte "ENTER A NUMBERED LINE TO ADD OR CHANGE.",13
@@ -2404,6 +2429,31 @@ editor_input_wait:
  jmp @again
 @normal:
  lda ED_CHAR
+ cmp #$87
+ bne @go
+ lda STRING_LENGTH
+ pha
+ lda SELECTOR
+ pha
+ lda INPUT_KIND
+ pha
+ ldx #0
+@binary_backup:
+ lda INPUT_BUFFER,x
+ sta BE_INPUT_BACKUP,x
+ inx
+ cpx #160
+ bne @binary_backup
+ lda #2
+ BINARY_CALL be_open
+ pla
+ sta INPUT_KIND
+ pla
+ sta SELECTOR
+ pla
+ sta STRING_LENGTH
+ jmp @again
+@go:
  cmp #$86
  bne @help
  jsr editor_begin_goto

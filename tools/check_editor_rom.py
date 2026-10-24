@@ -49,10 +49,10 @@ class StockKernelMachine(Machine):
 
     def step(self):
         c = self.cpu
-        keyboard_input = (c.pc == 0xffcf and
+        keyboard_input = (c.pc == 0xffcf and not self.input_channel and
                           self.word(0x324) == self.labels['editor_input_gate'])
         if (self.real_kernel and self.memory.ram[1] & 2 and
-                (c.pc in (0xffd2, 0xffe4, 0xffe1) or keyboard_input)):
+                ((c.pc in (0xffd2, 0xffe4, 0xffe1) and not (c.pc == 0xffd2 and self.output_channel)) or keyboard_input)):
             if c.pc == 0xffd2:
                 self.output.append(c.a)
             elif c.pc == 0xffe4:

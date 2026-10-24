@@ -22,6 +22,11 @@ def package():
     destination=ROOT/'dist';destination.mkdir(exist_ok=True)
     for name in ('assembly-basic.bin','assembly-basic.crt','size-report.json','test-report.json'):
         shutil.copyfile(ROOT/'build'/name,destination/name)
+    binary_validation = ROOT/'build/binary-editor-rom-report.json'
+    if binary_validation.exists():
+        result = json.loads(binary_validation.read_text())
+        if result.get('passed') and result.get('rom_sha256') == report['rom_sha256']:
+            shutil.copyfile(binary_validation, destination/binary_validation.name)
     editor_validation = ROOT/'build/editor-rom-report.json'
     if editor_validation.exists():
         result = json.loads(editor_validation.read_text())
@@ -64,6 +69,8 @@ def package():
                                       'run_address':labels[f'__{image}_RUN__'],
                                       'bytes':labels[f'__{image}_SIZE__'],'encoding':'raw'}
                         for image,bank in (('GATEWAY',0),('SERVICE_GATEWAY',0),('COMPILER',1),('RUNTIME',2))},
+         'binary_editor':{'bank':4,'storage_bank':5,'metadata_workspaces':report['binary_metadata_workspaces'],
+                          'source_versions':[1,2],'reservation_slots':8,'blob_slots':16},
          'gateways':{n:labels[n] for n in ('bank_call','read_ram','call_ram','kernal_gate','enter_ready','sys_gateway','usr_gateway',
                      'file_entry','select_command_bank','copy_bank_image','bank_cold','bank_warm')},
          'runtime_entries':{n:v for n,v in sorted(labels.items())
@@ -78,7 +85,7 @@ def package():
         (destination/'examples'/example.with_suffix('.ab').name).write_bytes(data)
     manifest={'status':'development; version-one release acceptance incomplete',
               'design_revision':sync['design_revision'],'runtime_abi':report['runtime_abi'],
-              'cartridge_type':report['cartridge_type'],'source_version':1,
+              'cartridge_type':report['cartridge_type'],'source_version':1,'supported_source_versions':[1,2],
               'validated_tests':tests['tests_run'],'artifacts':{}}
     for path in sorted(destination.rglob('*')):
         if path.is_file() and path.name!='manifest.json':

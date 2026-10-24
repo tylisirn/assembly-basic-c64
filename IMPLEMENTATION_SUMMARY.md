@@ -1,5 +1,9 @@
 # Assembly BASIC implementation summary
 
+## Revision 0.16 — advanced binary/sprite editor
+
+F5 or direct SPRDEF opens the reservation/blob manager, eight-byte hex view and character-based hires/multicolor sprite editor. Hardware sprites supply 1X/2X previews and a complementary black/white hatched cursor. Bounds/type changes preserve bytes; initialization is explicit. Each sprite retains its palette and mode. BIN exchange is exact and bounded; BASIC SAVE/LOAD persists metadata and blob bytes in source v2 while retaining v1 compatibility. The host codec preserves these sections. Banks 4/5 provide the UI and storage services, with page-2 metadata outside the arena and KERNAL-owned tables. Runtime ABI 7 and the existing arena remain unchanged. See [binary editor documentation](docs/BINARY_EDITOR.md).
+
 ## Revision 0.15 — LIST break, F3 line navigation and stock PRG import
 
 LIST responds to RUN/STOP and pending cartridge breaks. F3 opens an incremental line-number prompt; any non-digit closes it without submitting the pane. Off-screen F3 and numbered-entry jumps retain up to three preceding BASIC lines for context, with wrapped context bounded so the destination stays visible.

@@ -16,6 +16,7 @@ BASIC line number and first displayed line number survive closing and reopening.
 | CTRL+2 | — | Toggle literal control entry |
 | DEL | — | Delete the preceding character |
 | HOME | — | Move to the start of the draft |
+| F5 | Open binary/sprite editor | Open binary/sprite editor, retaining the draft |
 | F3 | Go to a line number | Go to a line number, retaining the draft |
 | F1 | Show help; any key returns | Show help; any key returns |
 | F7 | Clear screen and quit | Clear screen and quit |
@@ -117,3 +118,6 @@ Five-line scrolling retains 600 characters in place and writes only the exposed
 text. [Recorded instruction/write measurements](editor-scroll-measurements.json)
 were recorded for revision 0.13 against commit `bac143f`; these are software measurements, not hardware
 timing claims.
+
+F5 opens the [binary/sprite editor](BINARY_EDITOR.md). Returning preserves pane
+contents, focus and bookmarks, including during keyboard INPUT.

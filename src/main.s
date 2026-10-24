@@ -253,6 +253,8 @@ direct_command:
  JEQ command_basic
  cmp #2
  JEQ command_quit
+ cmp #3
+ JEQ command_sprdef
  jsr tokenize_input
  ; Command-only statements are dispatched while stopped in ROM.
  lda TOKENS
@@ -321,6 +323,10 @@ command_run:
  lda #1
  sta RUNNING
  jmp run_entry
+command_sprdef:
+ lda #0
+ BINARY_CALL be_open
+ jmp ready
 command_basic:
  EDITOR_CALL editor_open
  jmp input_loop
@@ -365,7 +371,7 @@ command_error:
  JNE clean_fail
  jmp ready
 .segment "COMMAND"
-banner: .byte 147,"ASSEMBLY BASIC 0.15",13,0
+banner: .byte 147,"ASSEMBLY BASIC 0.16",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
 .word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
@@ -391,6 +397,7 @@ e_data: .byte "OUT OF DATA",0
 .include "clean.s"
 .segment "COMPILER"
 new_program:
+ STORAGE_CALL be_reset
  lda #0
  sta RESERVE_COUNT
  sta NAME_HEAD
@@ -500,6 +507,8 @@ command_free:
 .include "service_gateway.s"
 .include "screen_editor.s"
 .include "prg_import.s"
+.include "binary_storage.s"
+.include "binary_editor.s"
 
 ; Every auxiliary bank has a recovery header pointing into common RAM. This
 ; lets KERNAL cartridge NMI dispatch recover even during a banked image copy.

@@ -19,8 +19,8 @@ BANK_ROLES = (
     'raw resident compiler image',
     'raw RAM execution runtime image and banked ROM services',
     'split screen editor and stock BASIC PRG import; PRG export reserved',
-    'reserved: 16.16 fixed-point and PRINT formatting extensions',
-    'reserved: sprite, VIC and SID commands',
+    'binary, reservation and sprite editor',
+    'binary metadata, memory reservation and source persistence',
     'reserved: numeric tables, fonts and optional resources',
     'reserved: expansion and diagnostics',
 )
@@ -78,11 +78,11 @@ def build(toolchain=None):
             segments[match[1]] = int(match[2], 16)
     banks = []
     for bank, role in enumerate(BANK_ROLES):
-        names = ('HEADER', 'COMMAND', 'GATEWAY', 'SERVICE_GATEWAY') if bank == 0 else (f'HEADER{bank}',) + (('COMPILER',) if bank == 1 else ('RUNTIME', 'SERVICES') if bank == 2 else ('SCREEN_EDITOR',) if bank == 3 else ())
+        names = ('HEADER', 'COMMAND', 'GATEWAY', 'SERVICE_GATEWAY') if bank == 0 else (f'HEADER{bank}',) + (('COMPILER',) if bank == 1 else ('RUNTIME', 'SERVICES') if bank == 2 else ('SCREEN_EDITOR',) if bank == 3 else ('BINARY_EDITOR',) if bank == 4 else ('BINARY_STORAGE',) if bank == 5 else ())
         used = sum(segments[name] for name in names)
         banks.append({'bank': bank, 'offset': bank*8192, 'window': [0x8000, 0xa000],
                       'role': role, 'used_bytes': used, 'spare_bytes': 8192-used,
-                      'reserved': bank >= 4})
+                      'reserved': bank >= 6})
     used = sum(bank['used_bytes'] for bank in banks)
     report = {'rom_bytes': len(rom), 'rom_sha256': hashlib.sha256(rom).hexdigest(),
               'cartridge_type': 19, 'cartridge_format': 'classic Magic Desk', 'bank_bytes': 8192,
@@ -99,6 +99,10 @@ def build(toolchain=None):
               'editor_state_workspace': [0x03cc, 0x0400],
               'editor_view_workspace': [0x0f80, 0x0fe0],
               'editor_help_tail_workspace': [0x0fe0, 0x1000],
+              'binary_editor_bank': 4, 'binary_editor_rom_bytes': labels['__BINARY_EDITOR_SIZE__'],
+              'binary_storage_bank': 5, 'binary_storage_rom_bytes': labels['__BINARY_STORAGE_SIZE__'],
+              'binary_metadata_workspaces': [[0x0200,0x0259],[0x02a7,0x0300]],
+              'source_versions': [1,2],
               'services_bank': 2, 'services_rom_address': labels['__SERVICES_LOAD__'],
               'services_rom_bytes': services,
               'arena_spans': [[0x2c00, 0xd000], [0xe000, 0xe400]], 'arena_raw_bytes': 43008,

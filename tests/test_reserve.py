@@ -43,9 +43,8 @@ class ReserveTests(unittest.TestCase):
         m.command('NEW')
         self.assertEqual(sum(end - start for start, end in self.free_blocks(m)), 43008)
         self.assertNotIn('?', self.command(m, 'LOAD "RESERVED"'))
-        # Direct reservations are session state; NEW releases them. The stored
-        # source must contain its own declaration when protection is needed.
-        self.assertEqual(m.memory.ram[0xbd2], 0)
+        # V2 source persists the reservation metadata even for direct declarations.
+        self.assertEqual(m.memory.ram[0xbd2], 4)
 
     def test_boundaries_repeats_conflicts_and_new(self):
         m = Machine().boot()

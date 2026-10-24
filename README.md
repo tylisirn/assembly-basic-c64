@@ -2,7 +2,7 @@
 
 A 64 KiB classic Magic Desk autostart cartridge with an on-machine tokenizer and two-pass native 6502 compiler. Numbered lines retain custom source tokens beside their generated machine code. RUN executes in RAM with cartridge and KERNAL ROM hidden; device services use a common-RAM bank gateway. No host compiler is required to enter or run BASIC programs on the C64.
 
-This is a working development implementation of design revision 0.15, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
+This is a working development implementation of design revision 0.16, **not the completed version-one release**. [Implementation status](docs/IMPLEMENTATION_STATUS.md) lists the remaining language, validation and hardware work. The original revision 0.3 design is preserved in the first Git commit, `9480026`.
 
 ## Build and test
 
@@ -26,15 +26,21 @@ The user has successfully loaded Void Runner from disk and played it in VICE wit
 
 ## Bank layout
 
-Bank 0 contains command/editor code and gateway load images, bank 1 the raw compiler image, and bank 2 the raw runtime image plus ROM execution services for DATA/READ/RESTORE, DEF FN activation and device/input operations. Bank 3 implements the split screen editor and stock BASIC PRG import; PRG export remains planned. Banks 4–7 reserve space for 16.16 fixed-point and PRINT extensions, VIC/SID/sprite commands, resources and expansion. These other planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
+Bank 0 contains command/editor code and gateway load images, bank 1 the raw compiler image, and bank 2 the raw runtime image plus ROM execution services for DATA/READ/RESTORE, DEF FN activation and device/input operations. Bank 3 implements the split screen editor and stock BASIC PRG import; PRG export remains planned. Banks 4 and 5 implement the binary/sprite editor and metadata persistence. Banks 6–7 retain space for numeric/PRINT and hardware extensions, resources and expansion. These other planned features are not implemented yet; current integer semantics remain unchanged. See [the bank map and gateway contracts](docs/MAGIC_DESK_BANKS.md).
 
 Common RAM at `$0334–$03FF` holds 152 bytes of service/output entry stubs and 52 bytes of editor state. The gateway contains 593 code bytes and reserves `$0A60–$0AFF` for the 160-byte editor draft. The high runtime uses 5,922 of 7,162 bytes, leaving 1,240 bytes for implementation. See [the banked-service ABI and initialization requirements](docs/MAGIC_DESK_BANKS.md#banked-service-call-abi).
 
-Firmware revision 0.15 uses runtime ABI 7; source-container version remains 1. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
+Firmware revision 0.16 uses runtime ABI 7; source-only containers remain version 1; files with binary metadata use version 2. Hard-reset after attaching the new cartridge and reload/reenter source. Old snapshots retain the earlier runtime and native helper references.
 
 ## Use
 
 Enter `BASIC` to open the [split screen editor](docs/SCREEN_EDITOR.md): a scrolling listing above a four-row edit pane. Return copies the selected line; the `←` (PETSCII 95) key switches focus; INS toggles INSERT/OVERWRITE; CTRL+2 toggles literal control entry; F1 shows help; F3 jumps as you type a line number, and Enter or another non-digit closes the prompt. F7 or `QUIT` closes and clears the screen. `RUN` closes the editor before execution. Only the selected line number is highlighted, including while editing. Numbered submissions select the affected line. Off-screen jumps show up to three preceding BASIC lines for context. Earlier visible pane lines can be edited, and errors return the text cursor to the command start. Cursor movement leaves listing text intact, and scrolling shifts existing characters without moving color RAM. The editor remembers its selected line and viewport.
+
+Press F5 in the BASIC editor, or enter `SPRDEF`, for the
+[binary/sprite editor](docs/BINARY_EDITOR.md). Manage reservations and typed
+SPR/BIN/ASM blobs, edit bytes in the hex view, or paint hires/multicolor sprites
+with hardware previews and a hatched cursor. `.BIN` exchanges exact selected
+bytes; BASIC SAVE/LOAD retains metadata, palettes and blob contents in `.AB`.
 
 `LIST` responds to RUN/STOP and pending cartridge breaks. `LOAD` automatically
 recognizes a stock C64 BASIC PRG at `$0801` and converts its BASIC V2 tokens into
@@ -78,8 +84,8 @@ numbered line before entering/importing the rest of the program, or issue them
 directly before loading it. They take effect during compilation, cannot appear
 inside IF, and do not run again during RUN. Repeating identical bounds is harmless;
 conflicting/live allocations fail without being overwritten. Reservations remain
-through RUN, CLR, edits and CLEAN; NEW releases them. SAVE stores numbered
-declarations, so LOAD reinstates them. Removing a declaration does not release
+through RUN, CLR, edits and CLEAN; NEW releases them. SAVE stores reservation metadata and numbered
+declarations, so LOAD reinstates both direct and numbered reservations. Removing a declaration does not release
 its region until NEW. Failed entry/import may retain a successfully declared
 reservation. POKE and SYS still require the caller to respect memory ownership.
 

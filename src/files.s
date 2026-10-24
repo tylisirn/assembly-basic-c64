@@ -52,6 +52,7 @@ file_command:
  lda #0
  sta FILE_MODE
 serialize_source:
+ STORAGE_CALL be_save_version
  jsr export_map
  lda #$ff
  sta FILE_CRC
@@ -59,10 +60,15 @@ serialize_source:
  ldx #0
 @header:
  lda source_header,x
+ cpx #8
+ bne :+
+ lda BE_VERSION
+:
  jsr file_put
  inx
  cpx #10
  bne @header
+ STORAGE_CALL be_write_reservations
  lda FILE_COUNT
  jsr file_put
  lda FILE_COUNT+1
@@ -221,6 +227,7 @@ serialize_source:
  jsr file_put
  lda #$ff
  jsr file_put
+ STORAGE_CALL be_write_metadata
  lda FILE_CRC
  jsr transport_put
  lda FILE_CRC+1
@@ -499,6 +506,11 @@ file_get:
  rts
 ; LOAD builds a second graph with the old graph still allocated.
 .segment "COMPILER"
+file_crc_get:
+ lda $90
+ and #$40
+ JNE load_fail
+ jmp transport_get
 file_load:
  lda NAME_COUNT
  sta LOAD_OLD+14
@@ -536,6 +548,7 @@ file_load:
  sta PROGRAM_HEAD
  lda #>run_end
  sta PROGRAM_HEAD+1
+ STORAGE_CALL be_load_begin
  lda #$ff
  sta FILE_CRC
  sta FILE_CRC+1
@@ -553,11 +566,22 @@ file_load:
  ldx #1
 @header:
  jsr file_get
+ cpx #8
+ bne @compare
+ sta BE_VERSION
+ cmp #1
+ beq @accepted
+ cmp #2
+ JNE load_fail
+ beq @accepted
+@compare:
  cmp source_header,x
  JNE load_fail
+@accepted:
  inx
  cpx #10
  bne @header
+ STORAGE_CALL be_read_reservations
  jsr file_get
  sta FILE_COUNT
  jsr file_get
@@ -613,7 +637,7 @@ file_load:
 @number:
  lda LINE_NO+1
  cmp #$fa
- bcs load_fail
+ JCS load_fail
  lda FILE_ANCHOR
  ora FILE_ANCHOR+1
  beq @tokens
@@ -649,16 +673,18 @@ file_load:
  sta FILE_ANCHOR+1
  jmp @line
 @crc:
- jsr transport_get
+ STORAGE_CALL be_read_metadata
+ jsr file_crc_get
  cmp FILE_CRC
  bne load_fail
- jsr transport_get
+ jsr file_crc_get
  cmp FILE_CRC+1
  bne load_fail
  lda $90
  and #$40
  beq load_fail
 load_commit:
+ STORAGE_CALL be_load_finish
  ; Even an empty load replaces the graph and invalidates cached editor anchors.
  inc GENERATION
  bne :+
@@ -673,6 +699,7 @@ load_commit:
  jsr file_close
  jmp ready
 load_fail:
+ STORAGE_CALL be_load_rollback
  lda #0
  sta LOADING
  ; Rollback source heads. Full staged-graph reclamation is performed first.
