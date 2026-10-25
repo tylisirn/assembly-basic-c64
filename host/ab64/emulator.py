@@ -73,6 +73,8 @@ class Machine:
         self.channel = None
         self.file_cursor = 0
         self.file_write = False
+        self.device_status = b'00, OK,00,00\r'
+        self.status_talking = False
         self.input_channel = False
         self.output_channel = False
     def rts(self):
@@ -124,9 +126,25 @@ class Machine:
                 self.output_channel=False
             elif c.pc == 0xffc3:
                 self.channel=None
+            elif c.pc == 0xffb4:
+                self.file_cursor=0
+            elif c.pc == 0xff96:
+                self.status_talking=c.a == 0x6f
+            elif c.pc == 0xffa5 and self.status_talking:
+                if self.file_cursor >= len(self.device_status):
+                    c.a=0
+                    m[0x90]=2  # no status response: serial read timeout
+                else:
+                    c.a=self.device_status[self.file_cursor]
+                    self.file_cursor+=1
+                    m[0x90]=64 if self.file_cursor==len(self.device_status) else 0
+                c.p=(c.p & ~0x83) | (c.a & 0x80) | (2 if c.a==0 else 0)
+            elif c.pc == 0xffab:
+                self.status_talking=False
             elif c.pc == 0xffd2:
                 if self.output_channel:
                     self.files[self.channel].append(c.a)
+                    c.p &= ~1
                     self.rts()
                     self.steps+=1
                     return True

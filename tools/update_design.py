@@ -296,7 +296,13 @@ def synchronize():
         'the compatibility argument. Validate the complete argument list before emitting '
         'the file operation, so malformed file arguments cannot write/load first and raise a '
         'syntax trap afterward. Colon and ELSE are legitimate boundaries. LOAD keeps its '
-        'existing staged publication and return-to-READY behavior.')
+        'existing staged publication and return-to-READY behavior. SAVE checks transport '
+        'status during OPEN/output/CLOSE, then requires a complete DOS success response '
+        'after closing the data file. Query secondary 15 using TALK/TKSA/ACPTR/UNTALK '
+        'without allocating or closing another logical channel. Failed writes and DOS '
+        'errors report DEVICE ERROR and release the temporary export map; source and '
+        'binary data remain available for retry. Existing files are not overwritten '
+        'automatically.')
     rewrites.update({
         'Use a seven-byte stable anchor per line':
         'Use a seven-byte stable anchor per line and a single allocation containing its tokens and native body. Bind full identifiers to an interned name dictionary. Keywords, operators and the first 128 name references each occupy one byte; valid integer immediates are binary values. Runtime calls use fixed RAM helpers or common-RAM service entry stubs. Cold DATA/READ/RESTORE, DEF FN activation and device/input helpers execute from bank-2 ROM through bank_call; hot arithmetic, arrays, strings, function calls and collection remain in RAM.',

@@ -1,4 +1,59 @@
 .segment "BINARY_STORAGE"
+; Check a source SAVE only after closing its data channel, which flushes the
+; last buffered byte and commits the directory entry. TALK directly to status
+; secondary 15: no extra logical file or CLOSE-15 side effects on user files.
+file_save_status:
+ lda #1
+ sta BE_ERROR
+ lda FILE_DEVICE
+ jsr $ffb4
+ lda $90
+ bne @close
+ lda #$6f
+ jsr $ff96
+ lda $90
+ bne @close
+ lda #0
+ sta BE_INDEX
+@read:
+ lda $90
+ and #$40
+ bne @close
+ jsr $ffa5
+ sta BE_TEMP
+ lda $90
+ and #$bf
+ bne @close
+ ldx BE_INDEX
+ cpx #2
+ bcs @tail
+ lda BE_TEMP
+ cmp #'0'
+ bne @close
+@tail:
+ inc BE_INDEX
+ lda BE_TEMP
+ cmp #13
+ beq @ok
+ lda BE_INDEX
+ cmp #64
+ bcc @read
+ bcs @close
+@ok:
+ lda #0
+ sta BE_ERROR
+@close:
+ jsr $ffab
+ lda $90
+ and #$bf
+ ora BE_ERROR
+ beq @success
+ sec
+ rts
+@success:
+ clc
+ rts
+
 be_reset:
  lda #0
  ldx #88

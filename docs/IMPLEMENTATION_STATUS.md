@@ -2,6 +2,12 @@
 
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 
+The 25 October SAVE correction reports transport and final DOS failures as
+`DEVICE ERROR`, releases temporary export storage on failure, and preserves the
+program for retry. The supplied VICE 2.4 state contained drive error 74 and
+KERNAL status `$80`; [the investigation](SAVE_FAILURE.md) records the
+before/after reproduction and recovered source/blob backup.
+
 | Area | Implemented behavior | Remaining work |
 | --- | --- | --- |
 | Platform | 64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies, generic banked-service calls and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame | Broader VICE/stock-ROM acceptance, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts |

@@ -60,6 +60,12 @@ RUN
 
 Strings, multidimensional numeric/string arrays, DEF FN, GOSUB, FOR/NEXT, IF/THEN/ELSE, DATA/READ/RESTORE and STOP/CONT are implemented. `SAVE "PROGRAM.AB",8`, `LOAD "PROGRAM.AB",8` and `VERIFY "PROGRAM.AB",8` use the custom sequential source container, not stock tokenized PRG files. All three accept `filename[,device[,secondary]]`, so `SAVE "VOID2.AB",8,1` and `LOAD "VOID2.AB",8,1` are valid. Device defaults to 8. The optional secondary is checked as a byte (0–255) and ignored for the source-only format; transport still uses a sequential channel. Invalid or extra arguments are rejected before opening a file. Tape and RS-232 transports are explicitly unsupported. LOAD stages a second program and preserves the old source on failure; `NEW` can free space before loading a large file.
 
+SAVE reports `?DEVICE ERROR` for failed writes and unsuccessful DOS status after
+closing the file, including drive-not-ready, write protection, disk full and
+file-exists errors. It does not overwrite an existing file automatically.
+The [SAVE failure investigation](docs/SAVE_FAILURE.md) records the VICE 2.4
+reproduction and recovery of the supplied program snapshot.
+
 `LIST 10` lists one line; `LIST 10-50` lists an inclusive range. `LIST -50` and `LIST 10-` accept open endpoints. LIST starts on a new screen line.
 
 LIST and host decoding use compact function/array delimiters while retaining operator spacing: `TAB ( 11 )` becomes `TAB(11)`, `CHR$ (147)` becomes `CHR$(147)`, and `X=(1+2)*3` becomes `X = (1 + 2) * 3`. Nested calls, array subscripts and DEF FN parameter lists follow the same rule. Commas/semicolons have no preceding gap, commas retain a following separator, and literal string/comment/DATA bytes are preserved. Spaced TAB/SPC calls are recognized by both tokenizers, so Void Runner's game-over TAB(11) no longer becomes an out-of-range array reference.

@@ -1,6 +1,9 @@
 .segment "COMMAND"
 ; Source transport; reads accept both SEQ and PRG DOS file types. Native filename bytes have been staged in BRIDGE.
 file_command:
+ lda #0
+ sta FILE_MAP
+ sta FILE_MAP+1
  jsr $ffcc
  lda FILE_NAME_LEN
  cmp #252
@@ -31,13 +34,15 @@ file_command:
  ldy #2
  jsr $ffba
  jsr $ffc0
- JCS file_fail
+ JCS file_io_fail
+ lda $90
+ JNE file_io_fail
  lda FILE_OPERATION
  cmp #$34
  beq @save
  ldx #1
  jsr $ffc6
- JCS file_fail
+ JCS file_io_fail
  cmp #$33
  lda FILE_OPERATION
  cmp #$33
@@ -48,7 +53,9 @@ file_command:
 @save:
  ldx #1
  jsr $ffc9
- JCS file_fail
+ JCS file_io_fail
+ lda $90
+ JNE file_io_fail
  lda #0
  sta FILE_MODE
 serialize_source:
@@ -249,6 +256,15 @@ file_close:
  jsr $ffcc
  lda #1
  jsr $ffc3
+ lda FILE_OPERATION
+ cmp #$34
+ bne @done
+ lda $90
+ JNE file_io_fail
+ ; DOS may accept OPEN and every byte yet reject the file at CLOSE.
+ STORAGE_CALL file_save_status
+ JCS file_io_fail
+@done:
  rts
 file_fail:
  lda MEM_IO
@@ -279,7 +295,7 @@ transport_put:
  JNE memory_put
  ldx FILE_MODE
  bne @verify
- jmp $ffd2
+ jmp file_write_byte
 @verify:
  sta FILE_BYTE
  jsr $ffcf
@@ -287,6 +303,30 @@ transport_put:
  bne file_fail
  rts
 .segment "COMPILER"
+file_write_byte:
+ jsr $ffd2
+ bcs file_io_fail
+ lda $90
+ bne file_io_fail
+ rts
+file_io_fail:
+ ; A failed stream may still own its temporary dense-name map.
+ jsr $ffcc
+ lda #1
+ jsr $ffc3
+ lda FILE_MAP
+ sta PTR
+ lda FILE_MAP+1
+ sta PTR+1
+ ora PTR
+ beq @clear
+ jsr command_free
+@clear:
+ lda #0
+ sta FILE_MAP
+ sta FILE_MAP+1
+ lda #ERR_DEVICE
+ jmp command_error
 crc_byte:
  eor FILE_CRC+1
  sta FILE_CRC+1

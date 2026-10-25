@@ -374,7 +374,7 @@ command_error:
 banner: .byte 147,"ASSEMBLY BASIC 0.16",13,0
 ready_text: .byte 13,"READY.",13,0
 error_table:
-.word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data
+.word e_syntax,e_syntax,e_quantity,e_memory,e_divzero,e_undefined,e_return,e_next,e_type,e_cont,e_unsupported,e_stack,e_string,e_data,e_device
 e_syntax: .byte "SYNTAX ERROR",0
 e_quantity: .byte "ILLEGAL QUANTITY",0
 e_memory: .byte "OUT OF MEMORY",0
@@ -388,6 +388,7 @@ e_unsupported: .byte "UNSUPPORTED FEATURE",0
 e_stack: .byte "FORMULA TOO COMPLEX",0
 e_string: .byte "STRING TOO LONG",0
 e_data: .byte "OUT OF DATA",0
+e_device: .byte "DEVICE ERROR",0
 .include "gateway.s"
 .include "editor.s"
 .include "lexer.s"

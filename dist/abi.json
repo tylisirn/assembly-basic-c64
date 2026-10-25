@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b",
+  "rom_sha256": "d9b781054f3e3079857bb0d8cca5914044b2c24a96963a05de5e2d9b5ef4f912",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 8000,
-      "spare_bytes": 192,
+      "used_bytes": 8061,
+      "spare_bytes": 131,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5712,
-      "spare_bytes": 2480,
+      "used_bytes": 5756,
+      "spare_bytes": 2436,
       "reserved": false
     },
     {
@@ -74,8 +74,8 @@
         40960
       ],
       "role": "binary metadata, memory reservation and source persistence",
-      "used_bytes": 3316,
-      "spare_bytes": 4876,
+      "used_bytes": 3417,
+      "spare_bytes": 4775,
       "reserved": false
     },
     {
@@ -236,14 +236,14 @@
   "image_loads": {
     "gateway": {
       "bank": 0,
-      "rom_address": 40023,
+      "rom_address": 40084,
       "run_address": 2048,
       "bytes": 593,
       "encoding": "raw"
     },
     "service_gateway": {
       "bank": 0,
-      "rom_address": 40616,
+      "rom_address": 40677,
       "run_address": 820,
       "bytes": 152,
       "encoding": "raw"
@@ -252,7 +252,7 @@
       "bank": 1,
       "rom_address": 32777,
       "run_address": 5120,
-      "bytes": 5703,
+      "bytes": 5747,
       "encoding": "raw"
     },
     "runtime": {
