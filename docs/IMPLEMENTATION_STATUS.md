@@ -8,6 +8,13 @@ program for retry. The supplied VICE 2.4 state contained drive error 74 and
 KERNAL status `$80`; [the investigation](SAVE_FAILURE.md) records the
 before/after reproduction and recovered source/blob backup.
 
+The 25 October startup correction sets the CPU-port mapping latch before
+enabling its output pins. The original ROM from the supplied VICE 3.10 snapshot
+hides itself during cold start; the corrected ROM boots, executes `PRINT 7` and
+returns to READY on C64 old PAL, C64 PAL, C64C PAL and C64 NTSC in Linux VICE
+3.7.1. Windows GTK3VICE 3.10 retesting remains open. See the
+[startup investigation](VICE_STARTUP_FREEZE.md).
+
 | Area | Implemented behavior | Remaining work |
 | --- | --- | --- |
 | Platform | 64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies, generic banked-service calls and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame | Broader VICE/stock-ROM acceptance, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts |

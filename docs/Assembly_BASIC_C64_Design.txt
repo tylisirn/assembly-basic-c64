@@ -67,7 +67,7 @@ With classic Magic Desk, $35 hides ROML, BASIC and KERNAL while retaining I/O; $
 
 The KERNAL recognizes CBM80 at $8004 before initialization. Bank 0 has cold/warm entry vectors at $8000/$8002. Every auxiliary bank has the same signature and vectors to common-RAM recovery helpers installed at startup; these select bank 0 before returning to command ROM. The previous $A000 recovery words are removed because stock BASIC ROM occupies that window in the command map.
 Cold start and copying the execution image
-Disable IRQs, clear decimal mode and establish a bounded hardware stack. Set the port direction and command map, preserving cassette control bits. Perform the audited IOINIT, RAMTAS, RESTOR and CINT startup sequence. Allocate language state and install hooks only after RAMTAS has cleared its work areas. Use explicit language memory boundaries rather than accepting the cartridge-aware RAM test as the allocator limit. [3, 6]
+Disable IRQs, clear decimal mode and establish a bounded hardware stack. Set mapping bits 0..2 in the $01 data latch before making those pins outputs in $00, preserving upper port bits. CBM80 dispatch occurs before IOINIT; the reset latch is zero, so enabling the outputs first hides the executing cartridge and KERNAL. Perform the audited IOINIT, RAMTAS, RESTOR and CINT startup sequence. Allocate language state and install hooks only after RAMTAS has cleared its work areas. Use explicit language memory boundaries rather than accepting the cartridge-aware RAM test as the allocator limit. [3, 6]
 Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident compiler for $1400-$2BFF (runtime ABI 7). Store raw load images in Magic Desk banks 2 and 1 respectively. Copy the complete dependency closures through common RAM at cold start; refresh the runtime at RUN and CONT. The linker supplies separate load and run addresses, so internal instructions already name their RAM addresses. Copy service entry stubs to $0334-$03FF after KERNAL initialization. Bank-2 DATA/READ/RESTORE, DEF FN activation and device/input services execute directly from ROM through the generic common-RAM bank_call ABI. Shared hot helpers remain in the copied runtime. There is no decompression or arbitrary instruction relocation.
 Copy the common-RAM gateway image into its reserved workspace, and write the six RAM hardware-vector bytes at $FFFA-$FFFF underneath KERNAL. The vector targets are common-RAM interrupt entries. Finish all copies and validate their build stamp/checksum before enabling IRQs. The top RAM reservation is permanent, including while the ROM is visible; allocation must never use it as temporary editing space.
 Before RUN, verify the runtime image and refresh it from ROM when required. CONT uses the same fixed helper addresses and may refresh identical bytes, but an ABI/build change or structural program change invalidates continuation. A helper copy does not recompile already valid user bodies. Hardware RESET performs cold initialization and does not promise retention.
@@ -478,7 +478,7 @@ This appendix records the development implementation on 24 October 2026. The ful
 Measured linked build
 Build property	Measured value
 ROM bytes	65,536
-ROM SHA-256	d9b781054f3e3079857bb0d8cca5914044b2c24a96963a05de5e2d9b5ef4f912
+ROM SHA-256	6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4
 Cartridge type	19
 Cartridge format	classic Magic Desk
 Bank bytes	8,192
@@ -559,11 +559,11 @@ HEADER6	9
 HEADER7	9
 
 Validation and implementation context
-Automated validation: 184 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
+Automated validation: 186 tests passed, 2889 documented runtime instructions checked. Environment: instruction-level py65 with deterministic KERNAL stubs; this is not cycle-accurate or physical-machine acceptance evidence.
 Source v1/v2 and runtime ABI 7 are distinct; v2 carries binary metadata and bytes. Language zero page is $02-$78; common workspace is $0800-$13FF. Function activations currently use a guarded hardware stack with depth eight. The compiler emits native helper calls and branches, with literal power-of-two multiplication/division lowered to dedicated arithmetic shift helpers. Signed division applies a negative-operand bias to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, becoming signed -32768 only in mixed division. Strength reduction preserves the type and wrapping of every operation; there is no general constant folder. General inline scalar optimizations remain pending. The compiler reservation is $1400-$2BFF and the arena begins at $2C00.
 Instruction-level measurements and capacity scenario
 Measurement context	Value
-ROM SHA-256	d9b781054f3e3079857bb0d8cca5914044b2c24a96963a05de5e2d9b5ef4f912
+ROM SHA-256	6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4
 Environment	py65 1.2.0, deterministic KERNAL stubs; no VIC/IEC timing
 Cold start instructions	164,082
 
@@ -618,7 +618,7 @@ READY.
 
 Captured Void Runner collection replay
 Replay property	Value
-ROM SHA-256	d9b781054f3e3079857bb0d8cca5914044b2c24a96963a05de5e2d9b5ef4f912
+ROM SHA-256	6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4
 Environment	instruction-level py65; no IRQ/VIC timing
 Captured physical blocks	1,636
 Initial free blocks	253
@@ -632,6 +632,7 @@ Final free bytes	5,651
 Implementation status — design revision 0.16
 The implemented cartridge is a development build. The revision 0.3 version-one contract remains the release target. Updating the design records actual choices and unfinished requirements; it does not waive those requirements or assert release acceptance.
 The 25 October SAVE correction reports transport and final DOS failures as DEVICE ERROR, releases temporary export storage on failure, and preserves the program for retry. The supplied VICE 2.4 state contained drive error 74 and KERNAL status $80; the investigation records the before/after reproduction and recovered source/blob backup.
+The 25 October startup correction sets the CPU-port mapping latch before enabling its output pins. The original ROM from the supplied VICE 3.10 snapshot hides itself during cold start; the corrected ROM boots, executes PRINT 7 and returns to READY on C64 old PAL, C64 PAL, C64C PAL and C64 NTSC in Linux VICE 3.7.1. Windows GTK3VICE 3.10 retesting remains open. See the startup investigation.
 Area	Implemented behavior	Remaining work
 Platform	64 KiB classic Magic Desk ROM/CRT with eight 8 KiB banks, raw compiler/runtime image copies, generic banked-service calls and bank-preserving gateways, explicit KERNAL initialization, fixed RAM runtime, common gateways, RAM hardware vectors, separate raw/KERNAL NMI entry shapes, synthetic IRQ return frame	Broader VICE/stock-ROM acceptance, exhaustive interrupt injection, physical PAL and NTSC validation, warm-recovery contracts
 Editing and storage	Bank-3 split screen editor with persistent line/viewport bookmarks, bounded four-row command/INPUT pane, insert/overwrite with independent literal entry, F1 help, F3 numeric jumps, F5 binary/sprite editing, stock BASIC PRG import and clean exit; seven-byte stable anchors in 250-byte slabs, exact adjacent tokens/native bodies, final successor JMP, sorted insertion/replacement/deletion, tombstones, coalescing allocator with payloads allocated from the high end, staged failed edits, page-based graphics/machine-code RESERVE declarations, direct CLEAN rebuild of dense slabs and symbols with complete native rebinding	General arena sliding compaction, full graph-integrity preflight before every traversal, complete name-allocation rollback on failed edits
@@ -761,6 +762,7 @@ $0334–$033B	Unused	8
 $033C–$03FB	Cassette buffer, reclaimed because tape transport is unsupported	192
 $03FC–$03FF	Unused	4
 
+KERNAL CBM80 dispatch precedes IOINIT. Cold start must set mapping bits 0–2 in $01 before making them outputs in $00: the reset data latch is zero, and enabling its outputs first hides the executing cartridge and KERNAL. See the startup freeze investigation.
 Cold start installs the stubs after KERNAL initialization: RAMTAS clears all of page 3. Preserve KERNAL vectors through $0333 and keep tape transport unsupported while its buffer is repurposed. User machine code must preserve this firmware-owned range. The stock KERNAL declarations identify the cassette buffer; the initialization source records page-3 clearing.
 Banked-service call ABI
 Runtime ABI 7 adds bank_call, a common-RAM call gate. A call contains four inline descriptor bytes immediately after its JSR:

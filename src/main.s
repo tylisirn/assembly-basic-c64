@@ -13,12 +13,15 @@ cold_start:
  cld
  ldx #$ff
  txs
- lda $00
- ora #7
- sta $00
+ ; CBM80 dispatch precedes IOINIT: the mapping pins can still be inputs
+ ; with a zero data latch. Set the latch before enabling those outputs,
+ ; otherwise ROML/KERNAL disappear while this code is executing in ROM.
  lda PORT
  ora #7
  sta PORT
+ lda $00
+ ora #7
+ sta $00
  jsr $fda3 ; IOINIT
  jsr $fd50 ; RAMTAS
  jsr $fd15 ; RESTOR

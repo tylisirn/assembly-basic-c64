@@ -114,6 +114,8 @@ def synchronize():
         'roughly 389 such lines':'roughly 322 such lines',
     }
     rewrites={
+        'Disable IRQs, clear decimal mode and establish a bounded hardware stack.':
+        'Disable IRQs, clear decimal mode and establish a bounded hardware stack. Set mapping bits 0..2 in the $01 data latch before making those pins outputs in $00, preserving upper port bits. CBM80 dispatch occurs before IOINIT; the reset latch is zero, so enabling the outputs first hides the executing cartridge and KERNAL. Perform the audited IOINIT, RAMTAS, RESTOR and CINT startup sequence. Allocate language state and install hooks only after RAMTAS has cleared its work areas. Use explicit language memory boundaries rather than accepting the cartridge-aware RAM test as the allocator limit. [3, 6]',
         'Link the execution image for its fixed run addresses':
         'Link the execution runtime for fixed run addresses $E400-$FFF9 and the resident compiler for $1400-$2BFF (runtime ABI 3). Store a deterministic LZSS-compressed load image in the standard cartridge and decompress it through common-RAM read gates at cold start; refresh the runtime at RUN and CONT. Both images have separate fixed-address link outputs. The linker emits the RAM runtime as a separate fixed-address binary before compression; all internal calls already name its RAM run addresses. Copy the complete dependency closure, including helper code, tables, constants and diagnostics. No arbitrary relocation of ROM instructions is assumed.',
         'The allocator therefore has two spans:':

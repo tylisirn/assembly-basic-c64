@@ -27,10 +27,16 @@ class Memory:
         # Stock IRQ entry saves A/X/Y before dispatching through $0314.
         self.kernal[0x1f48:0x1f50]=bytes.fromhex('488a4898486c1403')
         self.kernal[0x1ffe:0x2000]=bytes.fromhex('48ff')
+    def port_bits(self):
+        # LORAM/HIRAM/CHAREN inputs are pulled high. The data latch alone
+        # does not determine the map until the corresponding DDR bits are set.
+        return ((self.ram[1] & self.ram[0]) | (~self.ram[0] & 7)) & 7
     def __getitem__(self, i):
         if isinstance(i,slice):
             return [self[j] for j in range(i.start or 0,i.stop or 65536,i.step or 1)]
-        mode = self.ram[1] & 7
+        if i == 1:
+            return (self.ram[1] & 0xf8) | self.port_bits()
+        mode = self.port_bits()
         if mode & 3 == 3:
             if self.cart_enabled and 0x8000 <= i < 0xa000:
                 return self.rom[self.bank*8192+i-0x8000]
@@ -45,7 +51,7 @@ class Memory:
             return self.kernal[i-0xe000]
         return self.ram[i]
     def __setitem__(self,i,v):
-        mode = self.ram[1] & 7
+        mode = self.port_bits()
         if mode & 4 and mode & 3 and 0xde00 <= i <= 0xdeff:
             self.bank = v & 7
             self.cart_enabled = not bool(v & 128)

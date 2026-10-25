@@ -37,6 +37,11 @@ Firmware keeps the cartridge enabled and hides ROM through `$01`; it never write
 | `$033C–$03FB` | Cassette buffer, reclaimed because tape transport is unsupported | 192 |
 | `$03FC–$03FF` | Unused | 4 |
 
+KERNAL CBM80 dispatch precedes `IOINIT`. Cold start must set mapping bits 0–2
+in `$01` before making them outputs in `$00`: the reset data latch is zero,
+and enabling its outputs first hides the executing cartridge and KERNAL.
+See the [startup freeze investigation](VICE_STARTUP_FREEZE.md).
+
 Cold start installs the stubs after KERNAL initialization: `RAMTAS` clears all of page 3. Preserve KERNAL vectors through `$0333` and keep tape transport unsupported while its buffer is repurposed. User machine code must preserve this firmware-owned range. The stock [KERNAL declarations](https://github.com/mist64/c64rom/blob/master/kernal/declare.s) identify the cassette buffer; the [initialization source](https://github.com/mist64/c64rom/blob/master/kernal/init.s) records page-3 clearing.
 
 ## Banked-service call ABI

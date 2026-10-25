@@ -13,6 +13,34 @@ class BankingTests(unittest.TestCase):
             if c.pc==0x700:return
         self.fail(f'{label} did not return: ${c.pc:04x}')
 
+    def test_reset_mapping_uses_port_direction_and_latch(self):
+        mem=Memory()
+        mem.ram[0]=0
+        mem.ram[1]=0
+        mem.ram[0x8004]=0x55
+        self.assertEqual(mem[1]&7,7)
+        self.assertEqual(mem[0x8004],0xc3)
+        mem[0]=7
+        self.assertEqual(mem[1]&7,0)
+        self.assertEqual(mem[0x8004],0x55)
+        mem[0xde00]=3
+        self.assertEqual(mem.bank,0) # I/O is hidden with the zero output latch.
+        mem[1]=7
+        self.assertEqual(mem[0x8004],0xc3)
+        mem[0xde00]=3
+        self.assertEqual(mem.bank,3)
+
+    def test_cold_start_from_uninitialized_cpu_port(self):
+        m=Machine()
+        # KERNAL jumps through CBM80 before IOINIT initializes $00/$01.
+        m.memory.ram[0]=0
+        m.memory.ram[1]=0
+        m.boot()
+        self.assertIn(b'ASSEMBLY BASIC',m.output)
+        self.assertIn(b'READY.',m.output)
+        self.assertEqual(m.memory.port_bits(),7)
+        self.assertEqual(m.command('PRINT 7').split('\r')[0],' 7 ')
+
     def test_latch_and_pla_visibility(self):
         mem=Memory()
         for bank in range(8):
