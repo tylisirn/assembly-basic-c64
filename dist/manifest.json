@@ -1,6 +1,6 @@
 {
-  "status": "development; version-one release acceptance incomplete",
-  "design_revision": "0.16",
+  "status": "packaged; validation scope is recorded in docs/implementation/STATUS.md",
+  "design_sha256": "37a80d563e3a3af55c562ec0cae29ddb2511e9dad1e3f7ebd027f966986967f3",
   "runtime_abi": 7,
   "cartridge_type": 19,
   "source_version": 1,
@@ -8,19 +8,19 @@
     1,
     2
   ],
-  "validated_tests": 186,
+  "validated_tests": 196,
   "artifacts": {
     "abi.json": {
       "bytes": 9301,
-      "sha256": "60c2c2f96bf6911f1e6ce74c694bf2b53b0e2edc632baf6588b46bd358d40e4e"
+      "sha256": "7e9cd785338e9ce882843a01bf7be17c4d803abf315a56df8381ecf5ee1ea82f"
     },
     "assembly-basic.bin": {
       "bytes": 65536,
-      "sha256": "6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4"
+      "sha256": "7a829195aab33c08e453647acb4e1c9bf52f14a0c5941b19ef15db6abd4d8b20"
     },
     "assembly-basic.crt": {
       "bytes": 65728,
-      "sha256": "119e773c6e654f185b8604d76d73ae1d6ae530143ea5a6ffdac6a6d2a7895687"
+      "sha256": "74ea617bdd35e5e8036d5561af79f1e98daf0d25c5e9a4c710742989cd96e55a"
     },
     "binary-editor-rom-report.json": {
       "bytes": 301,
@@ -62,13 +62,17 @@
       "bytes": 7019,
       "sha256": "750e937b274e2433172c89b522fb03c7d3f1ceb6374f87ce43c135cf8e873c57"
     },
+    "examples/voidrunner_ex.ab": {
+      "bytes": 5158,
+      "sha256": "0444c3ef85f9c6d572d606b9f8760ef3aaf3f6be7d19bdbf683bcd2392dc0762"
+    },
     "size-report.json": {
       "bytes": 4053,
-      "sha256": "8a0ddbd315de8952e03a8091d0032857588f6b2b63d076d76240117e7c324a09"
+      "sha256": "483307463a503c4272acddf9b550dd44600cc89e45dbf23b7d70182658fe83c1"
     },
     "test-report.json": {
-      "bytes": 266,
-      "sha256": "ac270aa66e9e72585f72e9226617ead7563f645f909faf8fb13109c41ffd71ef"
+      "bytes": 323,
+      "sha256": "206836ae7f321aa3f8e09b2fa42e5e6f8c48d540ae2a0518e8d37d81df5966d3"
     }
   }
 }

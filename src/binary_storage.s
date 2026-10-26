@@ -1,4 +1,168 @@
 .segment "BINARY_STORAGE"
+; BLOAD/BSAVE use the editor's raw sequential format. FILE_ID is the current
+; address, FILE_COUNT the remaining length; operation $eb means EOF-bounded.
+binary_file_command:
+ lda FILE_NAME_LEN
+ beq @syntax
+ cmp #252
+ bcs @syntax
+ lda FILE_OPERATION
+ bmi @name
+ ; Reject a bounded transfer that would wrap past $ffff. Ending at $10000
+ ; is valid, including a zero-byte operation at any address.
+ clc
+ lda FILE_ID
+ adc FILE_COUNT
+ sta TMP
+ lda FILE_ID+1
+ adc FILE_COUNT+1
+ bcc @name
+ ora TMP
+ beq @name
+ lda #ERR_QUANTITY
+ RAM_CALL runtime_error
+@syntax:
+ lda #ERR_SYNTAX
+ RAM_CALL runtime_error
+@name:
+ ldx FILE_NAME_LEN
+ lda #','
+ sta BRIDGE,x
+ inx
+ lda #'S'
+ sta BRIDGE,x
+ inx
+ lda #','
+ sta BRIDGE,x
+ inx
+ lda #'R'
+ ldy FILE_OPERATION
+ cpy #$6c
+ bne :+
+ lda #'W'
+:
+ sta BRIDGE,x
+ inx
+ txa
+ ldx #<BRIDGE
+ ldy #>BRIDGE
+ jsr $ffbd
+ lda #1
+ ldx FILE_DEVICE
+ ldy #2
+ jsr $ffba
+ lda #0
+ sta FILE_MODE ; pending error, retained across CLRCHN/CLOSE
+ jsr $ffcc
+ jsr $ffc0
+ JCS binary_file_error
+ lda $90
+ JNE binary_file_error
+ lda FILE_OPERATION
+ cmp #$6c
+ beq @output
+ ldx #1
+ jsr $ffc6
+ JCS binary_file_error
+ jmp @read
+@output:
+ ldx #1
+ jsr $ffc9
+ JCS binary_file_error
+ lda $90
+ JNE binary_file_error
+@write:
+ lda FILE_COUNT
+ ora FILE_COUNT+1
+ JEQ binary_file_close
+ jsr binary_file_pointer
+ jsr read_ram
+ jsr $ffd2
+ JCS binary_file_error
+ lda $90
+ JNE binary_file_error
+ jsr binary_file_advance
+ jmp @write
+@read:
+ lda $90
+ and #$bf ; EOF can accompany the last valid byte, even an empty file.
+ JNE binary_file_error
+ lda $90
+ and #$40
+ JNE binary_file_close
+ bit FILE_OPERATION
+ bmi @byte
+ lda FILE_COUNT
+ ora FILE_COUNT+1
+ JEQ binary_file_close
+@byte:
+ jsr $ffcf
+ pha
+ lda $90
+ and #$bf
+ bne @read_error
+ jsr binary_file_pointer
+ pla
+ sta (PTR),y ; writes RAM under ROM, with hardware I/O exposed
+ jsr binary_file_advance
+ lda FILE_ID
+ ora FILE_ID+1
+ bne @read
+ ; Never wrap an unbounded read into zero page. EOF at $ffff is valid.
+ lda $90
+ and #$40
+ bne binary_file_close
+ bit FILE_OPERATION
+ bpl @read
+ lda #ERR_QUANTITY
+ sta FILE_MODE
+ jmp binary_file_close
+@read_error:
+ pla
+binary_file_error:
+ lda #ERR_DEVICE
+ sta FILE_MODE
+binary_file_close:
+ jsr $ffcc
+ lda #1
+ jsr $ffc3
+ lda $90
+ and #$bf
+ beq :+
+ lda #ERR_DEVICE
+ sta FILE_MODE
+:
+ lda FILE_MODE
+ bne @error
+ lda FILE_OPERATION
+ cmp #$6c
+ bne @done
+ jsr file_save_status
+ bcc @done
+ lda #ERR_DEVICE
+@error:
+ RAM_CALL runtime_error
+@done:
+ rts
+binary_file_pointer:
+ lda FILE_ID
+ sta PTR
+ lda FILE_ID+1
+ sta PTR+1
+ ldy #0
+ rts
+binary_file_advance:
+ inc FILE_ID
+ bne :+
+ inc FILE_ID+1
+:
+ lda FILE_COUNT
+ bne :+
+ dec FILE_COUNT+1
+:
+ dec FILE_COUNT
+ rts
+
 ; Check a source SAVE only after closing its data channel, which flushes the
 ; last buffered byte and commits the directory entry. TALK directly to status
 ; secondary 15: no extra logical file or CLOSE-15 side effects on user files.

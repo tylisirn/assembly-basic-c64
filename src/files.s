@@ -1,6 +1,12 @@
 .segment "COMMAND"
 ; Source transport; reads accept both SEQ and PRG DOS file types. Native filename bytes have been staged in BRIDGE.
 file_command:
+ lda FILE_OPERATION
+ cmp #$6b
+ bcc @source
+ STORAGE_CALL binary_file_command
+ rts
+@source:
  lda #0
  sta FILE_MAP
  sta FILE_MAP+1
@@ -872,7 +878,7 @@ validate_tokens:
  JCS @direct
  cmp #$70
  JCS @small
- cmp #$6b
+ cmp #$6d
  JCS load_fail
  cmp #$20
  bcs @keyword

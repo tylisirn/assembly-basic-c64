@@ -94,6 +94,13 @@ length prefix or metadata in a `.BIN`. Save writes the exact selected extent.
 Load stops at the end of the file or the selected extent; short files leave the
 remaining memory unchanged and long files never write past the boundary.
 
+The BASIC statements `BLOAD filename,drive,address[,bytes]` and
+`BSAVE filename,drive,address,bytes` exchange the same raw bytes from direct mode
+or a numbered program. Supply the complete filename, including `.BIN` when
+using files named by this editor. BLOAD without a byte count reads until EOF;
+with a count it stops at EOF or that limit. See the
+[language reference](LANGUAGE_REFERENCE.md#raw-binary-files).
+
 BASIC SAVE stores reservations, BASIC/manual ownership, blob bounds/types, each
 sprite's colors/mode and the exact bytes in every blob in the `.AB` program file.
 Unassigned reservation bytes are not included.

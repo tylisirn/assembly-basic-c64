@@ -21,8 +21,8 @@ All words are unsigned little-endian fields unless stated otherwise. A line has 
 | `$19` NAME16 | Word name ID, canonical for IDs 128–65534 |
 | `$1A`, `$1B` | `<<`, `>>` |
 | `$1C–$1F` | Reserved; invalid |
-| `$20–$6A` | Keywords in the table below |
-| `$6B–$6F` | Reserved; invalid |
+| `$20–$6C` | Keywords in the table below |
+| `$6D–$6F` | Reserved; invalid |
 | `$70–$7F` | Decimal magnitude 0–15, value = code minus `$70` |
 | `$80–$FF` | Name ID 0–127, ID = code minus `$80` |
 
@@ -75,7 +75,8 @@ Keyword spellings are exact whole-identifier matches. TAB( and SPC( include thei
 | `$42` | `GET#` | `$68` | `ELSE` |
 | `$43` | `NEW` | `$69` | `CLEAN` |
 | `$44` | `TAB(` | `$6A` | `RESERVE` |
-| `$45` | `TO` |  |  |
+| `$45` | `TO` | `$6B` | `BLOAD` |
+|  |  | `$6C` | `BSAVE` |
 
 ## Name dictionary
 
@@ -128,6 +129,8 @@ The host validator implements the complete canonical token checks. The target lo
 ## Staged loading and transport
 
 Source transport uses bounded sequential KERNAL channels, never an unrestricted KERNAL LOAD into the arena. LOAD builds and compiles a second graph, publishes only after validation, and returns to READY. Source/allocation/CRC failure retains the old graph. Temporary space for both graphs is required. Successfully processed RESERVE declarations can remain protected after a failed import.
+
+`BLOAD filename,drive,address[,bytes]` and `BSAVE filename,drive,address,bytes` exchange raw sequential bytes in the editor's BIN format, without a header or metadata. They are ordinary compiled statements and retain program execution after success. BLOAD stops at EOF or its optional count; BSAVE writes exactly its required count. They validate arguments before opening the transport, reject bounded ranges past `$FFFF`, and never wrap an unlimited load into zero page. BSAVE checks final DOS status after closing the data channel. Neither statement changes reservations or blob metadata.
 
 Format 2 validates the complete file before reopening it to restore blob bytes in a second streaming pass. Keep the file unchanged and available until completion. A second-pass I/O failure can change some already restored bytes; there is no blob-sized rollback buffer. SAVE checks OPEN/output/CLOSE transport status and final DOS status before reporting success, and releases temporary export storage on error.
 

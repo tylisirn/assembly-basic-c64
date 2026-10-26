@@ -426,6 +426,10 @@ compile_statement:
  JEQ compile_file
  cmp #$35
  JEQ compile_file
+ cmp #$6b
+ JEQ compile_binary_file
+ cmp #$6c
+ JEQ compile_binary_file
  cmp #$3f
  JEQ compile_open
  cmp #$40
@@ -1819,6 +1823,66 @@ compile_substring:
  lda #<right_word
  ldx #>right_word
  jmp emit_call
+
+; Raw binary statements share file_word's banked entry with source files.
+compile_binary_file:
+ pha
+ jsr compile_binary_argument ; filename
+ lda #1
+ jsr expect
+ jsr compile_binary_argument ; required device
+ lda #1
+ jsr expect
+ jsr compile_binary_argument ; start address
+ jsr token_peek
+ cmp #1
+ beq @count
+ pla
+ cmp #$6b
+ JNE compile_recover ; BSAVE always needs a count.
+ lda #$eb ; BLOAD with no count: read until EOF.
+ pha
+ lda #0
+ sta VALUE
+ sta VALUE+1
+ jsr emit_ax
+ lda #<push_number
+ ldx #>push_number
+ jsr emit_call
+ jmp @boundary
+@count:
+ inc TOKEN_POS
+ jsr compile_binary_argument
+@boundary:
+ jsr token_peek
+ cpx TOKEN_LEN
+ bcs @operation
+ cmp #0
+ beq @operation
+ cmp #$68
+ JNE compile_recover
+@operation:
+ lda #$a9
+ jsr emit
+ pla
+ jsr emit
+ lda #<file_word
+ ldx #>file_word
+ jsr emit_call
+ clc
+ rts
+compile_binary_argument:
+ jsr token_peek
+ cpx TOKEN_LEN
+ JCS compile_recover
+ cmp #0
+ JEQ compile_recover
+ cmp #1
+ JEQ compile_recover
+ cmp #$68
+ JEQ compile_recover
+ lda #0
+ jmp expression
 
 .segment "COMMAND"
 compile_file:

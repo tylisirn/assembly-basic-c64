@@ -30,6 +30,8 @@ Custom keywords and commands:
 | --- | --- |
 | `ELSE` | Alternate arm of an `IF`, on the same physical line |
 | `RESERVE address,bytes` | Protect RAM for graphics or machine code before entering/loading the rest of a program |
+| `BLOAD filename,drive,address[,bytes]` | Load raw bytes into memory, stopping at EOF or the optional byte limit |
+| `BSAVE filename,drive,address,bytes` | Save exactly the specified memory bytes without a header or metadata |
 | `CLEAN` | Rebuild source storage, clear values and invalidate `CONT`; direct mode only |
 | `BASIC` | Open the source editor; direct mode only |
 | `SPRDEF` | Open the binary/sprite editor; direct mode only |

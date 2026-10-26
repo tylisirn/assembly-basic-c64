@@ -240,8 +240,8 @@ $18 BADTEXT	Length byte and malformed source retained for repair
 $19 NAME16	Word name ID, canonical for IDs 128–65534
 $1A, $1B	<<, >>
 $1C–$1F	Reserved; invalid
-$20–$6A	Keywords in the table below
-$6B–$6F	Reserved; invalid
+$20–$6C	Keywords in the table below
+$6D–$6F	Reserved; invalid
 $70–$7F	Decimal magnitude 0–15, value = code minus $70
 $80–$FF	Name ID 0–127, ID = code minus $80
 
@@ -288,7 +288,8 @@ $41	GET	$67	π
 $42	GET#	$68	ELSE
 $43	NEW	$69	CLEAN
 $44	TAB(	$6A	RESERVE
-$45	TO
+$45	TO	$6B	BLOAD
+		$6C	BSAVE
 
 Name dictionary
 Names are unique uppercase spellings of 1–255 bytes: letter, letters/digits, optional final % or $. Reject exact keywords and special variables, duplicates and ID $FFFF. The dictionary count is a word, with IDs 0–65534. Scalars, arrays and functions resolve their separate bindings from spelling IDs; A and A() can share a spelling ID while having different storage.
@@ -322,6 +323,7 @@ Validate magic/flags/version, dictionary identity, sorted line records, bounded 
 The host validator implements the complete canonical token checks. The target loader does not yet enforce every DATA_SPELLING equality/context check; see implementation gaps. Target VERIFY compares canonical serialization of the current program with file bytes rather than canonicalizing an arbitrary file's dictionary. Host verification canonicalizes both inputs.
 Staged loading and transport
 Source transport uses bounded sequential KERNAL channels, never an unrestricted KERNAL LOAD into the arena. LOAD builds and compiles a second graph, publishes only after validation, and returns to READY. Source/allocation/CRC failure retains the old graph. Temporary space for both graphs is required. Successfully processed RESERVE declarations can remain protected after a failed import.
+BLOAD filename,drive,address[,bytes] and BSAVE filename,drive,address,bytes exchange raw sequential bytes in the editor's BIN format, without a header or metadata. They are ordinary compiled statements and retain program execution after success. BLOAD stops at EOF or its optional count; BSAVE writes exactly its required count. They validate arguments before opening the transport, reject bounded ranges past $FFFF, and never wrap an unlimited load into zero page. BSAVE checks final DOS status after closing the data channel. Neither statement changes reservations or blob metadata.
 Format 2 validates the complete file before reopening it to restore blob bytes in a second streaming pass. Keep the file unchanged and available until completion. A second-pass I/O failure can change some already restored bytes; there is no blob-sized rollback buffer. SAVE checks OPEN/output/CLOSE transport status and final DOS status before reporting success, and releases temporary export storage on error.
 Stock BASIC PRG import
 LOAD also detects the little-endian PRG address $0801 and converts stock BASIC V2 linked lines into native source. It verifies physical next links, increasing valid line numbers, terminators, token codes and the final zero link. Malformed, oversized/truncated files and appended machine-code payloads are rejected without replacing the old source.
@@ -342,11 +344,12 @@ Binary scenes compose one row at a time and compare against character/color RAM.
 Hardware sprites supply 1X/2X previews and two complementary hatched hires cursor sprites. The sprite's background fills the preview panel. Each sprite retains its own background, sprite and two common colors plus its hires/multicolor mode. Painting updates the corresponding data byte and previews. Toggling mode does not transform pixel bytes. VIC registers and sprite pointers are restored on exit.
 Persistence
 Raw BIN exchange is a sequential stream of exactly the selected reservation/blob bytes, with no load address, length prefix or metadata. A short load leaves the remainder unchanged; a long load stops at the extent boundary.
+The compiled BASIC statements BLOAD and BSAVE use the same raw byte format, with an explicit drive and memory address. BLOAD accepts an optional byte limit; BSAVE requires a count. Their filenames are used exactly as supplied, while editor prompts add .BIN when there is no extension.
 Native program files save logical reservations, ownership, blob bounds/types, palettes and exact blob bytes. Unassigned bytes inside reservations are excluded. Reservation descriptors precede source compilation so allocations cannot consume incoming binary pages. LOAD validates source/metadata/data before a second streaming pass restores bytes, avoiding a blob-sized staging buffer. Validation failure preserves old state; second-pass device failure can leave already restored bytes changed. See source format for binary layouts and checks.
 Measured linked build
 Build property	Measured value
 ROM bytes	65,536
-ROM SHA-256	6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4
+ROM SHA-256	7a829195aab33c08e453647acb4e1c9bf52f14a0c5941b19ef15db6abd4d8b20
 Cartridge type	19
 Cartridge format	classic Magic Desk
 Bank bytes	8,192
@@ -374,20 +377,20 @@ Editor help tail workspace	[$0FE0, $1000) (exclusive end)
 Binary editor bank	4
 Binary editor ROM bytes	7,457
 Binary storage bank	5
-Binary storage ROM bytes	3,408
+Binary storage ROM bytes	3,754
 Binary metadata workspaces	[$0200, $0259); [$02A7, $0300) (exclusive ends)
 Source versions	1, 2
 Services bank	2
 Services ROM address	$972B (38,699)
-Services ROM bytes	1,282
+Services ROM bytes	1,326
 Arena raw bytes	43,008
 Compiler run address	$1400 (5,120)
-Compiler used bytes	5,747
-Compiler ROM bytes	5,747
+Compiler used bytes	5,895
+Compiler ROM bytes	5,895
 Compiler image encoding	raw
 Compiler budget bytes	6,144
-ROM used bytes	39,221
-ROM spare bytes	26,315
+ROM used bytes	39,788
+ROM spare bytes	25,748
 
 User arena spans
 Start	Exclusive end	Raw bytes
@@ -397,26 +400,26 @@ $E000	$E400	1,024
 Cartridge bank allocation
 Each bank uses the CPU window [$8000, $A000), with an exclusive upper bound. ROM offsets below are byte offsets.
 Bank	ROM offset	Contents	Used bytes	Spare bytes	Reserved
-0	0	boot, command editor, tokenizer, LIST and source transport	8,061	131	No
-1	8,192	raw resident compiler image	5,756	2,436	No
-2	16,384	raw RAM execution runtime image and banked ROM services	7,213	979	No
+0	0	boot, command editor, tokenizer, LIST and source transport	8,090	102	No
+1	8,192	raw resident compiler image	5,904	2,288	No
+2	16,384	raw RAM execution runtime image and banked ROM services	7,257	935	No
 3	24,576	split screen editor and stock BASIC PRG import; PRG export reserved	7,290	902	No
 4	32,768	binary, reservation and sprite editor	7,466	726	No
-5	40,960	binary metadata, memory reservation and source persistence	3,417	4,775	No
+5	40,960	binary metadata, memory reservation and source persistence	3,763	4,429	No
 6	49,152	reserved: numeric tables, fonts and optional resources	9	8,183	Yes
 7	57,344	reserved: expansion and diagnostics	9	8,183	Yes
 
 Linked segment sizes
 Segment	Bytes
 HEADER	9
-COMMAND	7,307
+COMMAND	7,336
 GATEWAY	593
-COMPILER	5,747
+COMPILER	5,895
 RUNTIME	5,922
-SERVICES	1,282
+SERVICES	1,326
 SERVICE_GATEWAY	152
 SCREEN_EDITOR	7,281
-BINARY_STORAGE	3,408
+BINARY_STORAGE	3,754
 BINARY_EDITOR	7,457
 HEADER1	9
 HEADER2	9

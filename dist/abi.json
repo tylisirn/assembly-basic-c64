@@ -1,6 +1,6 @@
 {
   "runtime_abi": 7,
-  "rom_sha256": "6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4",
+  "rom_sha256": "7a829195aab33c08e453647acb4e1c9bf52f14a0c5941b19ef15db6abd4d8b20",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_register": 56832,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 8061,
-      "spare_bytes": 131,
+      "used_bytes": 8090,
+      "spare_bytes": 102,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5756,
-      "spare_bytes": 2436,
+      "used_bytes": 5904,
+      "spare_bytes": 2288,
       "reserved": false
     },
     {
@@ -38,8 +38,8 @@
         40960
       ],
       "role": "raw RAM execution runtime image and banked ROM services",
-      "used_bytes": 7213,
-      "spare_bytes": 979,
+      "used_bytes": 7257,
+      "spare_bytes": 935,
       "reserved": false
     },
     {
@@ -74,8 +74,8 @@
         40960
       ],
       "role": "binary metadata, memory reservation and source persistence",
-      "used_bytes": 3417,
-      "spare_bytes": 4775,
+      "used_bytes": 3763,
+      "spare_bytes": 4429,
       "reserved": false
     },
     {
@@ -199,23 +199,23 @@
   "rom_services": {
     "bank": 2,
     "address": 38699,
-    "bytes": 1282,
+    "bytes": 1326,
     "entries": {
       "rom_activate_function": 39451,
-      "rom_close_word": 39720,
+      "rom_close_word": 39764,
       "rom_file_word": 39529,
-      "rom_get_number": 39804,
-      "rom_input_channel": 39746,
-      "rom_input_field": 39859,
-      "rom_input_prompt": 39785,
-      "rom_open_word": 39591,
-      "rom_output_channel": 39742,
+      "rom_get_number": 39848,
+      "rom_input_channel": 39790,
+      "rom_input_field": 39903,
+      "rom_input_prompt": 39829,
+      "rom_open_word": 39635,
+      "rom_output_channel": 39786,
       "rom_puts": 33000,
       "rom_read_number": 39215,
       "rom_read_string": 39277,
-      "rom_reset_channel": 39772,
+      "rom_reset_channel": 39816,
       "rom_restore_data": 38699,
-      "rom_unsupported": 39973
+      "rom_unsupported": 40017
     },
     "ram_entries": {
       "restore_data": 820,
@@ -236,14 +236,14 @@
   "image_loads": {
     "gateway": {
       "bank": 0,
-      "rom_address": 40084,
+      "rom_address": 40113,
       "run_address": 2048,
       "bytes": 593,
       "encoding": "raw"
     },
     "service_gateway": {
       "bank": 0,
-      "rom_address": 40677,
+      "rom_address": 40706,
       "run_address": 820,
       "bytes": 152,
       "encoding": "raw"
@@ -252,7 +252,7 @@
       "bank": 1,
       "rom_address": 32777,
       "run_address": 5120,
-      "bytes": 5747,
+      "bytes": 5895,
       "encoding": "raw"
     },
     "runtime": {

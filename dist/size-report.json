@@ -1,6 +1,6 @@
 {
   "rom_bytes": 65536,
-  "rom_sha256": "6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4",
+  "rom_sha256": "7a829195aab33c08e453647acb4e1c9bf52f14a0c5941b19ef15db6abd4d8b20",
   "cartridge_type": 19,
   "cartridge_format": "classic Magic Desk",
   "bank_bytes": 8192,
@@ -14,8 +14,8 @@
         40960
       ],
       "role": "boot, command editor, tokenizer, LIST and source transport",
-      "used_bytes": 8061,
-      "spare_bytes": 131,
+      "used_bytes": 8090,
+      "spare_bytes": 102,
       "reserved": false
     },
     {
@@ -26,8 +26,8 @@
         40960
       ],
       "role": "raw resident compiler image",
-      "used_bytes": 5756,
-      "spare_bytes": 2436,
+      "used_bytes": 5904,
+      "spare_bytes": 2288,
       "reserved": false
     },
     {
@@ -38,8 +38,8 @@
         40960
       ],
       "role": "raw RAM execution runtime image and banked ROM services",
-      "used_bytes": 7213,
-      "spare_bytes": 979,
+      "used_bytes": 7257,
+      "spare_bytes": 935,
       "reserved": false
     },
     {
@@ -74,8 +74,8 @@
         40960
       ],
       "role": "binary metadata, memory reservation and source persistence",
-      "used_bytes": 3417,
-      "spare_bytes": 4775,
+      "used_bytes": 3763,
+      "spare_bytes": 4429,
       "reserved": false
     },
     {
@@ -138,7 +138,7 @@
   "binary_editor_bank": 4,
   "binary_editor_rom_bytes": 7457,
   "binary_storage_bank": 5,
-  "binary_storage_rom_bytes": 3408,
+  "binary_storage_rom_bytes": 3754,
   "binary_metadata_workspaces": [
     [
       512,
@@ -155,7 +155,7 @@
   ],
   "services_bank": 2,
   "services_rom_address": 38699,
-  "services_rom_bytes": 1282,
+  "services_rom_bytes": 1326,
   "arena_spans": [
     [
       11264,
@@ -168,20 +168,20 @@
   ],
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,
-  "compiler_used_bytes": 5747,
-  "compiler_rom_bytes": 5747,
+  "compiler_used_bytes": 5895,
+  "compiler_rom_bytes": 5895,
   "compiler_image_encoding": "raw",
   "compiler_budget_bytes": 6144,
   "segments": {
     "HEADER": 9,
-    "COMMAND": 7307,
+    "COMMAND": 7336,
     "GATEWAY": 593,
-    "COMPILER": 5747,
+    "COMPILER": 5895,
     "RUNTIME": 5922,
-    "SERVICES": 1282,
+    "SERVICES": 1326,
     "SERVICE_GATEWAY": 152,
     "SCREEN_EDITOR": 7281,
-    "BINARY_STORAGE": 3408,
+    "BINARY_STORAGE": 3754,
     "BINARY_EDITOR": 7457,
     "HEADER1": 9,
     "HEADER2": 9,
@@ -191,6 +191,6 @@
     "HEADER6": 9,
     "HEADER7": 9
   },
-  "rom_used_bytes": 39221,
-  "rom_spare_bytes": 26315
+  "rom_used_bytes": 39788,
+  "rom_spare_bytes": 25748
 }

@@ -37,7 +37,7 @@ class TokenTests(unittest.TestCase):
             self.assertEqual(tokenize(listing(s,n),n),s,source)
     def test_reject_malformed(self):
         n=Names(['A'])
-        for s in (b'\x1c',b'\x6b',b'\x10\x00',b'\x11\xff\x00',b'\x19\0\0',b'\x13\x03x',b'\x18\0',b'\x14\0',b'\x2f',b'\x81',b'\x23\x15\x01\x31',b'\x23\x71\x16\x01\x32'):
+        for s in (b'\x1c',b'\x6d',b'\x10\x00',b'\x11\xff\x00',b'\x19\0\0',b'\x13\x03x',b'\x18\0',b'\x14\0',b'\x2f',b'\x81',b'\x23\x15\x01\x31',b'\x23\x71\x16\x01\x32'):
             with self.assertRaises(SourceError,msg=s.hex()):decode(s,n)
     def test_transactional_tokenization(self):
         n=Names(['ORIGINAL'])

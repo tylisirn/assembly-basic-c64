@@ -1,14 +1,14 @@
 {
   "runtime_abi": 7,
-  "design_sha256": "22c12cec093b10154c9375da079d6b1b0d9f3de6d660194a0490d1b09d73c577",
+  "design_sha256": "37a80d563e3a3af55c562ec0cae29ddb2511e9dad1e3f7ebd027f966986967f3",
   "source_sha256": {
     "architecture.md": "08ea762995fb458211593f36322d5a7f5408a8f08c465ebf2000e010bde811e5",
     "banking.md": "76a4278530908fc44f5c4bd54afe8a569dad4916b6ef02839a6a2d68e041f673",
     "integer_arithmetic.md": "209d04baa6f7157aedf56b78db96514bef87208217e1828e9e81286f226a0f99",
-    "source_format.md": "56e0332cd21e02f524716c2c46f39922e5292374bfbf50d88666889bd7f8c372",
-    "editors.md": "aa28a9589593a5e91ce657542d350aa916ac036b59f3942e51fd06a25eae9bb1"
+    "source_format.md": "9114edecf33eb90c678d4dbf30ced477e8b4ced19e24ef127c4cfe58bf8c6959",
+    "editors.md": "0e6d31f266c15511208fba50fd33962b1fe873db6aa3c3cf041622850f046c78"
   },
-  "rom_sha256": "6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4",
+  "rom_sha256": "7a829195aab33c08e453647acb4e1c9bf52f14a0c5941b19ef15db6abd4d8b20",
   "runtime_run_address": 58368,
   "arena_raw_bytes": 43008,
   "compiler_run_address": 5120,

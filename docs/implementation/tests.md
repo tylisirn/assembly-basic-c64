@@ -16,6 +16,7 @@ Native tests execute assembled cartridge code and generated instructions with de
 | --- | --- |
 | [test_banking.py](../../tests/test_banking.py) | PLA visibility, reset mapping, startup copies, bank/port preservation and interrupts |
 | [test_binary_editor.py](../../tests/test_binary_editor.py) | Reservations/blobs, hex and sprite workflows, rendering, BIN/native persistence and failures |
+| [test_binary_files.py](../../tests/test_binary_files.py) | BLOAD/BSAVE raw bytes, EOF/count bounds, shadow RAM/I/O, compiled source round trips, argument validation and transport/DOS failures |
 | [test_cartridge.py](../../tests/test_cartridge.py) | Magic Desk CRT headers, bank packets and exact ROM reconstruction in build/dist |
 | [test_cli.py](../../tests/test_cli.py) | Native console exit status and output handling |
 | [test_collection.py](../../tests/test_collection.py) | Captured-heap replay/cycle budget, bitmap boundaries and automatic collection roots |

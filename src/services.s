@@ -430,6 +430,23 @@ rom_activate_function:
  rts
 rom_file_word:
  sta FILE_OPERATION
+ cmp #$6b
+ bcc @device
+ RAM_CALL pop_number
+ sta FILE_COUNT
+ stx FILE_COUNT+1
+ ; A signed negative length is not a byte count.
+ cpx #$80
+ bcc @address
+ bit NUM_TYPE
+ bmi @address
+ lda #ERR_QUANTITY
+ RAM_CALL runtime_error
+@address:
+ RAM_CALL pop_number
+ sta FILE_ID
+ stx FILE_ID+1
+@device:
  RAM_CALL byte_quantity
  sta FILE_DEVICE
  cmp #3

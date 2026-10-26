@@ -30,4 +30,6 @@ Hardware sprites supply 1X/2X previews and two complementary hatched hires curso
 
 Raw BIN exchange is a sequential stream of exactly the selected reservation/blob bytes, with no load address, length prefix or metadata. A short load leaves the remainder unchanged; a long load stops at the extent boundary.
 
+The compiled BASIC statements BLOAD and BSAVE use the same raw byte format, with an explicit drive and memory address. BLOAD accepts an optional byte limit; BSAVE requires a count. Their filenames are used exactly as supplied, while editor prompts add `.BIN` when there is no extension.
+
 Native program files save logical reservations, ownership, blob bounds/types, palettes and exact blob bytes. Unassigned bytes inside reservations are excluded. Reservation descriptors precede source compilation so allocations cannot consume incoming binary pages. LOAD validates source/metadata/data before a second streaming pass restores bytes, avoiding a blob-sized staging buffer. Validation failure preserves old state; second-pass device failure can leave already restored bytes changed. See [source format](source_format.md) for binary layouts and checks.

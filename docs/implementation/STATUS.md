@@ -12,7 +12,7 @@ This record distinguishes current behavior from unimplemented work. The [languag
 | Values and control | Signed/unsigned wrapping words, arithmetic shifts, integer functions/RND, strings, multidimensional arrays, DATA/READ/RESTORE, DEF FN, GOSUB, FOR/NEXT, STOP/END/CONT |
 | Memory | Address-ordered coalescing allocator, nonmoving collection, page reservations and stopped CLEAN rebuild |
 | Devices | PRINT#/INPUT#/GET#/OPEN/CLOSE/CMD, ST, low-word TI, TI$ read/set, SYS/USR mapping recovery |
-| Persistence | Native source and binary metadata/blob containers with CRC, staged LOAD, target VERIFY, stock BASIC PRG import, checked SAVE transport/final DOS status |
+| Persistence | Native source and binary metadata/blob containers with CRC, staged LOAD, target VERIFY, stock BASIC PRG import, raw BLOAD/BSAVE memory files, checked SAVE/BSAVE transport/final DOS status |
 | Binary editing | Manual/BASIC reservations, SPR/BIN/ASM blobs, bounded hex editing, hires/multicolor sprites and hardware previews, per-sprite palettes and raw BIN exchange |
 
 ## Known limits and follow-up work

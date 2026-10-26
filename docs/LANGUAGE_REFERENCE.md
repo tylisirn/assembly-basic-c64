@@ -202,7 +202,26 @@ Native LOAD stages and validates the program before publication, preserving the 
 
 Target `VERIFY` compares the file against the current program's canonical serialized bytes. A structurally valid file with a differently arranged name dictionary can therefore differ. The [host verifier](HOST_TOOLS.md) canonicalizes both input files.
 
-Raw `.BIN` exchange belongs to the [binary/sprite editor](BINARY_EDITOR.md); it has no load-address prefix. Native SAVE cannot export a stock BASIC PRG.
+Native SAVE cannot export a stock BASIC PRG.
+
+## Raw binary files
+
+```basic
+RESERVE $C000,$100
+BLOAD "SPRITE.BIN",8,$C000
+BLOAD "SPRITE.BIN",8,$C000,64
+BSAVE "COPY.BIN",8,$C000,64
+```
+
+`BLOAD filename,drive,address[,bytes]` loads raw file bytes into memory. It stops at EOF or the optional byte limit, whichever comes first. A short or empty file leaves the remaining memory unchanged. Omitting the limit reads until EOF.
+
+`BSAVE filename,drive,address,bytes` saves exactly the requested number of memory bytes. The count is required; zero creates an empty file. A zero-count BLOAD opens and closes the file without changing memory. Both statements work in direct mode and numbered programs, continuing with the following statement when successful.
+
+The filename is a string expression, the required drive is a checked byte for a supported device (3–255), and the address and count are 16-bit numeric expressions. Counts must be nonnegative (0–65535). Arguments are evaluated once; malformed lists, types and invalid bounds are rejected before opening a file. A bounded range may end at `$FFFF` but cannot extend past it. An unlimited BLOAD reports `ILLEGAL QUANTITY` if more file bytes remain after `$FFFF`; bytes already loaded remain in memory.
+
+These files use the same raw sequential byte format as the [binary/sprite editor](BINARY_EDITOR.md), with no load address, length prefix or metadata. Supply the complete filename, including any extension; these statements use it exactly as given. BSAVE reports `DEVICE ERROR` for transport failures and unsuccessful final DOS status, including file-exists, disk-full and write-protect errors. It does not automatically overwrite existing files. BLOAD reports `DEVICE ERROR` for missing files or transport failures; an interrupted load can leave bytes already read in memory.
+
+Memory access follows PEEK/POKE: RAM beneath ROM is accessible and `$D000–$DFFF` accesses hardware I/O. Reserve application RAM before compiling or loading the rest of a program; BLOAD does not create reservations or blob metadata. Choose a destination that preserves firmware, vectors and allocated program memory.
 
 ## Hardware and reserved memory
 
