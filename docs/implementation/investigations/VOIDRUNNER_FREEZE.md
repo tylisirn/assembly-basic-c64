@@ -75,7 +75,7 @@ logging commands suggested earlier.
 
 ## Gameplay retest and remaining latency — 10 October 2026
 
-Following the revision 0.6 Magic Desk conversion, the user reports successful
+Following the Magic Desk cartridge conversion, the user reports successful
 loading of Void Runner from disk into VICE, followed by running and playing the
 game. Garbage collection completes, but periodically pauses gameplay for roughly
 0.25–0.5 seconds. The following maze workload also runs, with collection pauses

@@ -33,7 +33,7 @@ class DesignFormattingTests(unittest.TestCase):
         links = root.findall('.//w:hyperlink', NS)
         self.assertEqual(links[0].get(f'{{{W}}}anchor'),
                          root.find('.//w:bookmarkStart', NS).get(f'{{{W}}}name'))
-        self.assertEqual(word.relationships[0].get('Target'), 'docs/measurements.json')
+        self.assertEqual(word.relationships[0].get('Target'), 'measurements.json')
 
     def test_literal_code_preserves_indentation_and_operators(self):
         code = '  PRINT A*B:REM **literal**\n\n.byte $00, $ff'

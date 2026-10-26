@@ -1,4 +1,4 @@
-"""Normative Appendix A v1 codec. Payloads are bytes, never recursive tokens."""
+"""Source-token codec; see docs/design/source_format.md for the specification."""
 from dataclasses import dataclass
 import re
 

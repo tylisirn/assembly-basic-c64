@@ -55,7 +55,7 @@ def measure_collection():
         'final_free_blocks': len(free),
         'final_free_bytes': sum(size for _, size in free),
     }
-    destination = ROOT/'docs/voidrunner-collection.json'
+    destination = ROOT/'docs/implementation/voidrunner-collection.json'
     destination.write_text(json.dumps(result, indent=2) + '\n')
     print(destination)
     return result

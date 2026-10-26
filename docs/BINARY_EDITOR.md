@@ -10,7 +10,7 @@ bookmarks. F5 is also available while collecting keyboard INPUT.
 
 Cursor up/down selects a reservation. Return enters its blob list; Return on a
 blob opens its editor. SPR opens the sprite view; BIN and ASM open the hex view.
-ASM is a type label reserved for a future assembler. The current reservation
+ASM labels machine-code bytes; there is no built-in assembler. The current reservation
 remains highlighted while selecting its blobs.
 
 | Key | Reservation selection | Blob selection |
@@ -39,7 +39,7 @@ rejected, preserving the current program.
 
 There are eight logical reservation slots and sixteen blob slots. The existing
 allocator supports eight page ranges. Deleted or moved ranges remain protected
-until NEW, so removing metadata does not overwrite bytes with allocator headers.
+until NEW, preserving their contents after metadata is removed.
 Their protected pages can be reused by other editor reservations. NEW clears all
 metadata and releases the page exclusions. SAVE/NEW/LOAD also consolidates page
 claims to the surviving logical reservations.
@@ -94,20 +94,9 @@ length prefix or metadata in a `.BIN`. Save writes the exact selected extent.
 Load stops at the end of the file or the selected extent; short files leave the
 remaining memory unchanged and long files never write past the boundary.
 
-BASIC SAVE uses source-container version 2 when binary metadata is present;
-source-only files remain byte-identical version 1. Both versions can be loaded.
-Version 2 saves reservations, BASIC/manual ownership, blob bounds/types, each
-sprite's colors/mode, and the exact bytes in every blob. Unassigned reservation
-bytes are not included. All sections participate in the file CRC.
-
-The v2 byte layout is the eight-byte `AB64SRC`/zero magic, version/flags `2,0`,
-a one-byte reservation count and five-byte reservation descriptors (start word,
-size word, BASIC flag), followed by the unchanged v1 dictionary and line records.
-After the `FFFF` line marker comes a one-byte blob count. Each blob has an
-eight-byte descriptor (reservation index, start word, size word, type/multicolor
-flags, two packed palette bytes) and its raw data. The final two bytes are the
-CRC-16/CCITT-FALSE. Words are little-endian. Reservation descriptors precede
-compilation so even low-arena blob pages are protected before any source allocation.
+BASIC SAVE stores reservations, BASIC/manual ownership, blob bounds/types, each
+sprite's colors/mode and the exact bytes in every blob in the `.AB` program file.
+Unassigned reservation bytes are not included.
 
 LOAD stages source and metadata and validates the complete stream before writing
 blob bytes. It then reopens the validated file and restores data without needing
@@ -118,38 +107,5 @@ restored bytes changed. As with existing staged source loads, NEW before loading
 can help when the old program occupies pages required by the incoming program.
 CLEAN and garbage collection preserve the metadata and protected bytes.
 
-The host `ab64.container` codec retains metadata on its `ProgramLines` mapping,
-so `dumps(*loads(data))` preserves the binary sections. `Reservation` and `Blob`
-objects allow creating v2 files on the host. Text decoding exports BASIC source
-only; use `.AB` or individual `.BIN` files to retain binary content.
-
-## Implementation and validation
-
-Scenes are composed one row at a time and compared with screen and color RAM;
-only changed cells are written, without clearing the screen between updates.
-Visible hex navigation updates the old/new byte cells and the value footer.
-Sprite painting updates just its enlarged pixel and the preview data byte; cursor
-motion and palette selection leave the rest of the screen intact. Prompts also
-update only changed cells and restore their covered rows when dismissed.
-
-ROM bank 4 contains the UI and bank 5 the metadata/reservation/file services.
-The existing bank-call gateway restores bank, mapping and interrupt state.
-Persistent metadata occupies `$0200–$0258` and `$02A7–$02FF`, leaving KERNAL file
-tables and keyboard state intact. These ranges are firmware-owned. Transient
-buffers use existing inactive workspace, preserving the BASIC draft and frozen
-control stack. VIC registers and sprite pointers are restored on exit.
-
-The sprite organization follows the original Commodore documentation:
-[24×21 sprite geometry](https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_3/page_131.html)
-and [63 pixel bytes, multicolor pairs and pointers](https://www.devili.iki.fi/Computers/Commodore/C64/Programmers_Reference/Chapter_3/page_133.html).
-
-Run the regression suite with `python3 tools/test.py`. For supplied stock ROMs:
-
-```sh
-python3 tools/check_binary_editor_rom.py --rom-dir /path/to/VICE/C64 \
-    --previews build/binary-previews
-```
-
-This executes genuine KERNAL keyboard/display instructions with injected device
-bytes and renders character/sprite state for review. It does not replace
-cycle-accurate VIC/IEC or physical-machine validation.
+Use the [host tools](HOST_TOOLS.md) to exchange BASIC text. Text decoding exports
+source only; retain `.AB` or individual `.BIN` files for binary content.

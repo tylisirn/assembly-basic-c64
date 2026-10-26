@@ -6,14 +6,10 @@ Reads let Commodore DOS determine PRG/SEQ file type; SAVE continues to create
 native sequential `.AB` containers. Imported source is compiled on the cartridge.
 Empty programs replace the current program and clear the editor listing.
 
-The importer accepts the standard little-endian load address `$0801`, followed
-by linked BASIC line records and the final zero link. It verifies physical next
-links, increasing line numbers in 0–63999, line terminators, supported stock token
-codes, file status and the final end marker. This follows the original
-[BASIC line-link format](https://github.com/mist64/c64rom/blob/master/basic/code1.s)
-and [BASIC V2 token spellings](https://github.com/mist64/c64rom/blob/master/basic/token2.s).
-The load address identifies the format; bytes are streamed through the source
-converter rather than written over the cartridge's live workspace.
+The PRG must use the standard BASIC load address `$0801` and valid linked
+BASIC V2 lines. Appended machine-code payloads, relocated programs and extended
+dialects are unsupported. [Format and validation details](design/source_format.md#stock-basic-prg-import)
+are documented separately.
 
 Stock keywords, operators and the two-token `GO TO` spelling are converted to
 native source before tokenization. Embedded strings and REM/DATA fields retain
@@ -31,7 +27,7 @@ the cartridge's existing wrapping 16-bit integer contract. This does not add
 floating-point execution: fractional/exponent source and unsupported expressions
 remain listable, editable source with the existing compiler/runtime diagnostics.
 
-LOAD constructs a second source graph and publishes it only after validation.
+LOAD validates and compiles the incoming source before replacing the program.
 Malformed or truncated files, invalid links/numbers/tokens, allocation failure,
 or a converted line exceeding 255 text bytes roll back to the old program.
 Native token lines also retain their 255-byte limit. Appended machine code or
@@ -40,4 +36,5 @@ relocated or extended-dialect programs are outside this importer. Imported
 machine addresses and SYS/USR calls are not relocated.
 
 After loading, use BASIC to inspect/edit the listing, RUN to execute supported
-source, and SAVE to retain it in `.AB` format. Stock PRG export remains planned.
+source, and SAVE to retain it in `.AB` format. Stock PRG export is unavailable. See the [language reference](LANGUAGE_REFERENCE.md)
+for execution differences and supported keywords.

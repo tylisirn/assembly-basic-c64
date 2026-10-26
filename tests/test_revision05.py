@@ -1,4 +1,4 @@
-"""Revision 0.5 behavior exercised through the actual cartridge and native code."""
+"""Command, control-flow and memory behavior through actual native code."""
 import random
 import re
 import unittest

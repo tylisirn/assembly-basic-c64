@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the built development cartridge only with matching validation/design facts."""
+"""Package the built cartridge only with matching validation/design facts."""
 from pathlib import Path
 import hashlib
 import json
@@ -14,11 +14,15 @@ from ab64.container import dumps
 def package():
     report=json.loads((ROOT/'build/size-report.json').read_text())
     tests=json.loads((ROOT/'build/test-report.json').read_text())
-    sync=json.loads((ROOT/'docs/design-sync.json').read_text())
+    sync=json.loads((ROOT/'docs/implementation/design-sync.json').read_text())
     assert tests['failures']==tests['errors']==0, 'Fix regression failures before packaging'
     assert tests['rom_sha256']==sync['rom_sha256']==report['rom_sha256']
     assert hashlib.sha256((ROOT/'build/assembly-basic.bin').read_bytes()).hexdigest()==report['rom_sha256']
-    assert hashlib.sha256((ROOT/'Assembly_BASIC_C64_Design.docx').read_bytes()).hexdigest()==sync['design_sha256']
+    assert hashlib.sha256((ROOT/'docs/design/Assembly_BASIC_C64_Design.docx').read_bytes()).hexdigest()==sync['design_sha256']
+    for name, expected in sync['source_sha256'].items():
+        assert hashlib.sha256((ROOT/'docs/design'/name).read_bytes()).hexdigest()==expected, 'Regenerate the design after editing its Markdown sources'
+    for name in ('measurements.json', 'voidrunner-collection.json'):
+        assert json.loads((ROOT/'docs/implementation'/name).read_text())['rom_sha256']==report['rom_sha256'], 'Refresh measurements for this cartridge'
     destination=ROOT/'dist';destination.mkdir(exist_ok=True)
     for name in ('assembly-basic.bin','assembly-basic.crt','size-report.json','test-report.json'):
         shutil.copyfile(ROOT/'build'/name,destination/name)
@@ -83,8 +87,8 @@ def package():
         encoding='utf-8-sig' if source.startswith(b'\xef\xbb\xbf') else 'latin-1'
         data=dumps(*text_program(source.decode(encoding)))
         (destination/'examples'/example.with_suffix('.ab').name).write_bytes(data)
-    manifest={'status':'development; version-one release acceptance incomplete',
-              'design_revision':sync['design_revision'],'runtime_abi':report['runtime_abi'],
+    manifest={'status':'packaged; validation scope is recorded in docs/implementation/STATUS.md',
+              'design_sha256':sync['design_sha256'],'runtime_abi':report['runtime_abi'],
               'cartridge_type':report['cartridge_type'],'source_version':1,'supported_source_versions':[1,2],
               'validated_tests':tests['tests_run'],'artifacts':{}}
     for path in sorted(destination.rglob('*')):
@@ -92,6 +96,6 @@ def package():
             data=path.read_bytes()
             manifest['artifacts'][str(path.relative_to(destination))]={'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
     (destination/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    print(f"Packaged revision {sync['design_revision']}: {tests['tests_run']} tests, ROM {report['rom_sha256']}")
+    print(f"Packaged cartridge: {tests['tests_run']} tests, ROM {report['rom_sha256']}")
 
 if __name__=='__main__':package()

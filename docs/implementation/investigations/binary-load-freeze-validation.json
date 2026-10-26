@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-24",
+  "verdict": "Freeze confirmed in supplied snapshot; trigger not reproduced after fresh initialization; firmware unchanged.",
+  "inputs": {
+    "debug/vrasm.bin": {
+      "bytes": 265,
+      "sha256": "68c4e85b6344005509a7a01b7132b7deccdc570ce2526bd1a9949a7a1ff85b6a"
+    },
+    "debug/load-freeze.vsf": {
+      "bytes": 595150,
+      "sha256": "3204f49b0840fc703f8ceb6fb17fdf38ac93959136c8cde8b51e8a1583729502"
+    },
+    "debug/assembly-basic.d64": {
+      "bytes": 174848,
+      "sha256": "dc1ffec671eb01bde06cf45d91f16ba6a8b037c034e11bfd6f0f1ca28b589824"
+    },
+    "build/assembly-basic.bin": {
+      "bytes": 65536,
+      "sha256": "7fd42725b12ed67946bf9280fe607d9a384f9ee9c2b662254a63197fd100aa9b"
+    }
+  },
+  "snapshot": {
+    "pc": 60979,
+    "cpu_port": 55,
+    "selected_blob_start": 49152,
+    "selected_blob_size": 265,
+    "next_write_address": 49416,
+    "remaining_bytes": 1,
+    "status": 0,
+    "matching_prefix_bytes": 264,
+    "missing_final_byte": 96
+  },
+  "disk": {
+    "name": "VRASM.BIN",
+    "type": "SEQ",
+    "sectors": [
+      [
+        15,
+        1
+      ],
+      [
+        15,
+        11
+      ]
+    ],
+    "final_sector_used_byte": 12,
+    "payload_bytes": 265,
+    "matches_supplied_binary": true
+  },
+  "validation": {
+    "kernal": "901227-03",
+    "kernal_sha256": "83c60d47047d7beab8e5b7bf6f67f80daa088b7a6a27de0d7e016f6484042721",
+    "drive_rom": "325302-01 + 901229-05",
+    "drive_rom_sha256": "d1d45afb46fd4e2b48d93ca367b889d75654a3b7acf73044e51f6d880c09369e",
+    "vice24": {
+      "version": "2.4 (Ubuntu vice_2.4.dfsg-1ubuntu1_amd64.deb)",
+      "mode": "x64sc; PAL; true 1541 emulation; ROM traps disabled; original D64",
+      "editor_context": "Fresh cartridge initialization, restored captured language scratch, metadata, editor state and selected ASM blob; actual KERNAL filename keyboard queue and banked blob transfer. CPU/drive mid-transfer snapshot state was not reused.",
+      "repetitions": 10,
+      "bytes_compared_per_repetition": 265,
+      "successful_editor_returns": 10
+    },
+    "vice371": {
+      "version": "3.7.1",
+      "mode": "x64sc; PAL; true 1541 emulation; original D64",
+      "result": "265-byte bounded transfer completes"
+    },
+    "limits": [
+      "Does not recreate the preceding user workflow.",
+      "Restoring the captured mid-transfer serial/drive/timer state does not reproduce a fresh load.",
+      "No physical-machine or Windows-build verification."
+    ]
+  }
+}

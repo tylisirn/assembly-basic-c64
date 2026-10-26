@@ -25,21 +25,10 @@ Wrapped source continues after the line-number column. Moving the selection
 past the listing frame advances or backs up the viewport by five BASIC lines,
 clamped at the program's ends. Only the selected line number is highlighted,
 even while editing; source text and continuation rows remain in normal video.
-Listing cursor moves update only number cells, and switching focus retains the
-highlight without detokenizing the listing.
+Switching focus retains the line-number highlight.
 
-Scrolling shifts the overlapping character rows in place and renders only the
-newly exposed rows. A clipped line at the bottom resumes in those new rows;
-wrapped lines determine the physical row count of each five-BASIC-line shift.
-Listing color RAM is initialized on entry and is never shifted or rewritten
-during navigation or source updates. When no rows overlap, the new viewport is
-rendered normally. Commands that leave source alone skip the listing refresh.
-Source changes compare displayed characters and write only cells that differ,
-including after identical edits. Numbered submissions move the selection to the
-affected line and bring it into view; deletion selects the next surviving line,
-or the preceding line when deleting the last one. Numeric bookmarks are
-resolved against the current program, including after NEW, LOAD,
-and CLEAN, so the editor never retains a pointer into freed source.
+Numbered submissions select the affected line and bring it into view; deletion selects the next surviving line,
+or the preceding line when deleting the last one. The selected line and viewport track program changes, including NEW, LOAD and CLEAN.
 
 F3 opens a `GO LINE` prompt in the status bar. Each digit immediately selects
 the requested BASIC line, or the next higher line; requests beyond the program
@@ -87,37 +76,6 @@ line whose canonical spelling exceeds that capacity remains listable and is
 rejected for copying with an explicit message, rather than being truncated and
 accidentally replacing the original source. Output above a draft is scrolled
 away as needed when typing wraps; moving the cursor alone never scrolls.
-
-The UI lives in Magic Desk bank 3 and shares bank 0's canonical LIST formatter.
-The common-RAM CHROUT hook preserves registers, flags and user zero-page
-pointers. Hooks are restored on exit. Editor text occupies `$0A60–$0AFF`, and
-persistent state occupies `$03CC–$03FF`, outside the program arena and compiler,
-collector, and runtime scratch. `$FB–$FE` are borrowed as screen pointers while
-editing. The row map and scroll work occupy `$0F80–$0FDF`, the unused upper
-half of the existing 32-entry expression-stack page. Help saves the 800 listing
-characters in inactive TOKENS, LEX_BUFFER and BRIDGE buffers plus `$0FE0–$0FFF`;
-it restores those characters without reformatting the program or touching color
-RAM. The draft, INPUT command backup and frozen control stack remain intact.
-
-Build and run the full suite with `python3 tools/build.py` and
-`python3 tools/test.py`. Optional validation with a user-supplied stock KERNAL
-and character ROM also produces a rendered preview:
-
-```sh
-python3 tools/check_editor_rom.py --rom-dir /path/to/VICE/C64 \
-    --preview build/editor-preview.png
-```
-
-This runs actual 901227-03 RESTOR/CINT/GETIN/CHRIN/CHROUT instructions in py65,
-with injected keyboard bytes and synthetic raster registers. It is a software
-integration check, not cycle-accurate VIC/IEC or physical-machine acceptance.
-
-On a deterministic 30-line workload, moving between visible lines now uses four
-character writes and no color writes, compared with 1,042 of each previously.
-Five-line scrolling retains 600 characters in place and writes only the exposed
-text. [Recorded instruction/write measurements](editor-scroll-measurements.json)
-were recorded for revision 0.13 against commit `bac143f`; these are software measurements, not hardware
-timing claims.
 
 F5 opens the [binary/sprite editor](BINARY_EDITOR.md). Returning preserves pane
 contents, focus and bookmarks, including during keyboard INPUT.

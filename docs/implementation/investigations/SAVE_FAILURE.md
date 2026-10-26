@@ -2,7 +2,7 @@
 
 `SAVE "VOID4.AB",8` returned to READY while the drive error light blinked and no
 file appeared. `debug/save-fail.vsf` contains the complete program and the same
-cartridge as the investigated revision 0.16 build.
+cartridge as the investigated build.
 
 ## Cause and captured evidence
 

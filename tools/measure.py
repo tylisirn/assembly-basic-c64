@@ -49,7 +49,7 @@ def measure():
         'accepted_lines':accepted,'first_rejected_line':number,
         'remaining_free_physical_bytes':free,'failure':output,
         'note':'Cold NEW, one scalar; common-span anchor exhaustion and fragmentation can limit capacity before all raw bytes are used.'}
-    destination=ROOT/'docs/measurements.json'
+    destination=ROOT/'docs/implementation/measurements.json'
     destination.write_text(json.dumps(report,indent=2)+'\n')
     print(destination)
     measure_collection()

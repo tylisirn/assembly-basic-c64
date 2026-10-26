@@ -7,8 +7,7 @@ cartridge's CPU-port initialization order. The corrected cartridge is
 
 ## Captured evidence and cause
 
-The supplied snapshot contains the same 64 KiB ROM as the previous revision
-0.16 build, SHA-256
+The supplied snapshot contains the same 64 KiB ROM as the previous build, SHA-256
 `d9b781054f3e3079857bb0d8cca5914044b2c24a96963a05de5e2d9b5ef4f912`.
 Its CPU is at `$0008`, with stack pointer `$16`, CPU-port direction `$07` and
 data latch `$00`. The screen and firmware RAM images still contain power-on

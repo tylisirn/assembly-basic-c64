@@ -37,7 +37,7 @@ class WordContent:
         self.bookmarks = {}
         self.bookmark_id = 1000
         # Reuse our definition on later synchronizations, without accumulating
-        # orphaned list instances when Appendix B is replaced.
+        # orphaned list instances when the document body is replaced.
         owned = {n.get(f'{{{W}}}abstractNumId') for n in numbering
                  if n.find("w:name[@w:val='DesignDecimal']", NS) is not None}
         for node in list(numbering):
@@ -114,7 +114,7 @@ class WordContent:
                     hyperlink.set(f'{{{W}}}anchor', self.bookmarks[key])
                 else:
                     if not re.match(r'^[a-zA-Z][\w+.-]*:', target):
-                        target = posixpath.normpath('docs/' + target)
+                        target = posixpath.normpath(posixpath.join(posixpath.dirname(source), target))
                     existing = next((r for r in self.relationships
                                      if r.get('Target') == target and
                                      r.get('Type', '').endswith('/hyperlink')), None)
@@ -208,7 +208,7 @@ class WordContent:
         lines = text.splitlines()
         levels = [len(m.group(1)) for line in lines if (m := re.match(r'^(#+) ', line))]
         minimum = min(levels, default=1)
-        # The integer source uses a bold document title above level-three headings.
+        # Accept a bold document title as well as Markdown heading syntax.
         bold_title = bool(lines and re.fullmatch(r'\*\*.+\*\*', lines[0]))
         nodes, pending = [], []
         i = 0

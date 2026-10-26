@@ -1,4 +1,4 @@
-**Proposed specification: 16-bit integer signedness and arithmetic**
+# Integer signedness and arithmetic
 
 ### 1. Numeric types
 
@@ -6,7 +6,6 @@
 |---|---|---:|
 | `A` | Signed 16-bit integer | −32768 to 32767 |
 | `A%` | Unsigned 16-bit integer | 0 to 65535 |
-| `A#` | 16.16 fixed point | Separate arithmetic and conversion rules |
 
 Both integer types use a 16-bit word. Signed values use two’s-complement interpretation.
 
@@ -118,7 +117,7 @@ N% + (4 - 5)
 
 Here, `4 - 5` independently produces unsigned `65535`.
 
-Parentheses around a literal alone need not prevent contextual typing: `N% + (2)` may behave like `N% + 2`.
+Parentheses around a literal alone preserve contextual typing: `N% + (2)` behaves like `N% + 2`.
 
 ### 5. Mixed integer arithmetic
 
@@ -160,7 +159,7 @@ Implementation may share routines for:
 - Signed and unsigned subtraction.
 - Multiplication that returns only the low 16 bits.
 
-Signedness remains significant for division, remainder, ordering comparisons, printing, and conversion to fixed point.
+Signedness remains significant for division, ordering comparisons and printing.
 
 Division must select its signed or unsigned implementation after operand types have been resolved.
 
@@ -185,9 +184,9 @@ PRINT (4 - 5) / 2
 
 must evaluate as unsigned `65535 / 2`, producing `32767`. Folding it through mathematical `-1 / 2` would change its behavior.
 
-### 8. Implementation record — revision 0.10
+### 8. Implementation constraints
 
-The signed/unsigned integer rules above are implemented by the 64 KiB Magic Desk cartridge, runtime ABI 6, retaining source format version 1. Numeric cells and array elements remain two bytes; expression tags remain signed 0, string 1 and unsigned $80.
+Numeric cells and array elements occupy two bytes. Expression tags are signed 0, string 1 and unsigned $80. These rules apply to both native source-container formats; binary metadata does not change numeric evaluation.
 
 Representable naked literals beside signed operands can retain their default unsigned tag internally: the mixed signed rule gives exactly the same operand interpretation and result type as adopting signed. This requires no extra runtime provenance and does not allow context to change an already evaluated operation. Positive constants never inherit the assignment destination's type.
 
@@ -195,4 +194,4 @@ Negative literal prefixes, including `-32768` and `-(2)`, produce signed words. 
 
 Literal power-of-two multiplication uses wrapping left shifts. Signed division uses biased arithmetic right shifts to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal `$8000` is unsigned 32768, interpreted as signed -32768 only in mixed signed division. General constant folding is not implemented; the same per-operation rules constrain the existing strength reductions.
 
-The table's `A#` 16.16 fixed-point type remains a future extension; its conversion rules are outside this integer implementation. The design mentions remainder but defines no remainder operator syntax, so this revision adds none. Explicit `>>` retains the language's arithmetic sign-fill behavior for both integer types.
+There is no fixed-point type or remainder operator. Explicit `>>` uses arithmetic sign fill for both integer types. See the [language reference](../LANGUAGE_REFERENCE.md#operators-and-precedence) for precedence, count bounds and division behavior.

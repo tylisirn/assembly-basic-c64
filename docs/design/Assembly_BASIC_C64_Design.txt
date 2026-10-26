@@ -1,0 +1,427 @@
+Assembly BASIC for the Commodore 64
+Current architecture and format specifications. Generated from docs/design Markdown; edit those sources. Build tables identify the measured ROM. Validation gaps are recorded separately in docs/implementation/STATUS.md.
+Cartridge and compiler architecture
+Assembly BASIC is an on-machine tokenizer and native 6502 compiler. Retained custom source tokens support LIST, editing and recompilation; execution follows generated instructions rather than dispatching statement tokens. The cartridge supplies its own integer arithmetic, arrays, strings and BASIC-level device adapters. It does not call the stock BASIC evaluator.
+Execution and memory ownership
+The 64 KiB Magic Desk cartridge has eight 8 KiB banks. Commands and source transport execute in ROM. A compiler image is copied to fixed RAM at cold start; hot execution helpers also have a fixed RAM image. Cold execution services use explicit banked calls. See banking for transitions and interrupt contracts.
+Address range	Owner
+$0000–$0001	6510 direction and mapping port
+$0002–$0078	Language zero-page state
+$0090–$00FF	KERNAL service state; preserve according to each service
+$0100–$01FF	Bounded hardware stack
+$0200–$0258, $02A7–$02FF	Binary editor metadata; intervening KERNAL tables remain available
+$0334–$03FF	Common service entry stubs and editor state
+$0400–$07FF	Screen RAM and sprite pointers
+$0800–$13FF	Language workspace, gateways, scratch and software stacks
+$1400–$2BFF	Resident compiler, excluded from allocation
+$2C00–$7FFF	Common user arena; stable anchors and bindings must fit here
+$8000–$CFFF	User arena, including RAM beneath cartridge/BASIC ROM
+$D000–$DFFF	Hardware I/O; underlying RAM excluded from allocation
+$E000–$E3FF	User arena beneath KERNAL
+$E400–$FFF9	Fixed RAM runtime
+$FFFA–$FFFF	RAM hardware vectors
+
+The two user spans are [$2C00,$D000) and [$E000,$E400): 43,008 raw bytes before source, code, objects and headers. User graphics/machine code must declare reservations before allocations occupy those bytes. Stock BASIC memory-top POKEs do not configure this arena. Exact linked sizes are in build/size-report.json, and generated design exports include its tables.
+Allocation and collection
+Allocated blocks have a two-byte little-endian physical size including the header. Free blocks contain size and next-free pointer in four bytes; every physical allocation is at least four bytes. The free list is address ordered and coalesces adjacent blocks. Stable/common objects allocate from the low end; source/code and heap payloads allocate from the high end to preserve common space.
+The collector is nonmoving mark-and-sweep. It marks registered roots once per 2 KiB address window using a 256-byte bitmap in inactive scratch at $0E00–$0EFF, then sweeps physical headers alongside monotonic free-list cursors and coalesces. Roots include slabs, names, bindings, live line payloads, arrays/functions, direct code, descriptors, expression temporaries and helper string roots. Collection occurs outside active lexing/compilation and skips reserved ranges. It never moves native code or rewrites pointers. Fragmentation can prevent an allocation despite sufficient total free bytes.
+FRE runs collection while preserving live values and continuations. Direct CLEAN instead serializes referenced source to temporary RAM, builds a second graph with dense names/anchor slabs, recompiles every reference, publishes it and clears values/continuations. Failure retains the old source. CLEAN needs temporary headroom and does not promise general sliding compaction.
+Stable lines and native linkage
+A stable anchor is seven bytes. Branch targets use its address, so replacing a line does not invalidate other native branches.
+Anchor offset	Bytes	Meaning
+0	1	$4C, absolute JMP opcode
+1	2	Native body address, or the undefined-line helper
+3	2	Decimal line number, 0–63999
+5	2	Payload pointer; zero for an unresolved/deleted line
+
+Anchors occupy 35-slot slabs: two-byte allocation header, two-byte slab link, one-byte used count and 245 slot bytes, totaling 250 bytes. Deleted/forward-reference slots persist until NEW or CLEAN.
+Each live line has one exact-sized source/code allocation:
+Location	Meaning
+payload-2	Physical allocation size word
+payload	Token-stream length T, 1–255
+payload+1	T authoritative source-token bytes
+payload+1+T	Native body, also the anchor's JMP destination
+block end-3	Final $4C and next-live-anchor word, or RUN_END
+
+The trailer operand doubles as the sorted source-list successor. Insertion patches the predecessor trailer (or global head); replacement retains the anchor and successor; deletion unlinks the payload and points the anchor at undefined-line handling. No persistent relocation, incoming-reference or statement-entry table is stored. Source scans beneath ROM use a common-RAM accessor.
+Tokenization and compilation
+Full uppercase identifiers are interned in a linked dictionary with a one-byte spelling length and 16-bit ID. Native scalar references bind stable cells at compile time; runtime expression evaluation does not search names. Scalars, arrays and functions have their own binding kinds. See source format and integer arithmetic.
+A bounded Pratt parser runs sizing and emission passes over the retained tokens. It emits documented NMOS 6502 instructions, native branches and helper calls. Most expression operations use helpers; the illustrative inline-scalar optimizations sometimes associated with native compilers are not implemented. Literal power-of-two multiplication/division uses shifts, with signed-division bias preserving truncation toward zero. General constant folding is not implemented. Long conditional branches use an inverse short branch over an absolute JMP.
+A numbered edit stages tokens, bindings, forward anchors and its new payload before publishing pointer/link changes in a short critical section. Recoverable malformed/unsupported source remains listable and gets a deferred runtime trap; resource failure retains the previous payload. Complete name-allocation rollback is a known gap. Edits clear values and invalidate CONT before replacing native PCs.
+Runtime values and control state
+Numeric cells/elements are two-byte words. Expression values distinguish signed, unsigned and string types. String descriptors contain a byte length, payload pointer and ownership/root flags. Immutable strings may share payloads; concatenation and substrings allocate new values, and lasting literals/assignments use heap-owned storage. Allocating helpers must register temporary pointers before collection.
+Array records hold stable bounds/type metadata and a payload pointer. Numeric elements use two bytes, string descriptors four. Dimension products and offsets are checked before narrowing to word addresses. Arrays have inclusive bounds, up to eight dimensions, and an implicit upper bound of 10 when first used without DIM.
+GOSUB and FOR use a separate 512-byte tagged software stack. A GOSUB frame is three bytes (tag and continuation PC); a FOR frame is nine (tag, cell, limit, signed step and PC). RETURN/NEXT search dynamic frames. Suspended programs freeze their control frames below the direct-command stack boundary. STOP/END/CONT preserve native PCs only while the program generation is unchanged.
+DEF FN stores compiled expression code inside its line allocation, skipped by normal fall-through. Executing the definition activates its stable record. Calls save/restore the numeric parameter, with at most eight active calls on the guarded hardware stack. This is the implemented activation mechanism; a software function-activation stack is not present.
+DATA cursors keep a line anchor and byte token offset and scan typed source fields through trailer links. RESTORE resets the cursor. READ converts values according to the destination and preserved field spelling.
+Native and error boundaries
+Integer helpers use A/X for low/high bytes; A/X/Y and arithmetic flags are caller-clobbered unless a helper declares otherwise. Values and temporary string roots use the registered expression stack. Statement/continuation entries establish CURRENT_LINE context and poll for breaks. Decimal mode is clear at language boundaries. Native execution uses the RAM/I/O map; KERNAL calls use common-RAM gates.
+RUN clears values/stacks/definitions/DATA state and refreshes the fixed runtime, then jumps to the first or requested anchor. It does not recompile valid lines. Errors return through common RAM to the command reporter, restore channels/stack baseline and invalidate continuation. LOAD uses staged publication and returns to READY rather than continuing the calling program. Detailed persistence invariants are in source format.
+Banking and service contracts
+The cartridge is 64 KiB, divided into eight 8 KiB banks mapped at $8000–$9FFF. The CRT declares classic Magic Desk type 19, EXROM=0, GAME=1, with one CHIP packet per bank. The raw binary concatenates banks 0 through 7. The format follows the VICE cartridge specification; VICE 3.7.1 cartconv accepts it and reproduces the binary exactly. This is the classic C64 format, rather than Magic Desk 16K or Magic Desk 128.
+Bank	Contents
+0	Autostart, command editor, tokenizer, LIST, source transport and gateway load image
+1	Raw resident compiler load image
+2	Raw runtime load image and banked DATA/DEF FN/device services
+3	Split screen editor and stock BASIC PRG import
+4	Binary/sprite editor UI
+5	Binary metadata, reservation and persistence services
+6–7	Recovery headers and available expansion space
+
+Exact linked usage and budgets are in build/size-report.json and the generated design exports. Spare ROM in different banks is not interchangeable without changing placement or adding bank calls. It does not enlarge the fixed compiler/runtime RAM reservations.
+Maps and bank ownership
+Command execution uses $01 low bits 7: bank 0 at $8000, stock BASIC ROM at $A000, I/O and KERNAL visible. BASIC ROM is visible but the language does not call its routines. Generated native code uses low bits 5: cartridge/BASIC/KERNAL hidden, I/O visible. This retains writable shadow RAM and the existing program arena. Writes beneath visible ROM reach underlying RAM.
+The bank latch at $DE00 is write-only. Firmware records its current bank at $0BE3 (CART_BANK), outside user allocation. Every firmware bank selection updates both locations. Do not infer the latch from a read of $DE00. I/O must be visible when writing the latch. Native user code that selects a different bank must update the shadow too if it expects interrupted banked operations to resume that bank; SYS/USR normalize the bank to zero on return.
+Command dispatch, source formatting and transport run in bank 0, the split screen UI runs in bank 3, and cold execution services run in bank 2. The editor calls existing command/compiler routines through bank_call and hooks KERNAL input/output through common RAM. All instructions that select another bank and their return paths execute from the common-RAM gateway at $0800. copy_bank_image uses the shared bank_call ABI with IRQs masked for the copy, restores the original bank, complete $01 and flags, and consumes SOURCE/DEST/COUNT. Cold start copies the gateway and service entry stubs after KERNAL initialization, then bank 2's runtime to $E400–$FFF9 and bank 1's compiler to $1400–$2BFF. RUN and CONT refresh only the RAM runtime image; bank-2 services execute directly from ROM. There is no decompressor or instruction relocation.
+KERNAL and IRQ gateways preserve the interrupted bank, temporarily select bank 0 for ROM service/recovery paths and restore it before returning. NMI handling stays in common RAM and preserves the selected bank. READY, source transport and SYS/USR returns establish bank 0 after exposing I/O. The first nine bytes of every bank contain the CBM80 signature and cold/warm vectors; auxiliary-bank vectors reach common-RAM recovery helpers installed at boot. Hardware reset starts in bank 0.
+Firmware keeps the cartridge enabled and hides ROM through $01; it never writes $80 to disable the cartridge. Some Magic Desk hardware variants latch disable until hardware reset. User code must leave the cartridge enabled and preserve the gateway, runtime, compiler, vectors and language state.
+Common service entry stubs and remaining reservation
+$0334–$03FF is a 204-byte firmware-owned common-RAM region, outside the user arena and BASIC RESERVE ranges. It holds 152 bytes of SERVICE_GATEWAY entry stubs, including the screen-output hook, followed by 52 bytes of editor state at $03CC–$03FF. The main gateway holds 593 code bytes, including the keyboard-input hook, and reserves $0A60–$0AFF for the 160-byte editor draft. The cached row map uses $0F80–$0FDF, and the help snapshot tail uses $0FE0–$0FFF, above the existing 32 four-byte expression-stack entries. No user-arena bytes are added or removed. The linker restricts code to its own spans so it cannot overlap these buffers. The linker names the stub region FUTURE; src/memory.inc declares FUTURE_RAM_START and exclusive FUTURE_RAM_END.
+Range	Stock C64 use	Reclaimed bytes
+$0334–$033B	Unused	8
+$033C–$03FB	Cassette buffer, reclaimed because tape transport is unsupported	192
+$03FC–$03FF	Unused	4
+
+KERNAL CBM80 dispatch precedes IOINIT. Cold start must set mapping bits 0–2 in $01 before making them outputs in $00: the reset data latch is zero, and enabling its outputs first hides the executing cartridge and KERNAL. See the startup freeze investigation.
+Cold start installs the stubs after KERNAL initialization: RAMTAS clears all of page 3. Preserve KERNAL vectors through $0333 and keep tape transport unsupported while its buffer is repurposed. User machine code must preserve this firmware-owned range. The stock KERNAL declarations identify the cassette buffer; the initialization source records page-3 clearing.
+Banked-service call ABI
+Runtime ABI 7 defines bank_call, a common-RAM call gate. A call contains four inline descriptor bytes immediately after its JSR:
+jsr bank_call
+.byte BANK_SERVICES,7 ; bank 0..7, or $ff to retain the current bank; port low bits 5 or 7
+.word rom_read_number ; little-endian target address
+; execution resumes here
+Arguments are A/X/Y and the service's documented common-RAM state. The gate reads the descriptor in the caller's original mapping, advances the return PC over the descriptor, and saves the complete $01, software bank shadow and caller flags on that call's hardware-stack frame. Setup and return mask IRQs; the callee receives the caller's interrupt mask with decimal mode clear. Each active call adds five stack bytes compared with an ordinary JSR, plus service/helper locals. Arguments and results do not depend on a shared saved frame.
+The result is A/X/Y and the callee's N/Z/C/V flags. Return restores the original bank, complete $01 and caller interrupt mask, and clears decimal mode. The target and return addresses are stacked before IRQs are reenabled, so nested ROM calls, RAM callbacks and KERNAL calls can reuse dispatch scratch safely. The NMI handler records pending aborts without calling services or changing dispatch scratch. No ROM instruction switches banks or hides its own continuation.
+The gate clobbers IO_A, IO_X, IO_Y, IO_STATUS, IO_MAP, GATE_FLAGS and its dispatch staging bytes; it does not borrow the language's indirect pointers. Each service documents or follows its existing helper-state clobbers. Descriptor bytes must be visible in the caller's mapping and use the valid bank/map values above. Descriptor and return-address arithmetic is binary even when a SYS caller arrives with decimal mode set.
+kernal_gate, call_ram, file_entry and copy_bank_image use this ABI; image copying additionally keeps IRQs masked and restores the original flags. SYS/USR retain their dedicated register/return contracts and normalize bank 0 plus the execution mapping. The small read_ram accessor remains a direct common-RAM byte reader to avoid full dispatch overhead during source scans.
+The migrated bank-2 services implement DATA traversal, READ conversions, RESTORE, DEF FN definition activation, file-operation staging, OPEN/CLOSE/channel selection, INPUT prompting/field acquisition and GET conversion. Shadow source, filenames and definition operands are read through read_ram; writes reach underlying RAM. Shared number/string/stack helpers are reached through RAM_CALL descriptors with bank $ff, map 5. Allocator/collector, expression/control state and hot DEF FN calls remain in RAM. The activation stub consumes the original native return address before dispatch, preserving the compiler's four inline definition operands; it resumes the native skip jump only after restoring the RAM mapping.
+Nonreturning errors enter the existing RAM error/READY path, establish bank 0 and reset the hardware stack. LOAD retains its existing return-to-READY behavior. Normal blocking input leaves IRQs enabled and restores each bank frame after the KERNAL service returns.
+Component	Used / reserved bytes
+High RAM runtime at $E400	5,922 / 7,162
+Common gateway at $0800	593 code + 160 text / 768
+Service entry stubs at $0334	152 code + 52 state / 204
+Bank-2 ROM services	1,282 / bank's remaining ROM
+
+The fixed compiler and runtime reservations remain excluded from the 43,008-byte raw user arena. Source-only containers use format 1; binary metadata uses format 2. These file formats are independent of the runtime ABI. Stored source is authoritative and is recompiled on LOAD; native helper addresses must never be reused with a different firmware image.
+Extension constraints
+Additional banked routines must declare arguments, results, shadow reads, RAM callbacks, errors and hardware-stack use. Keep allocation, collection, active control state and native return addresses in stable RAM. ROM helpers enter common RAM before selecting a different bank. Any change to fixed runtime entry points or numeric representations requires an ABI review and source recompilation.
+Validation
+The test guide covers nested ROM/RAM/KERNAL calls, bank/port/register/flag/stack restoration, IRQ/NMI transitions, startup image copies, shadow-source access, SYS/USR recovery and cartridge parsing. The status record distinguishes deterministic instruction tests, genuine-ROM software checks, VICE smoke checks and outstanding physical-machine validation.
+Integer signedness and arithmetic
+1. Numeric types
+Variable syntax	Type	Range
+A	Signed 16-bit integer	−32768 to 32767
+A%	Unsigned 16-bit integer	0 to 65535
+
+Both integer types use a 16-bit word. Signed values use two’s-complement interpretation.
+For a word w:
+Unsigned value: w.
+Signed value: w when w < 32768, otherwise w - 65536.
+Changing integer signedness preserves the word. It does not perform range checking.
+2. Evaluation and destination conversion are separate
+Evaluate an expression according to its operands and operators. The destination must not influence earlier arithmetic.
+After evaluation, the destination consumes or converts the result:
+Consumer	Treatment of integer result
+Signed integer variable	Preserve the word; interpret as signed
+Unsigned integer variable	Preserve the word; interpret as unsigned
+PRINT	Print according to the expression’s result type
+POKE address argument	Consume the word as an unsigned address
+
+Thus:
+PRINT 20000 + 20000   : REM Prints 40000
+A = 20000 + 20000     : REM A becomes -25536
+A% = 20000 + 20000    : REM A% becomes 40000
+
+PRINT -5 + 4          : REM Prints -1
+A% = -5 + 4           : REM A% becomes 65535
+The arithmetic result is identical regardless of destination. Only its final interpretation changes.
+3. Integer literals
+Constant-only arithmetic
+In expressions containing only integer constants:
+Nonnegative constants, including zero, are unsigned.
+Negative constants are signed.
+Operators follow the normal mixed arithmetic rules.
+Result signedness follows operand types, not the mathematical sign of the answer.
+Examples:
+PRINT 4 - 5          : REM Unsigned 65535
+PRINT -5 + 4         : REM Signed -1
+PRINT 20000 + 20000  : REM Unsigned 40000
+Contextual naked literals
+When directly combined with a typed variable expression, a naked literal adopts that expression’s type if its value is representable in that type.
+Literal value	Permitted interpretation
+0 through 32767	Signed or unsigned, according to context
+32768 through 65535	Unsigned
+−32768 through −1	Signed
+
+Examples:
+N% + 2      : REM 2 adopts unsigned
+N + 2       : REM 2 adopts signed
+N + 40000   : REM 40000 remains unsigned; mixed arithmetic applies
+N% + -2     : REM -2 remains signed; mixed arithmetic applies
+The signed negative constant -32768 must be recognized before independently typing its magnitude 32768.
+4. Context is local to each operation
+Resolve literal context according to the expression tree, respecting precedence and associativity. Later operands must not retroactively change an earlier operation.
+A% / 2 + B
+Evaluate as:
+2 adopts unsigned from A%.
+Perform unsigned division.
+Combine that unsigned result with signed B.
+The addition has a signed result.
+For:
+A% + B + 2
+evaluate as:
+A% + B produces a signed result.
+2 adopts signed from that result.
+Perform signed addition.
+An evaluated constant subexpression has its own type and is no longer an adaptable naked literal:
+N% + (4 - 5)
+Here, 4 - 5 independently produces unsigned 65535.
+Parentheses around a literal alone preserve contextual typing: N% + (2) behaves like N% + 2.
+5. Mixed integer arithmetic
+Use the following type rule for binary integer arithmetic:
+Left operand	Right operand	Operation and result type
+Signed	Signed	Signed
+Unsigned	Unsigned	Unsigned
+Signed	Unsigned	Signed
+Unsigned	Signed	Signed
+
+For mixed operations, reinterpret the unsigned operand’s existing word as signed before performing sign-sensitive arithmetic. No wider intermediate or range check is implied.
+Consequences:
+A% = 40000
+B = 2
+
+PRINT A% / 2    : REM Unsigned division: 20000
+PRINT A% / B    : REM Signed division: -12768
+
+B = -2
+PRINT A% / B    : REM Signed division: 12768
+The last expression does not produce mathematical -20000: signed interpretation changes unsigned 40000 into signed -25536.
+6. Arithmetic width and overflow
+Integer addition, subtraction, and multiplication retain the low 16 bits of the result. Overflow wraps for both signed and unsigned arithmetic.
+The result’s type determines how those bits are subsequently interpreted.
+Implementation may share routines for:
+Signed and unsigned addition.
+Signed and unsigned subtraction.
+Multiplication that returns only the low 16 bits.
+Signedness remains significant for division, ordering comparisons and printing.
+Division must select its signed or unsigned implementation after operand types have been resolved.
+7. Constant folding
+Constant folding, if and where implemented, must reproduce the specified typed, 16-bit evaluation at every operation.
+A folder may use wider host arithmetic internally, but it must:
+Apply the language’s operand interpretations.
+Perform the operation.
+Retain the specified 16-bit result.
+Preserve the operation’s result type.
+It must not infer signedness from the final mathematical value or postpone all wrapping until the end.
+For example:
+PRINT (4 - 5) / 2
+must evaluate as unsigned 65535 / 2, producing 32767. Folding it through mathematical -1 / 2 would change its behavior.
+8. Implementation constraints
+Numeric cells and array elements occupy two bytes. Expression tags are signed 0, string 1 and unsigned $80. These rules apply to both native source-container formats; binary metadata does not change numeric evaluation.
+Representable naked literals beside signed operands can retain their default unsigned tag internally: the mixed signed rule gives exactly the same operand interpretation and result type as adopting signed. This requires no extra runtime provenance and does not allow context to change an already evaluated operation. Positive constants never inherit the assignment destination's type.
+Negative literal prefixes, including -32768 and -(2), produce signed words. Unary minus on computed expressions and declared values preserves their type: -(2+2) is unsigned 65532, whereas -4 is signed -4. Power retains its existing precedence; -2^2 is signed -4, while -(2^2) negates the already evaluated unsigned subexpression and produces unsigned 65532. NOT preserves numeric type; comparisons produce signed -1 or 0. Numeric functions keep their established declared result types (for example, VAL and RND are signed; FRE is unsigned; INT and ABS preserve the argument type).
+Literal power-of-two multiplication uses wrapping left shifts. Signed division uses biased arithmetic right shifts to preserve truncation toward zero; unsigned division uses zero-fill shifts. Literal $8000 is unsigned 32768, interpreted as signed -32768 only in mixed signed division. General constant folding is not implemented; the same per-operation rules constrain the existing strength reductions.
+There is no fixed-point type or remainder operator. Explicit >> uses arithmetic sign fill for both integer types. See the language reference for precedence, count bounds and division behavior.
+Source tokens and program file formats
+Authoritative BASIC source is a compact, byte-counted token stream with a separate full-name dictionary. Native machine code, addresses, values and line anchors are regenerated rather than serialized. The host implementations are tokens.py and container.py. This specification covers both supported container formats; their numbers describe file layouts, not firmware releases.
+All words are unsigned little-endian fields unless stated otherwise. A line has 1–255 token bytes. Payload bytes are data, never recursively decoded; zero is not an end-of-line marker.
+Token code space
+Code	Meaning
+$00–$0F	Punctuation/operators in order: : , ; ( ) + - * / ^ = < > <= >= <>
+$10 DEC8	One value byte, canonical for decimal 16–255
+$11 DEC16	Word value, canonical for decimal 256–65535
+$12 HEX16	Word value, 0–65535; LIST preserves radix as four hex digits
+$13 STRING	Length byte and PETSCII bytes, without quote delimiters; empty is valid
+$14 REMTEXT	Length byte and raw remainder; must follow REM and end the line
+$15 DATA_TEXT	Length byte and unquoted DATA field; empty is valid
+$16 DATA_SPELLING	Length byte and original trimmed numeric DATA spelling
+$17 NUMTEXT	Length byte and unsupported numeric spelling retained for diagnostics/listing
+$18 BADTEXT	Length byte and malformed source retained for repair
+$19 NAME16	Word name ID, canonical for IDs 128–65534
+$1A, $1B	<<, >>
+$1C–$1F	Reserved; invalid
+$20–$6A	Keywords in the table below
+$6B–$6F	Reserved; invalid
+$70–$7F	Decimal magnitude 0–15, value = code minus $70
+$80–$FF	Name ID 0–127, ID = code minus $80
+
+Raw payload lengths are unsigned bytes. NUMTEXT, BADTEXT and DATA_SPELLING require nonzero length. STRING excludes a literal quote byte; runtime quotes can be constructed with CHR$(34). Other raw payload bytes can include NUL and token-valued bytes where their context permits. All prefixes and payload bytes count toward the line budget.
+Decimal leading zeros outside DATA disappear. Signs remain separate operator tokens. Oversized/malformed numbers are retained as diagnostic forms rather than wrapped into valid literals. An accepted end-of-line unterminated string becomes a STRING whose closing quote is supplied by LIST.
+DATA_TEXT is valid only inside DATA and cannot contain quotes, commas, colons or line endings. Numeric fields use optional sign plus a binary magnitude, optionally followed by DATA_SPELLING when the trimmed input differs from canonical expansion. Its sign, radix and magnitude must agree with the encoded field. Thus DATA 001 can yield "001" when READ into a string without storing numeric text for ordinary arithmetic. NUMTEXT allows unsupported numeric fields to remain text-readable. A colon outside a payload ends DATA. REM must be followed by exactly one REMTEXT containing the rest of the physical line.
+Keyword assignments
+Keyword spellings are exact whole-identifier matches. TAB( and SPC( include their opening parenthesis in the keyword code; other functions use a separate $03. Floating-point functions and π have reserved spellings/codes but are unsupported when evaluated. BASIC, SPRDEF and QUIT are command/editor entry words, outside this stored-token vocabulary.
+Code	Keyword	Code	Keyword
+$20	END	$46	FN
+$21	FOR	$47	SPC(
+$22	NEXT	$48	THEN
+$23	DATA	$49	NOT
+$24	INPUT#	$4A	STEP
+$25	INPUT	$4B	AND
+$26	DIM	$4C	OR
+$27	READ	$4D	SGN
+$28	LET	$4E	INT
+$29	GOTO	$4F	ABS
+$2A	RUN	$50	USR
+$2B	IF	$51	FRE
+$2C	RESTORE	$52	POS
+$2D	GOSUB	$53	SQR
+$2E	RETURN	$54	RND
+$2F	REM	$55	LOG
+$30	STOP	$56	EXP
+$31	ON	$57	COS
+$32	WAIT	$58	SIN
+$33	LOAD	$59	TAN
+$34	SAVE	$5A	ATN
+$35	VERIFY	$5B	PEEK
+$36	DEF	$5C	LEN
+$37	POKE	$5D	STR$
+$38	PRINT#	$5E	VAL
+$39	PRINT	$5F	ASC
+$3A	CONT	$60	CHR$
+$3B	LIST	$61	LEFT$
+$3C	CLR	$62	RIGHT$
+$3D	CMD	$63	MID$
+$3E	SYS	$64	ST
+$3F	OPEN	$65	TI
+$40	CLOSE	$66	TI$
+$41	GET	$67	π
+$42	GET#	$68	ELSE
+$43	NEW	$69	CLEAN
+$44	TAB(	$6A	RESERVE
+$45	TO
+
+Name dictionary
+Names are unique uppercase spellings of 1–255 bytes: letter, letters/digits, optional final % or $. Reject exact keywords and special variables, duplicates and ID $FFFF. The dictionary count is a word, with IDs 0–65534. Scalars, arrays and functions resolve their separate bindings from spelling IDs; A and A() can share a spelling ID while having different storage.
+SAVE exports only referenced names, remapped densely in ascending original-ID order. An export ID cannot exceed its original ID, so remapping cannot widen a valid line beyond 255 bytes. LOAD constructs a fresh dictionary before compiling source; no pointers arrive from the file.
+Native container common structure
+The magic is eight bytes 41 42 36 34 53 52 43 00, or ASCII AB64SRC followed by zero. It is followed by a format byte (1 or 2) and flags byte (zero). Neither format has a C64 load-address prefix.
+Shared source section	Encoding
+Name count	Word N
+Dictionary	N records: length byte, then uppercase name bytes
+Lines	Strictly increasing line number word 0–63999, token-length byte T, then exactly T token bytes
+End of source	Word $FFFF, without length or tokens
+
+Format 1: source only
+The complete file is magic, format/flags 1,0, shared source section, and CRC word. The empty file has zero names, no line records and the end marker. EOF must immediately follow the CRC.
+Format 2: source with binary metadata
+The complete file is magic, format/flags 2,0, reservation section, shared source section, blob section, and CRC word. Descriptors come before compilation so incoming binary pages are protected before source allocation.
+Reservation section	Encoding
+Count	Byte, 0–8
+Each descriptor	Start word, size word, BASIC-owner flag byte (0 or 1)
+
+Ranges must be nonempty, nonoverlapping, entirely inside one user-arena span, and within the 16-bit address space. BASIC-owned reservations require page-aligned start and size. Manual reservations may be byte granular; their containing pages are allocator exclusions.
+Blob section	Encoding
+Count	Byte, 0–16
+Each descriptor	Reservation index byte, start word, size word, type/mode byte, two packed palette bytes
+Each payload	Exactly size raw bytes immediately after its descriptor
+
+Type/mode low bits are 0=BIN, 1=SPR, 2=ASM, with bit 7 marking multicolor. Other bits are invalid. Multicolor is valid only for SPR; a sprite has exactly 64 bytes. Each blob must fit its reservation and not overlap another blob. In the first palette byte, the low nibble is background and high nibble is sprite color; the second stores common colors 1 and 2 in low/high nibbles. Each color is 0–15. Unassigned reservation bytes are excluded from the file.
+CRC and validation
+Both formats finish with CRC-16/CCITT-FALSE over every preceding file byte, including the source end marker and any binary sections. Parameters: polynomial $1021, initial $FFFF, no reflection, final XOR zero; CRC is low byte first. Reject trailing bytes.
+Validate magic/flags/version, dictionary identity, sorted line records, bounded payload lengths, minimal decimal/name encodings, ID references, raw-token context, DATA spelling equality, binary metadata bounds and CRC. Structural validity is separate from language syntax: a safe source stream may compile to a reached syntax/unsupported-feature trap.
+The host validator implements the complete canonical token checks. The target loader does not yet enforce every DATA_SPELLING equality/context check; see implementation gaps. Target VERIFY compares canonical serialization of the current program with file bytes rather than canonicalizing an arbitrary file's dictionary. Host verification canonicalizes both inputs.
+Staged loading and transport
+Source transport uses bounded sequential KERNAL channels, never an unrestricted KERNAL LOAD into the arena. LOAD builds and compiles a second graph, publishes only after validation, and returns to READY. Source/allocation/CRC failure retains the old graph. Temporary space for both graphs is required. Successfully processed RESERVE declarations can remain protected after a failed import.
+Format 2 validates the complete file before reopening it to restore blob bytes in a second streaming pass. Keep the file unchanged and available until completion. A second-pass I/O failure can change some already restored bytes; there is no blob-sized rollback buffer. SAVE checks OPEN/output/CLOSE transport status and final DOS status before reporting success, and releases temporary export storage on error.
+Stock BASIC PRG import
+LOAD also detects the little-endian PRG address $0801 and converts stock BASIC V2 linked lines into native source. It verifies physical next links, increasing valid line numbers, terminators, token codes and the final zero link. Malformed, oversized/truncated files and appended machine-code payloads are rejected without replacing the old source.
+Stock tokens and GO TO become native spellings before tokenization. Strings and REM/DATA preserve raw PETSCII. The converter preserves stock two-character variable identity, including ignored spaces; stock signed % names become signed names prefixed PRGINT because native % means unsigned. Floating-point source remains subject to the integer language contract. SAVE writes native containers, not PRGs. User-facing conversion rules are in PRG import.
+Editor design
+The source editor and binary/sprite editor guides define user interaction. This document defines shared state and persistence constraints; implementation workspaces and ROM checks are recorded in editor implementation.
+Source editor
+The screen has 20 listing rows, one status row and four draft/output rows. Selected-line and viewport bookmarks are numeric line numbers, resolved against the current graph after edits, NEW, LOAD or CLEAN. No bookmark retains a freed source pointer. Wrapped source aligns after its line-number column, and off-screen jumps include preceding source context when it fits.
+Only line-number cells are highlighted. A cached row map supports selection changes without detokenizing source. Scrolling shifts overlapping character rows and formats exposed rows, including clipped continuations; listing color RAM stays in place. Source generations invalidate cached anchors. Refresh compares screen codes, and commands without source mutations skip listing refresh. Help saves/restores characters instead of regenerating source.
+The four-row pane is both a draft editor and bounded direct-output/keyboard-INPUT surface. Wrapped rows form logical lines, and earlier visible commands can be revisited. A failed submission retains its draft and returns the cursor to the logical command start. Successful numbered submissions update selection and clear the draft. A canonical line longer than 160 bytes is rejected for copying, never truncated into a replacement.
+Insert/overwrite policy and literal-control entry are independent state. F3 line navigation, help and F5 binary editing preserve the draft, cursor, focus and INPUT state. Runtime control frames and the command backup must remain intact. Closing restores KERNAL input/output hooks; file/device channels retain KERNAL routing.
+Reservations and blobs
+The binary editor has eight logical reservation slots and sixteen blob slots. BASIC RESERVE declarations have locked bounds; manual reservations have byte-granular bounds inside an allocator span. All containing pages are protected before publication. Existing live allocations and firmware ranges cannot be claimed.
+A blob has reservation ownership, start, size and type BIN/SPR/ASM. Bounds must remain inside its reservation and must not overlap another blob. SPR is exactly 64 bytes: 63 pixel bytes and an independently editable unused byte. ASM is a label displayed through the hex editor; no assembler is implemented.
+Bounds/type/palette changes reinterpret existing bytes. They do not initialize, copy or relocate content. Initialization requires an explicit action. Deleting/moving metadata retains page exclusions until NEW; surviving logical reservations can reuse protected pages. SAVE/NEW/LOAD consolidates page claims to surviving reservations. CLEAN and collection preserve metadata and protected bytes.
+Rendering and hardware state
+Binary scenes compose one row at a time and compare against character/color RAM. Navigation and prompts write only changed cells. Hex views show eight bounded bytes per row and never read a word beyond the blob's final byte. Sprite pixels use character cells, with one cell per hires pixel or two per multicolor pixel.
+Hardware sprites supply 1X/2X previews and two complementary hatched hires cursor sprites. The sprite's background fills the preview panel. Each sprite retains its own background, sprite and two common colors plus its hires/multicolor mode. Painting updates the corresponding data byte and previews. Toggling mode does not transform pixel bytes. VIC registers and sprite pointers are restored on exit.
+Persistence
+Raw BIN exchange is a sequential stream of exactly the selected reservation/blob bytes, with no load address, length prefix or metadata. A short load leaves the remainder unchanged; a long load stops at the extent boundary.
+Native program files save logical reservations, ownership, blob bounds/types, palettes and exact blob bytes. Unassigned bytes inside reservations are excluded. Reservation descriptors precede source compilation so allocations cannot consume incoming binary pages. LOAD validates source/metadata/data before a second streaming pass restores bytes, avoiding a blob-sized staging buffer. Validation failure preserves old state; second-pass device failure can leave already restored bytes changed. See source format for binary layouts and checks.
+Measured linked build
+Build property	Measured value
+ROM bytes	65,536
+ROM SHA-256	6131801405cc5197ca3d2cd09d24c19869941a1fe4e081b61f9785a642c854f4
+Cartridge type	19
+Cartridge format	classic Magic Desk
+Bank bytes	8,192
+Bank register	$DE00 (56,832)
+Runtime ABI	7
+Runtime run address	$E400 (58,368)
+Runtime used bytes	5,922
+Runtime ROM bytes	5,922
+Runtime image encoding	raw
+Runtime budget bytes	7,162
+Gateway used bytes	593
+Gateway budget bytes	768
+Workspace bytes	3,072
+Gateway code budget bytes	608
+Service gateway run address	$0334 (820)
+Service gateway used bytes	152
+Service gateway budget bytes	204
+Service gateway code budget bytes	152
+Editor bank	3
+Editor ROM bytes	7,281
+Editor text workspace	[$0A60, $0B00) (exclusive end)
+Editor state workspace	[$03CC, $0400) (exclusive end)
+Editor view workspace	[$0F80, $0FE0) (exclusive end)
+Editor help tail workspace	[$0FE0, $1000) (exclusive end)
+Binary editor bank	4
+Binary editor ROM bytes	7,457
+Binary storage bank	5
+Binary storage ROM bytes	3,408
+Binary metadata workspaces	[$0200, $0259); [$02A7, $0300) (exclusive ends)
+Source versions	1, 2
+Services bank	2
+Services ROM address	$972B (38,699)
+Services ROM bytes	1,282
+Arena raw bytes	43,008
+Compiler run address	$1400 (5,120)
+Compiler used bytes	5,747
+Compiler ROM bytes	5,747
+Compiler image encoding	raw
+Compiler budget bytes	6,144
+ROM used bytes	39,221
+ROM spare bytes	26,315
+
+User arena spans
+Start	Exclusive end	Raw bytes
+$2C00	$D000	41,984
+$E000	$E400	1,024
+
+Cartridge bank allocation
+Each bank uses the CPU window [$8000, $A000), with an exclusive upper bound. ROM offsets below are byte offsets.
+Bank	ROM offset	Contents	Used bytes	Spare bytes	Reserved
+0	0	boot, command editor, tokenizer, LIST and source transport	8,061	131	No
+1	8,192	raw resident compiler image	5,756	2,436	No
+2	16,384	raw RAM execution runtime image and banked ROM services	7,213	979	No
+3	24,576	split screen editor and stock BASIC PRG import; PRG export reserved	7,290	902	No
+4	32,768	binary, reservation and sprite editor	7,466	726	No
+5	40,960	binary metadata, memory reservation and source persistence	3,417	4,775	No
+6	49,152	reserved: numeric tables, fonts and optional resources	9	8,183	Yes
+7	57,344	reserved: expansion and diagnostics	9	8,183	Yes
+
+Linked segment sizes
+Segment	Bytes
+HEADER	9
+COMMAND	7,307
+GATEWAY	593
+COMPILER	5,747
+RUNTIME	5,922
+SERVICES	1,282
+SERVICE_GATEWAY	152
+SCREEN_EDITOR	7,281
+BINARY_STORAGE	3,408
+BINARY_EDITOR	7,457
+HEADER1	9
+HEADER2	9
+HEADER3	9
+HEADER4	9
+HEADER5	9
+HEADER6	9
+HEADER7	9
